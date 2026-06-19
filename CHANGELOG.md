@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.7 - 2026-06-19
+
+- Fixed broken in-app preview images by loading generated PNG files through an Electron IPC data URL instead of a `file://` URL.
+- Added a visible preview loading error message if the generated image cannot be read.
+
 ## v0.3.6 - 2026-06-19
 
 - Stopped generated GMT preview/export scripts from using `gmt end show`, so macOS Preview no longer opens automatically.

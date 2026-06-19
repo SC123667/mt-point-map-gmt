@@ -223,7 +223,7 @@ async function exportMap(formats, showAlert) {
   el.outputPath.textContent = `输出目录：${result.outputDirectory}`;
   if (formats.includes("png")) {
     const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
-    if (png) renderPreview(png);
+    if (png) await renderPreview(png);
   }
   if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
 }
@@ -243,9 +243,13 @@ function renderStationRows() {
   }
 }
 
-function renderPreview(filePath) {
-  const url = `file://${encodeURI(filePath.replace(/\\/g, "/"))}?t=${Date.now()}`;
-  el.previewBox.innerHTML = `<img src="${url}" alt="GMT 点位图预览" />`;
+async function renderPreview(filePath) {
+  try {
+    const url = await window.mtApp.imageDataUrl(filePath);
+    el.previewBox.innerHTML = `<img src="${url}" alt="GMT 点位图预览" />`;
+  } catch (error) {
+    el.previewBox.innerHTML = `<span>预览图读取失败：${escapeHTML(error.message || String(error))}</span>`;
+  }
 }
 
 function renderPlaceholder() {

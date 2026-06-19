@@ -111,6 +111,14 @@ ipcMain.handle("gmt:export", (_event, payload) => {
   return runGMT(script, outputDirectory, payload.config.outputName || "mt_point_map", formats);
 });
 
+ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) throw new Error(`预览图片不存在：${filePath || ""}`);
+  const extension = path.extname(filePath).toLowerCase();
+  const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : "image/png";
+  const data = fs.readFileSync(filePath).toString("base64");
+  return `data:${mime};base64,${data}`;
+});
+
 ipcMain.handle("gmt:install", (event) => startInstallerDownload(event.sender));
 ipcMain.handle("gmt:downloadPause", () => {
   if (!currentInstallerDownload) return { ok: false, message: "当前没有正在下载的 GMT 安装包。" };
@@ -171,6 +179,7 @@ function loadRenderer(win) {
       buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),
       saveScript: (payload) => ipcRenderer.invoke("gmt:saveScript", payload),
       exportMap: (payload) => ipcRenderer.invoke("gmt:export", payload),
+      imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
       pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),
       resumeGMTDownload: () => ipcRenderer.invoke("gmt:downloadResume"),
