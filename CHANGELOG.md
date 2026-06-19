@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.0 - 2026-06-20
+
+- Added an optional GMT earth-relief terrain basemap workflow with selectable 30s, 15s, 03s, and 01s resolutions.
+- Added estimated local terrain working-file size before download/preparation so large resolutions are easier to avoid.
+- Added terrain preparation progress, pause, resume, cancel, local terrain deletion, GMT earth data cache cleanup, and a remote-data documentation link.
+- Added deletion for the current exported map files from inside the app.
+
 ## v0.3.9 - 2026-06-20
 
 - Replaced manual color text boxes with preset color dropdowns plus native color pickers for point fill, point border, and station label text.

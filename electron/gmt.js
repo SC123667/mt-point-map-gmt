@@ -1,10 +1,21 @@
 const fs = require("fs");
+const crypto = require("crypto");
 const https = require("https");
 const path = require("path");
 const { execFileSync, spawn, spawnSync } = require("child_process");
 
 const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
+const TERRAIN_RESOLUTIONS = {
+  "20m": { seconds: 1200, remote: "@earth_relief_20m", label: "20 分，约 37 km" },
+  "10m": { seconds: 600, remote: "@earth_relief_10m", label: "10 分，约 18 km" },
+  "06m": { seconds: 360, remote: "@earth_relief_06m", label: "6 分，约 10 km" },
+  "01m": { seconds: 60, remote: "@earth_relief_01m", label: "1 分，约 1.9 km" },
+  "30s": { seconds: 30, remote: "@earth_relief_30s", label: "30 秒，约 900 m" },
+  "15s": { seconds: 15, remote: "@earth_relief_15s", label: "15 秒，约 450 m" },
+  "03s": { seconds: 3, remote: "@earth_relief_03s", label: "3 秒，约 90 m" },
+  "01s": { seconds: 1, remote: "@earth_relief_01s", label: "1 秒，约 30 m" }
+};
 
 function gmtAvailable() {
   return resolveGMT().available;
@@ -295,6 +306,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const shell = process.platform === "win32" ? "bat" : "sh";
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell);
+  const terrain = terrainScriptParts(config, region, outputDirectory, shell);
   if (shell === "bat") {
     return [
       "@echo off",
@@ -302,8 +314,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       ...environmentLines,
       `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
       "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
+      ...terrain.preCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-      `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+      terrain.imageCommand || `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
       `gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
       config.showLabels ? `gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
       config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
@@ -319,8 +332,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     "",
     `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
     "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
+    ...terrain.preCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-    `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+    terrain.imageCommand || `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
     `  gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
     config.showLabels ? `  gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
     config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
@@ -328,6 +342,28 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     "gmt end",
     ""
   ].filter(Boolean).join("\n");
+}
+
+function terrainScriptParts(config, region, outputDirectory, shell) {
+  if (!config.showTerrain) return { preCommands: [], imageCommand: "" };
+  const paths = terrainPaths(outputDirectory, config, region);
+  const grid = config.terrainGridPath && fs.existsSync(config.terrainGridPath) ? config.terrainGridPath : paths.gridPath;
+  const shade = config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
+  const remote = terrainRemoteName(config.terrainResolution);
+  const intensity = terrainIntensity(config.terrainIntensity);
+  const cpt = terrainCpt(config.terrainCpt);
+  const prefix = shell === "bat" ? "" : "  ";
+  const preCommands = [];
+  preCommands.push(`${prefix}gmt set GMT_DATA_SERVER oceania`);
+  preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
+  if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
+    preCommands.push(`${prefix}gmt grdcut ${remote} -R${region} -G${quote(grid)} -V`);
+    preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
+  }
+  return {
+    preCommands,
+    imageCommand: `${prefix}gmt grdimage ${quote(grid)} -R${region} -J${config.projection} -I${quote(shade)} -C${cpt}`
+  };
 }
 
 function saveScript(script, outputDirectory, outputName = "mt_point_map") {
@@ -390,6 +426,84 @@ function parseRegion(region) {
   };
 }
 
+function terrainRemoteName(resolution) {
+  return (TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"]).remote;
+}
+
+function terrainResolutionSeconds(resolution) {
+  return (TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"]).seconds;
+}
+
+function terrainCpt(value) {
+  return /^[A-Za-z0-9_+\-./]+$/.test(String(value || "")) ? String(value) : "geo";
+}
+
+function terrainIntensity(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0.65;
+  return Math.max(0.1, Math.min(1.5, numeric));
+}
+
+function terrainEstimate(region, resolution) {
+  const parsed = parseRegion(region);
+  const seconds = terrainResolutionSeconds(resolution);
+  if (!parsed || parsed.east <= parsed.west || parsed.north <= parsed.south) {
+    return {
+      cells: 0,
+      gridBytes: 0,
+      workingBytes: 0,
+      label: "请先导入点位或设置有效范围"
+    };
+  }
+  const xCells = Math.max(2, Math.ceil((parsed.east - parsed.west) * 3600 / seconds));
+  const yCells = Math.max(2, Math.ceil((parsed.north - parsed.south) * 3600 / seconds));
+  const cells = xCells * yCells;
+  const gridBytes = cells * 2;
+  const workingBytes = gridBytes * 2;
+  return {
+    cells,
+    gridBytes,
+    workingBytes,
+    label: `${formatBytes(workingBytes)} 本地工作文件，GMT 实际下载量取决于分块缓存`
+  };
+}
+
+function terrainPaths(outputDirectory, config, region = config.region) {
+  const resolution = config.terrainResolution || "06m";
+  const key = terrainKey(outputDirectory, config, region);
+  const directory = path.join(outputDirectory, "terrain_cache");
+  return {
+    key,
+    directory,
+    gridPath: path.join(directory, `earth_relief_${resolution}_${key}.nc`),
+    shadePath: path.join(directory, `earth_relief_${resolution}_${key}_shade.nc`)
+  };
+}
+
+function terrainKey(outputDirectory, config, region = config.region) {
+  return crypto
+    .createHash("sha1")
+    .update([
+      path.resolve(outputDirectory || "."),
+      String(region || ""),
+      String(config.terrainResolution || "06m"),
+      String(config.terrainIntensity || "0.65")
+    ].join("|"))
+    .digest("hex")
+    .slice(0, 12);
+}
+
+function formatBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Math.max(0, Number(bytes) || 0);
+  let index = 0;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
 function scaleForRegion(region) {
   if (!region) return { length: "1k", label: "km" };
   const midLat = (region.south + region.north) / 2;
@@ -448,7 +562,12 @@ module.exports = {
   defaultOutputDirectory,
   autoRegion,
   buildScript,
+  formatBytes,
   saveScript,
   runGMT,
+  terrainEstimate,
+  terrainPaths,
+  terrainRemoteName,
+  terrainIntensity,
   needsNativeTextRendering
 };

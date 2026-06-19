@@ -1,6 +1,7 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const { spawn, spawnSync } = require("child_process");
 const { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } = require("electron");
 const { parseStationText, buildRecords } = require("./parser");
 const {
@@ -13,11 +14,16 @@ const {
   openDownloadedInstaller,
   resolveGMT,
   runGMT,
-  saveScript
+  saveScript,
+  terrainEstimate,
+  terrainIntensity,
+  terrainPaths,
+  terrainRemoteName
 } = require("./gmt");
 
 const APP_TITLE = "MT点位图制作工具—GMT";
 let currentInstallerDownload = null;
+let currentTerrainTask = null;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -133,6 +139,45 @@ ipcMain.handle("output:chooseDirectory", async (_event, currentDirectory) => {
   saveOutputDirectory(result.filePaths[0]);
   return result.filePaths[0];
 });
+
+ipcMain.handle("output:deleteCurrent", (_event, payload) => {
+  const outputDirectory = outputDirectoryFromPayload(payload);
+  const outputName = String(payload?.outputName || "mt_point_map").trim() || "mt_point_map";
+  return deleteCurrentOutputs(outputDirectory, outputName);
+});
+
+ipcMain.handle("terrain:estimate", (_event, payload) => {
+  const outputDirectory = outputDirectoryFromPayload(payload);
+  const config = normalizeTerrainConfig(payload);
+  return {
+    ...terrainEstimate(config.region, config.terrainResolution),
+    ...terrainPaths(outputDirectory, config)
+  };
+});
+
+ipcMain.handle("terrain:prepare", (event, payload) => startTerrainTask(event.sender, payload));
+ipcMain.handle("terrain:pause", () => {
+  if (!currentTerrainTask) return { ok: false, message: "当前没有正在准备的地形底图。" };
+  currentTerrainTask.pause();
+  return { ok: true };
+});
+ipcMain.handle("terrain:resume", () => {
+  if (!currentTerrainTask) return { ok: false, message: "当前没有可继续的地形底图任务。" };
+  currentTerrainTask.resume();
+  return { ok: true };
+});
+ipcMain.handle("terrain:cancel", () => {
+  if (!currentTerrainTask) return { ok: false, message: "当前没有可取消的地形底图任务。" };
+  currentTerrainTask.cancel();
+  return { ok: true };
+});
+ipcMain.handle("terrain:deleteLocal", (_event, payload) => {
+  const outputDirectory = outputDirectoryFromPayload(payload);
+  const directory = path.join(outputDirectory, "terrain_cache");
+  fs.rmSync(directory, { recursive: true, force: true });
+  return { ok: true, message: `已删除本地地形底图：${directory}`, directory };
+});
+ipcMain.handle("terrain:clearCache", () => clearTerrainCache());
 
 ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
   if (!filePath || !fs.existsSync(filePath)) throw new Error(`预览图片不存在：${filePath || ""}`);
@@ -350,6 +395,15 @@ function loadRenderer(win) {
       saveScript: (payload) => ipcRenderer.invoke("gmt:saveScript", payload),
       exportMap: (payload) => ipcRenderer.invoke("gmt:export", payload),
       chooseOutputDirectory: (currentDirectory) => ipcRenderer.invoke("output:chooseDirectory", currentDirectory),
+      deleteCurrentOutputs: (payload) => ipcRenderer.invoke("output:deleteCurrent", payload),
+      estimateTerrain: (payload) => ipcRenderer.invoke("terrain:estimate", payload),
+      prepareTerrain: (payload) => ipcRenderer.invoke("terrain:prepare", payload),
+      pauseTerrain: () => ipcRenderer.invoke("terrain:pause"),
+      resumeTerrain: () => ipcRenderer.invoke("terrain:resume"),
+      cancelTerrain: () => ipcRenderer.invoke("terrain:cancel"),
+      deleteLocalTerrain: (payload) => ipcRenderer.invoke("terrain:deleteLocal", payload),
+      clearTerrainCache: () => ipcRenderer.invoke("terrain:clearCache"),
+      onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
       imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
       pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),
@@ -369,6 +423,84 @@ function loadRenderer(win) {
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);
   win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
+function normalizeTerrainConfig(payload) {
+  const config = { ...(payload?.config || {}) };
+  if (!String(config.region || "").trim() && Array.isArray(payload?.records) && payload.records.length) {
+    config.region = autoRegion(payload.records);
+  }
+  config.terrainResolution = config.terrainResolution || "06m";
+  config.terrainIntensity = terrainIntensity(config.terrainIntensity);
+  return config;
+}
+
+function deleteCurrentOutputs(outputDirectory, outputName) {
+  const extensions = process.platform === "win32" ? ["png", "pdf", "bat"] : ["png", "pdf", "gmt"];
+  const candidates = [
+    ...extensions.map((extension) => path.join(outputDirectory, `${outputName}.${extension}`)),
+    path.join(outputDirectory, "stations_points.tsv"),
+    path.join(outputDirectory, "stations_labels.tsv")
+  ];
+  const deleted = [];
+  for (const filePath of candidates) {
+    if (!fs.existsSync(filePath)) continue;
+    fs.rmSync(filePath, { force: true });
+    deleted.push(filePath);
+  }
+  return {
+    ok: true,
+    deleted,
+    message: deleted.length ? `已删除 ${deleted.length} 个当前图件文件。` : "没有找到可删除的当前图件文件。"
+  };
+}
+
+function startTerrainTask(webContents, payload) {
+  const outputDirectory = outputDirectoryFromPayload(payload);
+  saveOutputDirectory(outputDirectory);
+  const config = normalizeTerrainConfig(payload);
+  const gmtInfo = resolveGMT();
+  if (!gmtInfo.available) {
+    return { ok: false, message: "未找到 GMT，无法下载或准备地形底图。", status: null };
+  }
+  if (currentTerrainTask && !currentTerrainTask.done) {
+    return { ok: true, message: "地形底图任务正在进行。", status: currentTerrainTask.statusPayload() };
+  }
+  currentTerrainTask = new TerrainPrepareTask({
+    gmtInfo,
+    outputDirectory,
+    config,
+    webContents,
+    onDone: () => {
+      currentTerrainTask = null;
+    }
+  });
+  currentTerrainTask.start();
+  return { ok: true, message: "开始准备地形底图。", status: currentTerrainTask.statusPayload() };
+}
+
+function clearTerrainCache() {
+  const gmtInfo = resolveGMT();
+  if (!gmtInfo.available) return { ok: false, message: "未找到 GMT，无法清理地形缓存。" };
+  const result = spawnSync(gmtInfo.path, ["clear", "data=earth"], {
+    cwd: savedOutputDirectory(),
+    encoding: "utf8",
+    env: gmtChildEnv(gmtInfo)
+  });
+  if (result.status !== 0) {
+    return { ok: false, message: result.stderr || result.stdout || "GMT 地形缓存清理失败。" };
+  }
+  return { ok: true, message: result.stderr || result.stdout || "已清理 GMT 地形数据缓存。" };
+}
+
+function gmtChildEnv(gmtInfo) {
+  const env = {
+    ...process.env,
+    PATH: `${gmtInfo.binDir}${path.delimiter}${process.env.PATH || ""}`,
+    GMT_DATA_SERVER: process.env.GMT_DATA_SERVER || "oceania"
+  };
+  if (gmtInfo.gsLib) env.GS_LIB = gmtInfo.gsLib;
+  return env;
 }
 
 function startInstallerDownload(webContents) {
@@ -392,6 +524,231 @@ function startInstallerDownload(webContents) {
   });
   currentInstallerDownload.start();
   return { ok: true, message: `开始下载：${plan.download.fileName}`, status: currentInstallerDownload.statusPayload() };
+}
+
+class TerrainPrepareTask {
+  constructor({ gmtInfo, outputDirectory, config, webContents, onDone }) {
+    this.gmtInfo = gmtInfo;
+    this.outputDirectory = outputDirectory;
+    this.config = config;
+    this.webContents = webContents;
+    this.onDone = onDone;
+    this.paths = terrainPaths(outputDirectory, config);
+    this.estimate = terrainEstimate(config.region, config.terrainResolution);
+    this.child = null;
+    this.currentStep = "starting";
+    this.state = "starting";
+    this.message = "准备地形底图任务...";
+    this.percent = 0;
+    this.startedAt = Date.now();
+    this.done = false;
+    this.cancelled = false;
+    this.pausing = false;
+    this.pausedBySignal = false;
+    this.lastOutput = "";
+    this.lastEmitAt = 0;
+  }
+
+  start() {
+    fs.mkdirSync(this.paths.directory, { recursive: true });
+    if (fs.existsSync(this.paths.gridPath) && fs.existsSync(this.paths.shadePath)) {
+      this.state = "completed";
+      this.message = "地形底图已存在，可直接绘图。";
+      this.percent = 100;
+      this.done = true;
+      this.emit();
+      this.finishSoon();
+      return;
+    }
+    this.runSetDownloadMode();
+  }
+
+  runSetDownloadMode() {
+    this.runGMTStep({
+      step: "offline",
+      args: ["set", "GMT_DATA_UPDATE_INTERVAL", this.config.terrainAllowDownload ? "1d" : "off"],
+      message: this.config.terrainAllowDownload ? "已允许 GMT 联网获取缺失地形数据。" : "已关闭 GMT 在线下载，只使用本地缓存。",
+      basePercent: 5,
+      next: () => this.runCut()
+    });
+  }
+
+  runCut() {
+    this.runGMTStep({
+      step: "cut",
+      args: ["grdcut", terrainRemoteName(this.config.terrainResolution), `-R${this.config.region}`, `-G${this.paths.gridPath}`, "-V"],
+      message: `正在获取并裁剪 ${terrainRemoteName(this.config.terrainResolution)}...`,
+      basePercent: 12,
+      next: () => this.runGradient()
+    });
+  }
+
+  runGradient() {
+    this.runGMTStep({
+      step: "gradient",
+      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.paths.shadePath}`],
+      message: "正在生成地形阴影...",
+      basePercent: 80,
+      next: () => this.complete()
+    });
+  }
+
+  runGMTStep({ step, args, message, basePercent, next }) {
+    this.currentStep = step;
+    this.state = "running";
+    this.message = message;
+    this.percent = Math.max(this.percent, basePercent);
+    this.pausing = false;
+    this.pausedBySignal = false;
+    this.emit();
+    this.child = spawn(this.gmtInfo.path, args, {
+      cwd: this.outputDirectory,
+      encoding: "utf8",
+      env: gmtChildEnv(this.gmtInfo)
+    });
+    const onData = (chunk) => {
+      this.lastOutput = String(chunk).trim() || this.lastOutput;
+      this.message = this.lastOutput || message;
+      if (step === "cut") this.percent = Math.min(75, this.percent + 1.8);
+      if (step === "gradient") this.percent = Math.min(96, this.percent + 3);
+      this.emitThrottled();
+    };
+    this.child.stdout.on("data", onData);
+    this.child.stderr.on("data", onData);
+    this.child.on("error", (error) => {
+      if (!this.done && !this.pausing) this.fail(error.message || String(error));
+    });
+    this.child.on("close", (code, signal) => {
+      this.child = null;
+      if (this.cancelled || this.done) return;
+      if (this.pausing) {
+        this.state = "paused";
+        this.message = "地形底图任务已暂停，继续后会复用已缓存数据重新准备。";
+        this.emit();
+        return;
+      }
+      if (code === 0) {
+        if (step === "cut" && !fs.existsSync(this.paths.gridPath)) {
+          this.fail("GMT 没有生成地形网格文件。请尝试更低分辨率，或检查 GMT 数据服务器/GDAL OpenJPEG 支持。");
+          return;
+        }
+        if (step === "gradient" && !fs.existsSync(this.paths.shadePath)) {
+          this.fail("GMT 没有生成地形阴影文件。请尝试更低分辨率或重新准备底图。");
+          return;
+        }
+        next();
+      } else {
+        this.fail(this.lastOutput || `GMT ${step} 执行失败：${signal || code}`);
+      }
+    });
+  }
+
+  pause() {
+    if (this.done || this.state !== "running") return;
+    if (this.child && process.platform !== "win32") {
+      this.child.kill("SIGSTOP");
+      this.state = "paused";
+      this.pausedBySignal = true;
+      this.message = "地形底图任务已暂停。";
+      this.emit();
+      return;
+    }
+    this.pausing = true;
+    if (this.child) this.child.kill();
+    this.state = "paused";
+    this.message = "地形底图任务已暂停，继续后会重新启动当前步骤。";
+    this.emit();
+  }
+
+  resume() {
+    if (this.done || this.state !== "paused") return;
+    if (this.child && this.pausedBySignal && process.platform !== "win32") {
+      this.child.kill("SIGCONT");
+      this.state = "running";
+      this.pausedBySignal = false;
+      this.message = "继续准备地形底图...";
+      this.emit();
+      return;
+    }
+    this.message = "继续准备地形底图...";
+    if (this.currentStep === "gradient" && fs.existsSync(this.paths.gridPath)) {
+      this.runGradient();
+    } else if (this.currentStep === "offline") {
+      this.runSetDownloadMode();
+    } else {
+      this.runCut();
+    }
+  }
+
+  cancel() {
+    if (this.done) return;
+    this.cancelled = true;
+    this.done = true;
+    this.state = "cancelled";
+    this.message = "地形底图任务已取消。";
+    if (this.child) this.child.kill();
+    fs.rmSync(this.paths.gridPath, { force: true });
+    fs.rmSync(this.paths.shadePath, { force: true });
+    this.emit();
+    this.finishSoon();
+  }
+
+  complete() {
+    this.state = "completed";
+    this.message = "地形底图准备完成。";
+    this.percent = 100;
+    this.done = true;
+    this.emit();
+    this.finishSoon();
+  }
+
+  fail(message) {
+    if (this.done) return;
+    this.state = "failed";
+    this.message = `地形底图准备失败：${message}`;
+    this.done = true;
+    this.emit();
+    this.finishSoon();
+  }
+
+  statusPayload() {
+    const elapsedSeconds = Math.max((Date.now() - this.startedAt) / 1000, 0.1);
+    const total = this.estimate.workingBytes || 0;
+    const downloaded = total ? Math.round(total * (this.percent / 100)) : 0;
+    return {
+      state: this.state,
+      message: this.message,
+      step: this.currentStep,
+      key: this.paths.key,
+      gridPath: this.paths.gridPath,
+      shadePath: this.paths.shadePath,
+      directory: this.paths.directory,
+      estimatedBytes: total,
+      downloaded,
+      total,
+      percent: this.percent,
+      speed: downloaded / elapsedSeconds,
+      resolution: this.config.terrainResolution,
+      region: this.config.region
+    };
+  }
+
+  emit() {
+    if (!this.webContents || this.webContents.isDestroyed()) return;
+    this.lastEmitAt = Date.now();
+    this.webContents.send("terrain:progress", this.statusPayload());
+  }
+
+  emitThrottled() {
+    if (Date.now() - this.lastEmitAt < 250) return;
+    this.emit();
+  }
+
+  finishSoon() {
+    setTimeout(() => {
+      if (currentTerrainTask === this && this.onDone) this.onDone();
+    }, 1500);
+  }
 }
 
 class InstallerDownloadTask {

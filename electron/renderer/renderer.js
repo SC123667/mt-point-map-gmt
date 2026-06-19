@@ -3,7 +3,15 @@ const state = {
   records: [],
   columns: [],
   mapping: null,
-  outputDirectory: ""
+  outputDirectory: "",
+  terrain: {
+    key: "",
+    gridPath: "",
+    shadePath: "",
+    region: "",
+    resolution: ""
+  },
+  terrainWaiter: null
 };
 
 const CUSTOM_COLOR_VALUE = "__custom__";
@@ -30,10 +38,13 @@ const ids = [
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
-  "autoRegionBtn", "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
+  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
+  "terrainAllowDownloadInput", "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
+  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
+  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
   "labelDXInput", "labelDYInput",
-  "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput"
+  "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput", "deleteOutputBtn"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
@@ -59,13 +70,26 @@ function wireEvents() {
   el.exportPdfBtn.addEventListener("click", () => exportMap(["pdf"], true));
   el.exportBothBtn.addEventListener("click", () => exportMap(["png", "pdf"], true));
   el.saveScriptBtn.addEventListener("click", saveScript);
+  el.deleteOutputBtn.addEventListener("click", deleteCurrentOutputs);
   el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
+  el.prepareTerrainBtn.addEventListener("click", () => prepareTerrain(false));
+  el.pauseTerrainBtn.addEventListener("click", () => window.mtApp.pauseTerrain());
+  el.resumeTerrainBtn.addEventListener("click", () => window.mtApp.resumeTerrain());
+  el.cancelTerrainBtn.addEventListener("click", () => window.mtApp.cancelTerrain());
+  el.deleteTerrainBtn.addEventListener("click", deleteLocalTerrain);
+  el.clearTerrainCacheBtn.addEventListener("click", clearTerrainCache);
+  el.terrainDocsBtn.addEventListener("click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
+  [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput].forEach((control) => {
+    control.addEventListener("input", updateTerrainEstimate);
+    control.addEventListener("change", updateTerrainEstimate);
+  });
   el.recheckBtn.addEventListener("click", recheckGMT);
   el.installBtn.addEventListener("click", installGMT);
   el.pauseDownloadBtn.addEventListener("click", () => window.mtApp.pauseGMTDownload());
   el.resumeDownloadBtn.addEventListener("click", () => window.mtApp.resumeGMTDownload());
   el.cancelDownloadBtn.addEventListener("click", () => window.mtApp.cancelGMTDownload());
   window.mtApp.onGMTDownloadProgress(renderDownloadProgress);
+  window.mtApp.onTerrainProgress(renderTerrainProgress);
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
@@ -76,6 +100,7 @@ async function refreshStatus() {
   state.outputDirectory = status.outputDirectory;
   renderOutputDirectory();
   renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
+  updateTerrainEstimate();
 }
 
 function renderOutputDirectory() {
@@ -87,6 +112,7 @@ async function chooseOutputDirectory() {
   if (!selected) return;
   state.outputDirectory = selected;
   renderOutputDirectory();
+  updateTerrainEstimate();
 }
 
 async function recheckGMT() {
@@ -161,6 +187,8 @@ function loadParsed(parsed) {
   populateColumnSelects();
   renderStationRows();
   renderPlaceholder();
+  resetTerrainPaths();
+  updateTerrainEstimate();
 }
 
 function populateColumnSelects() {
@@ -191,6 +219,8 @@ async function applyMapping() {
     state.records = result.records;
     el.regionInput.value = result.region;
     renderStationRows();
+    resetTerrainPaths();
+    updateTerrainEstimate();
     notify("字段映射已更新。");
   } catch (error) {
     notify(error.message);
@@ -239,6 +269,13 @@ function readConfig() {
     labelColor: readColor("labelColor"),
     labelDX: Number(el.labelDXInput.value),
     labelDY: Number(el.labelDYInput.value),
+    showTerrain: el.showTerrainInput.checked,
+    terrainResolution: el.terrainResolutionInput.value,
+    terrainCpt: el.terrainCptInput.value,
+    terrainIntensity: Number(el.terrainIntensityInput.value),
+    terrainAllowDownload: el.terrainAllowDownloadInput.checked,
+    terrainGridPath: state.terrain.gridPath,
+    terrainShadePath: state.terrain.shadePath,
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   };
 }
@@ -246,6 +283,12 @@ function readConfig() {
 async function exportMap(formats, showAlert) {
   if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
   const config = readConfig();
+  if (config.showTerrain) {
+    const ready = await ensureTerrainReady(config);
+    if (!ready) return;
+    config.terrainGridPath = state.terrain.gridPath;
+    config.terrainShadePath = state.terrain.shadePath;
+  }
   const result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
   if (!result.ok) {
     await refreshStatus();
@@ -258,6 +301,140 @@ async function exportMap(formats, showAlert) {
     if (png) await renderPreview(png);
   }
   if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
+}
+
+async function deleteCurrentOutputs() {
+  const result = await window.mtApp.deleteCurrentOutputs({
+    outputDirectory: state.outputDirectory,
+    outputName: el.outputNameInput.value.trim() || "mt_point_map"
+  });
+  renderPlaceholder();
+  notify(result.message);
+}
+
+async function ensureTerrainReady(config) {
+  const key = terrainKeyClient(config);
+  if (state.terrain.key === key && state.terrain.gridPath && state.terrain.shadePath) return true;
+  if (!config.terrainAllowDownload) {
+    const confirmed = confirm("当前未准备本地地形底图，并且关闭了联网下载。是否仍然尝试只使用 GMT 本地缓存准备底图？");
+    if (!confirmed) return false;
+  }
+  try {
+    await prepareTerrain(true);
+    return Boolean(state.terrain.gridPath && state.terrain.shadePath);
+  } catch (error) {
+    notify(error.message || String(error));
+    return false;
+  }
+}
+
+async function prepareTerrain(waitForCompletion) {
+  if (!state.records.length) return notify("请先导入点位文件。");
+  const config = readConfig();
+  if (!config.region) config.region = autoRegionClient(state.records);
+  resetTerrainPaths();
+  el.terrainProgressPanel.classList.remove("hidden");
+  const waiting = waitForCompletion ? waitForTerrainCompletion() : null;
+  const result = await window.mtApp.prepareTerrain({ records: state.records, config, outputDirectory: state.outputDirectory });
+  if (result.status) renderTerrainProgress(result.status);
+  if (!result.ok) {
+    if (state.terrainWaiter) state.terrainWaiter.reject(new Error(result.message || "地形底图任务无法启动。"));
+    state.terrainWaiter = null;
+    notify(result.message);
+    return false;
+  }
+  if (!waitForCompletion) return true;
+  return waiting;
+}
+
+function waitForTerrainCompletion() {
+  if (state.terrainWaiter) return state.terrainWaiter.promise;
+  let resolve;
+  let reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  state.terrainWaiter = { promise, resolve, reject };
+  return promise;
+}
+
+function renderTerrainProgress(status) {
+  el.terrainProgressPanel.classList.remove("hidden");
+  const percent = Number.isFinite(status.percent) ? Math.max(0, Math.min(100, status.percent)) : 0;
+  el.terrainProgress.value = percent;
+  el.terrainProgressText.textContent = status.message || readableTerrainState(status.state);
+  el.terrainProgressPercent.textContent = `${percent.toFixed(percent < 10 ? 1 : 0)}%`;
+  el.pauseTerrainBtn.disabled = status.state !== "running";
+  el.resumeTerrainBtn.disabled = status.state !== "paused";
+  el.cancelTerrainBtn.disabled = !["starting", "running", "paused"].includes(status.state);
+  el.prepareTerrainBtn.disabled = ["starting", "running", "paused"].includes(status.state);
+  if (status.state === "completed") {
+    state.terrain = {
+      key: terrainKeyClient(readConfig()),
+      gridPath: status.gridPath,
+      shadePath: status.shadePath,
+      region: status.region,
+      resolution: status.resolution
+    };
+    if (state.terrainWaiter) state.terrainWaiter.resolve(true);
+    state.terrainWaiter = null;
+  }
+  if (["failed", "cancelled"].includes(status.state)) {
+    resetTerrainPaths();
+    if (state.terrainWaiter) state.terrainWaiter.reject(new Error(status.message || "地形底图任务未完成。"));
+    state.terrainWaiter = null;
+  }
+}
+
+async function updateTerrainEstimate() {
+  const region = el.regionInput.value.trim();
+  if (!region) {
+    el.terrainEstimateText.textContent = "导入点位后显示预计大小";
+    return;
+  }
+  const estimate = estimateTerrainClient(region, el.terrainResolutionInput.value);
+  el.terrainEstimateText.textContent = estimate.label;
+}
+
+function estimateTerrainClient(region, resolution) {
+  const secondsByResolution = { "20m": 1200, "10m": 600, "06m": 360, "01m": 60, "30s": 30, "15s": 15, "03s": 3, "01s": 1 };
+  const values = region.split("/").map((value) => Number(value));
+  const seconds = secondsByResolution[resolution] || 360;
+  if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) {
+    return { label: "范围无效，无法估算底图大小" };
+  }
+  const lonSpan = Math.max(0, values[1] - values[0]);
+  const latSpan = Math.max(0, values[3] - values[2]);
+  const cells = Math.max(2, Math.ceil(lonSpan * 3600 / seconds)) * Math.max(2, Math.ceil(latSpan * 3600 / seconds));
+  const bytes = cells * 2 * 2;
+  return { label: `预计本地工作文件约 ${formatBytes(bytes)}，实际联网下载量取决于 GMT 分块缓存` };
+}
+
+function terrainKeyClient(config) {
+  return [
+    state.outputDirectory,
+    config.region,
+    config.terrainResolution,
+    config.terrainIntensity
+  ].join("|");
+}
+
+function resetTerrainPaths() {
+  state.terrain = { key: "", gridPath: "", shadePath: "", region: "", resolution: "" };
+}
+
+async function deleteLocalTerrain() {
+  const result = await window.mtApp.deleteLocalTerrain({ outputDirectory: state.outputDirectory });
+  resetTerrainPaths();
+  el.terrainProgressPanel.classList.add("hidden");
+  notify(result.message);
+}
+
+async function clearTerrainCache() {
+  if (!confirm("这会清理 GMT 下载过的 earth_relief 地形缓存。以后再用地形底图可能需要重新联网下载。确定继续吗？")) return;
+  const result = await window.mtApp.clearTerrainCache();
+  notify(result.message);
 }
 
 async function saveScript() {
@@ -396,4 +573,15 @@ function readableDownloadState(state) {
     failed: "失败",
     cancelled: "已取消"
   }[state] || "";
+}
+
+function readableTerrainState(state) {
+  return {
+    starting: "准备中",
+    running: "处理中",
+    paused: "已暂停",
+    completed: "已完成",
+    failed: "失败",
+    cancelled: "已取消"
+  }[state] || "等待准备";
 }

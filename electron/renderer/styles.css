@@ -181,6 +181,16 @@ button:disabled {
   opacity: 0.55;
 }
 
+button.danger {
+  color: #8a1f17;
+  border-color: #d7aaa5;
+  background: #fff7f6;
+}
+
+button.danger:hover {
+  background: #ffecea;
+}
+
 fieldset {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -235,6 +245,35 @@ select {
 .color-picker:disabled {
   opacity: 1;
   cursor: default;
+}
+
+.field-note {
+  margin-top: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.terrain-actions {
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.terrain-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.terrain-progress {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid #e1e7ef;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.terrain-progress.hidden {
+  display: none;
 }
 
 table {
