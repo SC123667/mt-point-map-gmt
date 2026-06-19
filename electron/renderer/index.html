@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MT点位图制作工具—GMT</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>MT点位图制作工具—GMT</h1>
+        <p id="appStatus">正在检测 GMT...</p>
+      </div>
+      <div class="header-actions">
+        <button id="recheckBtn">重新检测 GMT</button>
+        <button id="installBtn" class="primary">安装 GMT</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="pane data-pane">
+        <div class="section-title">
+          <h2>数据</h2>
+          <p id="dataSummary">未导入点位文件</p>
+        </div>
+        <div class="button-row">
+          <button id="openBtn" class="primary">导入 TXT/CSV</button>
+          <button id="sampleBtn">示例</button>
+        </div>
+
+        <fieldset>
+          <legend>字段识别</legend>
+          <label>测点名<select id="nameColumn"></select></label>
+          <label>经度<select id="lonColumn"></select></label>
+          <label>纬度<select id="latColumn"></select></label>
+          <label>测线<select id="lineColumn"></select></label>
+          <label>高程<select id="elevationColumn"></select></label>
+          <button id="applyMappingBtn">应用字段映射</button>
+        </fieldset>
+
+        <table>
+          <thead>
+            <tr><th>测点</th><th>经度</th><th>纬度</th></tr>
+          </thead>
+          <tbody id="stationRows"></tbody>
+        </table>
+      </section>
+
+      <section class="pane preview-pane">
+        <div class="section-title horizontal">
+          <div>
+            <h2>地图预览</h2>
+            <p id="outputPath">输出目录将在导出后显示</p>
+          </div>
+          <button id="previewBtn" class="primary">生成预览</button>
+        </div>
+        <div class="preview-box" id="previewBox">
+          <span>导入点位后生成预览</span>
+        </div>
+        <div class="button-row export-row">
+          <button id="exportPngBtn">导出 PNG</button>
+          <button id="exportPdfBtn">导出 PDF</button>
+          <button id="exportBothBtn">导出 PNG + PDF</button>
+          <button id="saveScriptBtn">保存 GMT 脚本</button>
+        </div>
+        <details>
+          <summary>GMT 安装说明</summary>
+          <div class="install-help">
+            <p id="installPlanText"></p>
+            <button data-link="https://docs.gmt-china.org/latest/install/">GMT 中文手册安装页</button>
+            <button data-link="https://www.generic-mapping-tools.org/download/">GMT 官方下载页</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="pane parameter-pane">
+        <h2>绘图参数</h2>
+        <fieldset>
+          <legend>图幅</legend>
+          <label>标题<input id="titleInput" value="MT Survey Stations" /></label>
+          <label>范围 -R<input id="regionInput" /></label>
+          <label>投影 -J<input id="projectionInput" value="M16c" /></label>
+          <label>经纬网 -B<input id="frameInput" value="af" /></label>
+          <button id="autoRegionBtn">根据点位自动范围</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>点位符号</legend>
+          <label>形状
+            <select id="symbolInput">
+              <option value="c">圆形</option>
+              <option value="t">三角</option>
+              <option value="s">方形</option>
+              <option value="d">菱形</option>
+            </select>
+          </label>
+          <label>大小 cm<input id="pointSizeInput" type="number" min="0.05" max="1.5" step="0.01" value="0.22" /></label>
+          <label>填充色<input id="pointFillInput" value="#d7191c" /></label>
+          <label>边框宽 p<input id="penWidthInput" type="number" min="0" max="3" step="0.05" value="0.35" /></label>
+          <label>边框色<input id="penColorInput" value="black" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>测点标签</legend>
+          <label class="check"><input id="showLabelsInput" type="checkbox" checked />显示测点名</label>
+          <label>字号 pt<input id="labelSizeInput" type="number" min="5" max="18" step="0.5" value="8" /></label>
+          <label>文字色<input id="labelColorInput" value="black" /></label>
+          <label>右移 cm<input id="labelDXInput" type="number" min="-0.5" max="0.8" step="0.01" value="0.08" /></label>
+          <label>上移 cm<input id="labelDYInput" type="number" min="-0.5" max="0.8" step="0.01" value="0.08" /></label>
+        </fieldset>
+
+        <fieldset>
+          <legend>图件元素</legend>
+          <label class="check"><input id="showGridInput" type="checkbox" checked />经纬网</label>
+          <label class="check"><input id="showScaleInput" type="checkbox" checked />比例尺</label>
+          <label class="check"><input id="showNorthInput" type="checkbox" checked />指北针</label>
+          <label>输出名<input id="outputNameInput" value="mt_point_map" /></label>
+        </fieldset>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

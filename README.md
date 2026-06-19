@@ -38,11 +38,51 @@ A02 101.51 36.62 L1 1878
 
 没有表头时，程序会尝试从数值范围自动判断经纬度列，并自动生成测点名。
 
-## 运行
+## 推荐运行方式：Electron 跨平台版
+
+开发运行：
+
+```bash
+npm install
+npm start
+```
+
+生成 macOS App：
+
+```bash
+npm run dist:mac
+```
+
+生成 Windows 包需要在 Windows 机器或 CI 上运行：
+
+```bash
+npm install
+npm run dist:win
+```
+
+## Python 原型
+
+仓库里仍保留 Python/Tk 原型，主要作为制图逻辑参考：
 
 ```bash
 python3 run.py
 ```
+
+如果你的 macOS 上 Tk 不可用，请使用 Electron 跨平台版。
+
+## 旧版 macOS 原生实验
+
+```bash
+python3 scripts/build_mac_app.py
+```
+
+默认会生成并复制到：
+
+```text
+/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app
+```
+
+当前推荐使用 Electron 版作为对外分发版本。
 
 ## GMT 依赖
 
@@ -56,10 +96,13 @@ brew install gmt
 
 ## 输出
 
-默认输出到项目目录下的 `outputs/` 文件夹：
+默认输出到：
+
+```text
+~/Documents/MT点位图制作工具—GMT输出
+```
 
 - `mt_point_map.png`
 - `mt_point_map.pdf`
 - `mt_point_map.gmt`
 - 中间数据文件
-

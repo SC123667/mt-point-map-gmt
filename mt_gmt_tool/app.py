@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import tkinter as tk
+import os
 from pathlib import Path
 from tkinter import colorchooser, filedialog, messagebox, ttk
 from typing import Dict, List, Optional
@@ -11,8 +12,8 @@ from .gmt import GmtError, PlotConfig, auto_region, build_script, gmt_available,
 
 
 APP_TITLE = "MT点位图制作工具—GMT"
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "outputs"
+PROJECT_ROOT = Path(os.environ.get("MT_GMT_TOOL_HOME", Path(__file__).resolve().parents[1]))
+DEFAULT_OUTPUT_DIR = Path.home() / "Documents" / "MT点位图制作工具—GMT输出"
 
 
 class MTPointMapApp(tk.Tk):
