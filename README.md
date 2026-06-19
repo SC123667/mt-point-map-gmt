@@ -92,7 +92,7 @@ python3 scripts/build_mac_app.py
 brew install gmt
 ```
 
-如果没有安装 GMT，软件仍可导入数据和保存 GMT 脚本，但无法生成预览图或导出正式图片。
+Electron 分发版会自动检测 GMT。没有安装时，点击软件里的安装按钮会直接下载当前系统对应的 GMT 官方安装包；如果网络不可用或 GitHub 下载失败，会提示具体错误。没有安装 GMT 时，软件仍可导入数据和保存 GMT 脚本，但无法生成预览图或导出正式图片。
 
 ## 输出
 

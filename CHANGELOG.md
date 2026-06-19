@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.1 - 2026-06-19
+
+- Changed the GMT install button to directly download the official GMT installer for the current system.
+- Added download failure handling so network or GitHub access problems show a clear message.
+- Kept official GMT documentation links as secondary help instead of relying on them for the main install action.
+
 ## v0.3.0 - 2026-06-19
 
 - Added a cross-platform Electron implementation for macOS and Windows distribution.

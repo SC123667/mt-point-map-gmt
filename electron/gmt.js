@@ -1,6 +1,10 @@
 const fs = require("fs");
+const https = require("https");
 const path = require("path");
 const { execFileSync, spawn, spawnSync } = require("child_process");
+
+const GMT_MAC_VERSION = "6.5.0";
+const GMT_WINDOWS_VERSION = "6.6.0";
 
 function gmtAvailable() {
   const command = process.platform === "win32" ? "where" : "which";
@@ -23,26 +27,25 @@ function commandAvailable(name) {
 }
 
 function installPlan() {
+  const download = installerDownloadPlan();
   if (process.platform === "darwin") {
     return {
       platform: "macOS",
-      canAutoInstall: commandAvailable("brew"),
+      canAutoInstall: true,
       autoCommand: "brew install gmt",
       manualCommand: "brew install gmt",
-      message: commandAvailable("brew")
-        ? "可以调用 Homebrew 安装 GMT。"
-        : "未检测到 Homebrew，请先安装 Homebrew，或打开 GMT 官方下载页手动安装。"
+      download,
+      message: `可直接下载 GMT ${GMT_MAC_VERSION} 官方 macOS 安装包。`
     };
   }
   if (process.platform === "win32") {
     return {
       platform: "Windows",
-      canAutoInstall: commandAvailable("winget"),
+      canAutoInstall: true,
       autoCommand: "winget install --id GenericMappingTools.gmt --exact --accept-package-agreements --accept-source-agreements",
       manualCommand: "winget install --id GenericMappingTools.gmt --exact",
-      message: commandAvailable("winget")
-        ? "可以调用 winget 安装 GMT 官方 Windows 包。"
-        : "未检测到 winget，请打开 GMT 官方下载页手动下载安装包。"
+      download,
+      message: `可直接下载 GMT ${GMT_WINDOWS_VERSION} 官方 Windows 64 位安装器。`
     };
   }
   return {
@@ -54,28 +57,120 @@ function installPlan() {
   };
 }
 
-function startGMTInstall() {
-  const plan = installPlan();
-  if (!plan.canAutoInstall) {
-    return { ok: false, message: plan.message, plan };
-  }
+function installerDownloadPlan() {
   if (process.platform === "darwin") {
-    const script = `${plan.autoCommand}; echo; echo "GMT 安装流程结束。可以关闭此窗口。"; read -n 1 -s -r -p "按任意键关闭"`;
-    spawn("osascript", ["-e", `tell application "Terminal" to do script ${JSON.stringify(script)}`], {
-      detached: true,
-      stdio: "ignore"
-    }).unref();
-    return { ok: true, message: "已在终端中启动 Homebrew 安装 GMT。", plan };
+    const base = `https://github.com/GenericMappingTools/gmt/releases/download/${GMT_MAC_VERSION}`;
+    const arch = process.arch === "arm64" ? "arm64" : "x86_64";
+    const fileName = `gmt-${GMT_MAC_VERSION}-darwin-${arch}.dmg`;
+    return {
+      version: GMT_MAC_VERSION,
+      fileName,
+      url: `${base}/${fileName}`,
+      kind: "dmg"
+    };
   }
   if (process.platform === "win32") {
-    spawn("cmd.exe", ["/c", "start", "cmd.exe", "/k", plan.autoCommand], {
+    const base = `https://github.com/GenericMappingTools/gmt/releases/download/${GMT_WINDOWS_VERSION}`;
+    const fileName = `gmt-${GMT_WINDOWS_VERSION}-win64.exe`;
+    return {
+      version: GMT_WINDOWS_VERSION,
+      fileName,
+      url: `${base}/${fileName}`,
+      kind: "exe"
+    };
+  }
+  return null;
+}
+
+async function startGMTInstall(downloadDirectory) {
+  const plan = installPlan();
+  if (!plan.canAutoInstall || !plan.download) {
+    return { ok: false, message: plan.message, plan };
+  }
+  try {
+    const filePath = await downloadInstaller(plan.download, downloadDirectory);
+    openDownloadedInstaller(filePath);
+    return {
+      ok: true,
+      message: `GMT 安装包已下载并打开：${filePath}`,
+      filePath,
+      plan
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `GMT 安装包下载失败：${error.message || error}`,
+      plan
+    };
+  }
+}
+
+function downloadInstaller(download, downloadDirectory) {
+  fs.mkdirSync(downloadDirectory, { recursive: true });
+  const filePath = path.join(downloadDirectory, download.fileName);
+  return downloadFile(download.url, filePath, 0);
+}
+
+function downloadFile(url, filePath, redirectCount) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 5) {
+      reject(new Error("下载重定向次数过多，请检查网络或手动打开 GMT 官网。"));
+      return;
+    }
+
+    const request = https.get(url, { headers: { "User-Agent": "MT-Point-Map-GMT" }, timeout: 30000 }, (response) => {
+      if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
+        response.resume();
+        const location = response.headers.location;
+        if (!location) {
+          reject(new Error("下载地址重定向无效。"));
+          return;
+        }
+        const nextUrl = new URL(location, url).toString();
+        downloadFile(nextUrl, filePath, redirectCount + 1).then(resolve, reject);
+        return;
+      }
+
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`服务器返回 HTTP ${response.statusCode}`));
+        return;
+      }
+
+      const tempPath = `${filePath}.download`;
+      const file = fs.createWriteStream(tempPath);
+      response.pipe(file);
+      file.on("finish", () => {
+        file.close(() => {
+          fs.renameSync(tempPath, filePath);
+          resolve(filePath);
+        });
+      });
+      file.on("error", (error) => {
+        fs.rmSync(tempPath, { force: true });
+        reject(error);
+      });
+    });
+
+    request.on("timeout", () => {
+      request.destroy(new Error("下载超时，请检查网络连接。"));
+    });
+    request.on("error", reject);
+  });
+}
+
+function openDownloadedInstaller(filePath) {
+  if (process.platform === "darwin") {
+    spawn("open", [filePath], { detached: true, stdio: "ignore" }).unref();
+    return;
+  }
+  if (process.platform === "win32") {
+    spawn("cmd.exe", ["/c", "start", "", filePath], {
       detached: true,
       stdio: "ignore",
       windowsHide: false
     }).unref();
-    return { ok: true, message: "已打开命令行并启动 winget 安装 GMT。", plan };
   }
-  return { ok: false, message: "当前系统暂不支持自动安装。", plan };
 }
 
 function defaultOutputDirectory(app) {
@@ -183,6 +278,7 @@ function quote(value) {
 module.exports = {
   gmtAvailable,
   installPlan,
+  installerDownloadPlan,
   startGMTInstall,
   defaultOutputDirectory,
   autoRegion,

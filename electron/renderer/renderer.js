@@ -54,14 +54,21 @@ async function refreshStatus() {
 
 function renderGMTStatus(available, plan) {
   el.appStatus.textContent = available ? `GMT 已就绪，输出目录：${state.outputDirectory}` : `未检测到 GMT。${plan.message}`;
-  el.installPlanText.textContent = `${plan.platform} 推荐命令：${plan.manualCommand || "请参考官方安装文档"}`;
+  const downloadText = plan.download ? `将下载：${plan.download.fileName}` : "请参考官方安装文档";
+  el.installPlanText.textContent = `${plan.platform}：${downloadText}`;
   el.installBtn.disabled = available || !plan.canAutoInstall;
-  el.installBtn.textContent = available ? "GMT 已安装" : (plan.canAutoInstall ? "自动安装 GMT" : "打开安装链接");
+  el.installBtn.textContent = available ? "GMT 已安装" : "下载并安装 GMT";
 }
 
 async function installGMT() {
-  const result = await window.mtApp.installGMT();
-  notify(result.message);
+  el.installBtn.disabled = true;
+  el.installBtn.textContent = "正在下载 GMT...";
+  try {
+    const result = await window.mtApp.installGMT();
+    notify(result.message);
+  } finally {
+    await refreshStatus();
+  }
 }
 
 function loadParsed(parsed) {

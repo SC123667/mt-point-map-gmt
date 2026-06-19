@@ -107,7 +107,7 @@ ipcMain.handle("gmt:export", (_event, payload) => {
   return runGMT(script, outputDirectory, payload.config.outputName || "mt_point_map", formats);
 });
 
-ipcMain.handle("gmt:install", () => startGMTInstall());
+ipcMain.handle("gmt:install", () => startGMTInstall(app.getPath("downloads")));
 ipcMain.handle("gmt:recheck", () => ({ gmtAvailable: gmtAvailable(), installPlan: installPlan() }));
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));

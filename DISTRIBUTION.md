@@ -38,8 +38,9 @@ npm run dist:win
 
 软件会自动检测 `gmt` 命令。
 
-- macOS：检测到 Homebrew 时，可从软件里启动 `brew install gmt`。
-- Windows：检测到 winget 时，可从软件里启动 `winget install --id GenericMappingTools.gmt --exact --accept-package-agreements --accept-source-agreements`。
-- 如果自动安装不可用，软件会提供 GMT 中文手册安装页和 GMT 官方下载页。
+- macOS：点击安装按钮会下载 GMT 官方 macOS `.dmg`。当前使用有 DMG 资产的 GMT 6.5.0，Apple Silicon 下载 `darwin-arm64`，Intel 下载 `darwin-x86_64`。
+- Windows：点击安装按钮会下载 GMT 官方 Windows 64 位安装器。当前使用 GMT 6.6.0。
+- 如果下载失败，软件会提示网络或下载错误。
+- GMT 中文手册安装页和 GMT 官方下载页保留为备用帮助入口。
 
 GMT 不随本软件内置打包。这样可以避免把跨平台 GMT/GDAL/PROJ/Ghostscript 运行时塞进安装包导致体积、授权和维护复杂度大幅上升。软件本身会保存 GMT 脚本；安装 GMT 后即可直接导出 PNG/PDF。
