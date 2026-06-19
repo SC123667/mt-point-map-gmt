@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.2 - 2026-06-20
+
+- Added EDI folder import with recursive scanning of subfolders for `.edi` files.
+- Extracted station coordinates from `LAT/LONG` or fallback `REFLAT/REFLONG` fields, including degree-minute-second values.
+- Used EDI file names as station names and skipped placeholder `0/0` coordinates with a visible import summary.
+- Added a Node regression test for EDI coordinate parsing and invalid-coordinate rejection.
+
 ## v0.4.1 - 2026-06-20
 
 - Switched 1m, 30s, 15s, 3s, and 1s terrain basemap preparation to direct SRTM HGT downloads, avoiding the GMT App JP2/OpenJPEG failure path on high-resolution earth-relief data.

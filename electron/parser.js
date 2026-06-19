@@ -31,6 +31,58 @@ function parseStationText(text, filePath = "") {
   return { filePath, columns, rows, mapping, records, hasHeader };
 }
 
+function parseEdiStationText(text, filePath = "") {
+  const lat = firstEdiCoordinate(text, ["LAT", "REFLAT"]);
+  const lon = firstEdiCoordinate(text, ["LONG", "LON", "REFLONG", "REFLON"]);
+  const elevation = firstEdiNumber(text, ["ELEV", "REFELEV"]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    throw new Error("未找到有效 LAT/LONG 或 REFLAT/REFLONG 坐标。");
+  }
+  if (Math.abs(lon) < 1e-12 && Math.abs(lat) < 1e-12) {
+    throw new Error("EDI 坐标为 0/0，占位坐标已跳过。");
+  }
+  if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+    throw new Error(`EDI 坐标超出范围：${lon}, ${lat}`);
+  }
+  const stationName = ediStationName(text, filePath);
+  return {
+    name: stationName,
+    lon,
+    lat,
+    line: "",
+    elevation: Number.isFinite(elevation) ? elevation : null,
+    sourcePath: filePath
+  };
+}
+
+function buildEdiParsedResult(records, skipped = [], directory = "") {
+  const columns = ["测点名", "经度", "纬度", "高程", "EDI文件"];
+  const rows = records.map((record) => ({
+    "测点名": record.name,
+    "经度": String(record.lon),
+    "纬度": String(record.lat),
+    "高程": record.elevation === null || record.elevation === undefined ? "" : String(record.elevation),
+    "EDI文件": record.sourcePath || ""
+  }));
+  return {
+    filePath: directory,
+    columns,
+    rows,
+    mapping: {
+      coordinateType: "geographic",
+      name: "测点名",
+      lon: "经度",
+      lat: "纬度",
+      line: "",
+      elevation: "高程"
+    },
+    records,
+    hasHeader: true,
+    sourceType: "ediDirectory",
+    skippedEdiFiles: skipped
+  };
+}
+
 function detectMapping(columns, rows, hasHeader = true) {
   let lon = hasHeader ? firstHint(columns, LON_HINTS) : "";
   let lat = hasHeader ? firstHint(columns, LAT_HINTS) : "";
@@ -319,6 +371,64 @@ function toNumber(value) {
   return Number(String(value).trim().replace(/,/g, "").replace(/°/g, ""));
 }
 
+function firstEdiCoordinate(text, keys) {
+  for (const key of keys) {
+    const value = firstEdiValue(text, key);
+    if (!value) continue;
+    const parsed = parseEdiCoordinate(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return NaN;
+}
+
+function firstEdiNumber(text, keys) {
+  for (const key of keys) {
+    const value = firstEdiValue(text, key);
+    if (!value) continue;
+    const parsed = toNumber(unquote(value));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return NaN;
+}
+
+function firstEdiValue(text, key) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = String(text || "").match(new RegExp(`(?:^|\\n)\\s*${escaped}\\s*=\\s*([^\\r\\n]+)`, "i"));
+  return match ? match[1].trim() : "";
+}
+
+function parseEdiCoordinate(value) {
+  const text = unquote(value).trim();
+  const suffix = text.match(/[NSEW]$/i)?.[0].toUpperCase() || "";
+  const cleaned = text.replace(/[NSEW]$/i, "").replace(/[°'"]/g, ":").trim();
+  let sign = cleaned.startsWith("-") ? -1 : 1;
+  if (suffix === "S" || suffix === "W") sign = -1;
+  const unsigned = cleaned.replace(/^[+-]/, "");
+  if (unsigned.includes(":")) {
+    const parts = unsigned.split(":").filter((part) => part !== "").map(Number);
+    if (!parts.length || parts.some((part) => !Number.isFinite(part))) return NaN;
+    const degrees = parts[0] || 0;
+    const minutes = parts[1] || 0;
+    const seconds = parts[2] || 0;
+    return sign * (degrees + minutes / 60 + seconds / 3600);
+  }
+  const decimal = Number(unsigned);
+  return Number.isFinite(decimal) ? sign * decimal : NaN;
+}
+
+function ediStationName(text, filePath) {
+  const base = String(filePath || "").split(/[\\/]/).pop() || "";
+  const fileName = base.replace(/\.[Ee][Dd][Ii]$/, "");
+  if (fileName) return fileName;
+  const dataId = unquote(firstEdiValue(text, "DATAID"));
+  if (dataId && !/^unknown$/i.test(dataId)) return dataId;
+  return "EDI站点";
+}
+
+function unquote(value) {
+  return String(value || "").trim().replace(/^["']|["']$/g, "");
+}
+
 function toRadians(degrees) {
   return degrees * Math.PI / 180;
 }
@@ -329,6 +439,8 @@ function toDegrees(radians) {
 
 module.exports = {
   parseStationText,
+  parseEdiStationText,
+  buildEdiParsedResult,
   detectMapping,
   buildRecords
 };

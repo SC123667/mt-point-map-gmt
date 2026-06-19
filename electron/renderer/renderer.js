@@ -33,7 +33,7 @@ const COLOR_OPTIONS = [
 
 const ids = [
   "appStatus", "dataSummary", "openBtn", "sampleBtn", "nameColumn", "lonColumn", "latColumn",
-  "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
+  "openEdiDirBtn", "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
@@ -58,6 +58,14 @@ function wireEvents() {
   el.openBtn.addEventListener("click", async () => {
     const parsed = await window.mtApp.openFile();
     if (parsed) loadParsed(parsed);
+  });
+  el.openEdiDirBtn.addEventListener("click", async () => {
+    try {
+      const parsed = await window.mtApp.openEdiDirectory();
+      if (parsed) loadParsed(parsed);
+    } catch (error) {
+      notify(error.message || String(error));
+    }
   });
   el.sampleBtn.addEventListener("click", async () => loadParsed(await window.mtApp.loadSample()));
   el.applyMappingBtn.addEventListener("click", applyMapping);
@@ -180,7 +188,13 @@ function loadParsed(parsed) {
   state.mapping = parsed.mapping;
   el.regionInput.value = parsed.region;
   const coordinateText = parsed.mapping.coordinateType === "projected" ? "高斯投影坐标点位，已自动转经纬度" : "点位";
-  el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个${coordinateText}`;
+  if (parsed.sourceType === "ediDirectory") {
+    const skipped = parsed.skippedEdiFiles?.length || 0;
+    const total = parsed.totalEdiFiles || parsed.records.length + skipped;
+    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n扫描 ${total} 个 EDI，已读取 ${parsed.records.length} 个坐标${skipped ? `，跳过 ${skipped} 个无效坐标` : ""}`;
+  } else {
+    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个${coordinateText}`;
+  }
   if (parsed.mapping.coordinateType === "projected" && parsed.records.length > 50) {
     el.showLabelsInput.checked = false;
   }

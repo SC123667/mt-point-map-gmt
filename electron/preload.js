@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("mtApp", {
   status: () => ipcRenderer.invoke("app:status"),
   openFile: () => ipcRenderer.invoke("file:open"),
+  openEdiDirectory: () => ipcRenderer.invoke("edi:openDirectory"),
   loadSample: () => ipcRenderer.invoke("file:sample"),
   applyMapping: (payload) => ipcRenderer.invoke("data:applyMapping", payload),
   buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),

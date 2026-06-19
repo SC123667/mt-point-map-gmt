@@ -4,7 +4,7 @@ const path = require("path");
 const zlib = require("zlib");
 const { spawn, spawnSync } = require("child_process");
 const { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } = require("electron");
-const { parseStationText, buildRecords } = require("./parser");
+const { parseStationText, parseEdiStationText, buildEdiParsedResult, buildRecords } = require("./parser");
 const {
   autoRegion,
   buildScript,
@@ -75,6 +75,15 @@ ipcMain.handle("file:open", async () => {
   });
   if (result.canceled || !result.filePaths[0]) return null;
   return loadStationFile(result.filePaths[0]);
+});
+
+ipcMain.handle("edi:openDirectory", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择 EDI 文件夹",
+    properties: ["openDirectory"]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return loadEdiDirectory(result.filePaths[0]);
 });
 
 ipcMain.handle("file:sample", () => {
@@ -219,6 +228,52 @@ function loadStationFile(filePath) {
   const text = decodeText(buffer);
   const parsed = parseStationText(text, filePath);
   return { ...parsed, region: autoRegion(parsed.records) };
+}
+
+function loadEdiDirectory(directory) {
+  const ediFiles = findEdiFiles(directory);
+  if (!ediFiles.length) throw new Error("该目录及子文件夹中没有找到 .edi 文件。");
+  const records = [];
+  const skipped = [];
+  for (const filePath of ediFiles) {
+    try {
+      const text = decodeText(fs.readFileSync(filePath));
+      records.push(parseEdiStationText(text, filePath));
+    } catch (error) {
+      skipped.push({
+        filePath,
+        reason: error.message || String(error)
+      });
+    }
+  }
+  if (!records.length) {
+    const sample = skipped.slice(0, 5).map((item) => `${path.basename(item.filePath)}：${item.reason}`).join("\n");
+    throw new Error(`扫描到 ${ediFiles.length} 个 EDI，但没有解析出有效坐标。\n${sample}`);
+  }
+  const parsed = buildEdiParsedResult(records, skipped, directory);
+  return { ...parsed, region: autoRegion(records), totalEdiFiles: ediFiles.length };
+}
+
+function findEdiFiles(directory) {
+  const files = [];
+  const visit = (current) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath);
+      } else if (entry.isFile() && /\.edi$/i.test(entry.name)) {
+        files.push(fullPath);
+      }
+    }
+  };
+  visit(directory);
+  return files.sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
 }
 
 function outputDirectoryFromPayload(payload) {
@@ -392,6 +447,7 @@ function loadRenderer(win) {
     window.mtApp = {
       status: () => ipcRenderer.invoke("app:status"),
       openFile: () => ipcRenderer.invoke("file:open"),
+      openEdiDirectory: () => ipcRenderer.invoke("edi:openDirectory"),
       loadSample: () => ipcRenderer.invoke("file:sample"),
       applyMapping: (payload) => ipcRenderer.invoke("data:applyMapping", payload),
       buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),
