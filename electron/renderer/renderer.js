@@ -10,6 +10,8 @@ const ids = [
   "appStatus", "dataSummary", "openBtn", "sampleBtn", "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
+  "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
+  "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "installPlanText", "outputPath", "titleInput", "regionInput", "projectionInput", "frameInput",
   "autoRegionBtn", "symbolInput", "pointSizeInput", "pointFillInput", "penWidthInput", "penColorInput",
   "showLabelsInput", "labelSizeInput", "labelColorInput", "labelDXInput", "labelDYInput",
@@ -40,6 +42,10 @@ function wireEvents() {
   el.saveScriptBtn.addEventListener("click", saveScript);
   el.recheckBtn.addEventListener("click", refreshStatus);
   el.installBtn.addEventListener("click", installGMT);
+  el.pauseDownloadBtn.addEventListener("click", () => window.mtApp.pauseGMTDownload());
+  el.resumeDownloadBtn.addEventListener("click", () => window.mtApp.resumeGMTDownload());
+  el.cancelDownloadBtn.addEventListener("click", () => window.mtApp.cancelGMTDownload());
+  window.mtApp.onGMTDownloadProgress(renderDownloadProgress);
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
@@ -62,13 +68,36 @@ function renderGMTStatus(available, plan) {
 
 async function installGMT() {
   el.installBtn.disabled = true;
-  el.installBtn.textContent = "正在下载 GMT...";
-  try {
-    const result = await window.mtApp.installGMT();
+  el.installBtn.textContent = "正在准备下载...";
+  el.downloadPanel.classList.remove("hidden");
+  const result = await window.mtApp.installGMT();
+  if (result.status) renderDownloadProgress(result.status);
+  if (!result.ok) {
+    el.installBtn.disabled = false;
+    el.installBtn.textContent = "下载并安装 GMT";
     notify(result.message);
-  } finally {
-    await refreshStatus();
   }
+  await refreshStatus();
+  if (result.status && ["starting", "downloading", "paused"].includes(result.status.state)) {
+    renderDownloadProgress(result.status);
+  }
+}
+
+function renderDownloadProgress(status) {
+  el.downloadPanel.classList.remove("hidden");
+  const percent = Number.isFinite(status.percent) ? status.percent : 0;
+  const active = ["starting", "downloading", "paused"].includes(status.state);
+  el.downloadTitle.textContent = status.fileName || "GMT 安装包下载";
+  el.downloadStatus.textContent = status.message || "正在下载...";
+  el.downloadProgress.value = percent;
+  el.downloadBytes.textContent = `${formatBytes(status.downloaded || 0)} / ${status.total ? formatBytes(status.total) : "未知大小"}`;
+  el.downloadPercent.textContent = status.total ? `${percent.toFixed(percent < 10 ? 1 : 0)}%` : "等待大小";
+  el.downloadSpeed.textContent = status.state === "downloading" ? `${formatBytes(status.speed || 0)}/s` : readableDownloadState(status.state);
+  el.pauseDownloadBtn.disabled = status.state !== "downloading";
+  el.resumeDownloadBtn.disabled = status.state !== "paused";
+  el.cancelDownloadBtn.disabled = !active;
+  el.installBtn.disabled = active;
+  el.installBtn.textContent = active ? "正在下载 GMT..." : "下载并安装 GMT";
 }
 
 function loadParsed(parsed) {
@@ -214,4 +243,27 @@ function escapeHTML(value) {
 
 function notify(message) {
   alert(message);
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function readableDownloadState(state) {
+  return {
+    starting: "准备中",
+    downloading: "下载中",
+    paused: "已暂停",
+    completed: "已完成",
+    failed: "失败",
+    cancelled: "已取消"
+  }[state] || "";
 }

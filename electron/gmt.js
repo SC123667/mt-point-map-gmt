@@ -280,6 +280,7 @@ module.exports = {
   installPlan,
   installerDownloadPlan,
   startGMTInstall,
+  openDownloadedInstaller,
   defaultOutputDirectory,
   autoRegion,
   buildScript,

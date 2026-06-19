@@ -1,3 +1,3 @@
 """MT point map maker backed by GMT."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
