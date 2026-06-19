@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.1 - 2026-06-20
+
+- Switched 1m, 30s, 15s, 3s, and 1s terrain basemap preparation to direct SRTM HGT downloads, avoiding the GMT App JP2/OpenJPEG failure path on high-resolution earth-relief data.
+- Added SRTM tile download, pause, resume, cancel, decompression, cropping, GMT grid generation, and shaded-relief generation inside the existing terrain workflow.
+- Updated terrain resolution labels and size estimates so high-resolution options show realistic SRTM download and cache sizes.
+- Made GMT script saving prepare the local terrain grid first when a terrain basemap is enabled.
+
 ## v0.4.0 - 2026-06-20
 
 - Added an optional GMT earth-relief terrain basemap workflow with selectable 30s, 15s, 03s, and 01s resolutions.

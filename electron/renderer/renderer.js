@@ -399,6 +399,7 @@ async function updateTerrainEstimate() {
 
 function estimateTerrainClient(region, resolution) {
   const secondsByResolution = { "20m": 1200, "10m": 600, "06m": 360, "01m": 60, "30s": 30, "15s": 15, "03s": 3, "01s": 1 };
+  const srtmResolutions = new Set(["01m", "30s", "15s", "03s", "01s"]);
   const values = region.split("/").map((value) => Number(value));
   const seconds = secondsByResolution[resolution] || 360;
   if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) {
@@ -408,6 +409,16 @@ function estimateTerrainClient(region, resolution) {
   const latSpan = Math.max(0, values[3] - values[2]);
   const cells = Math.max(2, Math.ceil(lonSpan * 3600 / seconds)) * Math.max(2, Math.ceil(latSpan * 3600 / seconds));
   const bytes = cells * 2 * 2;
+  if (srtmResolutions.has(resolution)) {
+    const westTile = Math.floor(values[0]);
+    const eastTile = Math.floor(values[1] - Number.EPSILON);
+    const southTile = Math.floor(values[2]);
+    const northTile = Math.floor(values[3] - Number.EPSILON);
+    const tileCount = Math.max(1, eastTile - westTile + 1) * Math.max(1, northTile - southTile + 1);
+    return {
+      label: `预计下载约 ${formatBytes(tileCount * 8 * 1024 * 1024)} SRTM 高程瓦片，解压缓存约 ${formatBytes(tileCount * 26 * 1024 * 1024)}，本地网格约 ${formatBytes(bytes)}`
+    };
+  }
   return { label: `预计本地工作文件约 ${formatBytes(bytes)}，实际联网下载量取决于 GMT 分块缓存` };
 }
 
@@ -439,7 +450,14 @@ async function clearTerrainCache() {
 
 async function saveScript() {
   if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
-  const saved = await window.mtApp.saveScript({ records: state.records, config: readConfig(), outputDirectory: state.outputDirectory });
+  const config = readConfig();
+  if (config.showTerrain) {
+    const ready = await ensureTerrainReady(config);
+    if (!ready) return;
+    config.terrainGridPath = state.terrain.gridPath;
+    config.terrainShadePath = state.terrain.shadePath;
+  }
+  const saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory });
   if (saved) notify(`GMT 脚本已保存：${saved}`);
 }
 

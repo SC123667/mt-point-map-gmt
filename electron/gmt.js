@@ -7,14 +7,14 @@ const { execFileSync, spawn, spawnSync } = require("child_process");
 const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
 const TERRAIN_RESOLUTIONS = {
-  "20m": { seconds: 1200, remote: "@earth_relief_20m", label: "20 分，约 37 km" },
-  "10m": { seconds: 600, remote: "@earth_relief_10m", label: "10 分，约 18 km" },
-  "06m": { seconds: 360, remote: "@earth_relief_06m", label: "6 分，约 10 km" },
-  "01m": { seconds: 60, remote: "@earth_relief_01m", label: "1 分，约 1.9 km" },
-  "30s": { seconds: 30, remote: "@earth_relief_30s", label: "30 秒，约 900 m" },
-  "15s": { seconds: 15, remote: "@earth_relief_15s", label: "15 秒，约 450 m" },
-  "03s": { seconds: 3, remote: "@earth_relief_03s", label: "3 秒，约 90 m" },
-  "01s": { seconds: 1, remote: "@earth_relief_01s", label: "1 秒，约 30 m" }
+  "20m": { seconds: 1200, remote: "@earth_relief_20m", label: "20 分，约 37 km", source: "gmt" },
+  "10m": { seconds: 600, remote: "@earth_relief_10m", label: "10 分，约 18 km", source: "gmt" },
+  "06m": { seconds: 360, remote: "@earth_relief_06m", label: "6 分，约 10 km", source: "gmt" },
+  "01m": { seconds: 60, remote: "@earth_relief_01m", label: "1 分，约 1.9 km", source: "srtm" },
+  "30s": { seconds: 30, remote: "@earth_relief_30s", label: "30 秒，约 900 m", source: "srtm" },
+  "15s": { seconds: 15, remote: "@earth_relief_15s", label: "15 秒，约 450 m", source: "srtm" },
+  "03s": { seconds: 3, remote: "@earth_relief_03s", label: "3 秒，约 90 m", source: "srtm" },
+  "01s": { seconds: 1, remote: "@earth_relief_01s", label: "1 秒，约 30 m", source: "srtm" }
 };
 
 function gmtAvailable() {
@@ -434,6 +434,14 @@ function terrainResolutionSeconds(resolution) {
   return (TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"]).seconds;
 }
 
+function terrainResolutionInfo(resolution) {
+  return TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"];
+}
+
+function terrainSource(resolution) {
+  return terrainResolutionInfo(resolution).source || "gmt";
+}
+
 function terrainCpt(value) {
   return /^[A-Za-z0-9_+\-./]+$/.test(String(value || "")) ? String(value) : "geo";
 }
@@ -460,12 +468,34 @@ function terrainEstimate(region, resolution) {
   const cells = xCells * yCells;
   const gridBytes = cells * 2;
   const workingBytes = gridBytes * 2;
+  if (terrainSource(resolution) === "srtm") {
+    const tileCount = srtmTileCount(parsed);
+    const downloadBytes = tileCount * 8 * 1024 * 1024;
+    const cacheBytes = tileCount * 26 * 1024 * 1024;
+    return {
+      cells,
+      gridBytes,
+      workingBytes: workingBytes + downloadBytes,
+      downloadBytes,
+      cacheBytes,
+      tileCount,
+      label: `预计下载约 ${formatBytes(downloadBytes)} SRTM 高程瓦片，解压缓存约 ${formatBytes(cacheBytes)}，本地网格约 ${formatBytes(workingBytes)}`
+    };
+  }
   return {
     cells,
     gridBytes,
     workingBytes,
     label: `${formatBytes(workingBytes)} 本地工作文件，GMT 实际下载量取决于分块缓存`
   };
+}
+
+function srtmTileCount(region) {
+  const west = Math.floor(region.west);
+  const east = Math.floor(region.east - Number.EPSILON);
+  const south = Math.floor(region.south);
+  const north = Math.floor(region.north - Number.EPSILON);
+  return Math.max(1, east - west + 1) * Math.max(1, north - south + 1);
 }
 
 function terrainPaths(outputDirectory, config, region = config.region) {
@@ -567,7 +597,10 @@ module.exports = {
   runGMT,
   terrainEstimate,
   terrainPaths,
+  terrainResolutionInfo,
   terrainRemoteName,
+  terrainResolutionSeconds,
+  terrainSource,
   terrainIntensity,
   needsNativeTextRendering
 };
