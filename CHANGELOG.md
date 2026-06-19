@@ -2,6 +2,14 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.6 - 2026-06-19
+
+- Stopped generated GMT preview/export scripts from using `gmt end show`, so macOS Preview no longer opens automatically.
+- Tightened automatic map regions for small survey lines so station maps do not get excessive empty margins.
+- Made the scale bar length adapt to the map width instead of always drawing a 20 km scale bar.
+- Matched scale bar unit labels to the adaptive scale length, using meters for small survey maps.
+- Defaulted dense projected-coordinate imports to hide station labels for a cleaner first preview while keeping the label toggle available.
+
 ## v0.3.5 - 2026-06-19
 
 - Added support for field-survey TXT files with point name plus 3-degree Gauss-Kruger meter coordinates with zone prefixes, such as `点号 北向坐标/m 东向坐标/m`.

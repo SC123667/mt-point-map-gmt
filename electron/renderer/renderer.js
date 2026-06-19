@@ -124,6 +124,9 @@ function loadParsed(parsed) {
   el.regionInput.value = parsed.region;
   const coordinateText = parsed.mapping.coordinateType === "projected" ? "高斯投影坐标点位，已自动转经纬度" : "点位";
   el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个${coordinateText}`;
+  if (parsed.mapping.coordinateType === "projected" && parsed.records.length > 50) {
+    el.showLabelsInput.checked = false;
+  }
   populateColumnSelects();
   renderStationRows();
   renderPlaceholder();
@@ -146,7 +149,11 @@ function populateColumnSelects() {
 async function applyMapping() {
   if (!state.parsed) return notify("请先导入点位文件。");
   const mapping = readMapping();
-  if (!mapping.lon || !mapping.lat) return notify("经度和纬度列必须选择。");
+  if (mapping.coordinateType === "projected") {
+    if (!mapping.easting || !mapping.northing) return notify("投影坐标列必须选择。");
+  } else if (!mapping.lon || !mapping.lat) {
+    return notify("经度和纬度列必须选择。");
+  }
   try {
     const result = await window.mtApp.applyMapping({ rows: state.parsed.rows, mapping });
     state.mapping = mapping;
@@ -252,8 +259,8 @@ function autoRegionClient(records) {
   const east = Math.max(...lons);
   const south = Math.min(...lats);
   const north = Math.max(...lats);
-  const lonPad = Math.max((east - west) * 0.12, 0.03);
-  const latPad = Math.max((north - south) * 0.12, 0.03);
+  const lonPad = Math.max((east - west) * 0.12, 0.001);
+  const latPad = Math.max((north - south) * 0.12, 0.001);
   return `${(west - lonPad).toFixed(6)}/${(east + lonPad).toFixed(6)}/${(south - latPad).toFixed(6)}/${(north + latPad).toFixed(6)}`;
 }
 

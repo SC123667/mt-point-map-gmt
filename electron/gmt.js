@@ -267,8 +267,10 @@ function autoRegion(records) {
   const east = Math.max(...lons);
   const south = Math.min(...lats);
   const north = Math.max(...lats);
-  const lonPad = Math.max((east - west) * 0.12, 0.03);
-  const latPad = Math.max((north - south) * 0.12, 0.03);
+  const lonSpan = east - west;
+  const latSpan = north - south;
+  const lonPad = Math.max(lonSpan * 0.12, 0.001);
+  const latPad = Math.max(latSpan * 0.12, 0.001);
   return `${(west - lonPad).toFixed(6)}/${(east + lonPad).toFixed(6)}/${(south - latPad).toFixed(6)}/${(north + latPad).toFixed(6)}`;
 }
 
@@ -281,12 +283,14 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   fs.writeFileSync(labelsPath, pointLines, "utf8");
 
   const region = (config.region || "").trim() || autoRegion(records);
+  const regionValues = parseRegion(region);
   const gridPrefix = config.showGrid ? "g" : "";
   const frameOption = `-B${gridPrefix}${config.frame}`;
   const titleOption = (config.title || "").trim() ? ` -B+t${quote(config.title)}` : "";
   const outputPrefix = path.join(outputDirectory, config.outputName || "mt_point_map");
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
+  const scale = scaleForRegion(regionValues);
   const shell = process.platform === "win32" ? "bat" : "sh";
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell);
@@ -301,9 +305,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
       `gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
       config.showLabels ? `gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-      config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w20k+o0.5c/0.5c+f+lkm` : "",
+      config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
       config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
-      "gmt end show",
+      "gmt end",
       ""
     ].filter(Boolean).join("\r\n");
   }
@@ -318,9 +322,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
     `  gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
     config.showLabels ? `  gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w20k+o0.5c/0.5c+f+lkm` : "",
+    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
     config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
-    "gmt end show",
+    "gmt end",
     ""
   ].filter(Boolean).join("\n");
 }
@@ -368,6 +372,43 @@ function quote(value) {
   if (/^[A-Za-z0-9_+\-./:=,#]+$/.test(text)) return text;
   if (process.platform === "win32") return `"${text.replace(/"/g, "\"\"")}"`;
   return `'${text.replace(/'/g, "'\"'\"'")}'`;
+}
+
+function parseRegion(region) {
+  const values = String(region || "").split("/").map((value) => Number(value));
+  if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) return null;
+  return {
+    west: values[0],
+    east: values[1],
+    south: values[2],
+    north: values[3]
+  };
+}
+
+function scaleForRegion(region) {
+  if (!region) return { length: "1k", label: "km" };
+  const midLat = (region.south + region.north) / 2;
+  const widthKm = Math.max(0.001, (region.east - region.west) * 111.32 * Math.cos(toRadians(midLat)));
+  const targetKm = widthKm / 4;
+  if (targetKm < 1) return { length: `${niceDistanceMeters(targetKm * 1000)}e`, label: "m" };
+  return { length: `${niceDistanceKm(targetKm)}k`, label: "km" };
+}
+
+function niceDistanceMeters(value) {
+  const options = [20, 50, 100, 200, 500, 1000];
+  return options.find((option) => option >= value) || 1000;
+}
+
+function niceDistanceKm(value) {
+  const exponent = Math.floor(Math.log10(value));
+  const base = 10 ** exponent;
+  const normalized = value / base;
+  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return Number((step * base).toPrecision(6));
+}
+
+function toRadians(degrees) {
+  return degrees * Math.PI / 180;
 }
 
 function ghostscriptLibraryPath(binDir) {
