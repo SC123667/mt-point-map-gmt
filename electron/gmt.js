@@ -7,12 +7,95 @@ const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
 
 function gmtAvailable() {
-  const command = process.platform === "win32" ? "where" : "which";
+  return resolveGMT().available;
+}
+
+function resolveGMT() {
+  const pathCandidates = gmtPathCandidates();
+  for (const candidate of pathCandidates) {
+    const resolved = testGMTCandidate(candidate.path, candidate.source);
+    if (resolved.available) return resolved;
+  }
+  return {
+    available: false,
+    path: "",
+    binDir: "",
+    version: "",
+    source: "",
+    message: "未找到 GMT 命令。"
+  };
+}
+
+function gmtPathCandidates() {
+  const candidates = [];
+  const seen = new Set();
+  const add = (candidate, source) => {
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    candidates.push({ path: candidate, source });
+  };
+
+  for (const binDir of String(process.env.PATH || "").split(path.delimiter)) {
+    if (!binDir) continue;
+    add(path.join(binDir, process.platform === "win32" ? "gmt.exe" : "gmt"), "PATH");
+  }
+
+  if (process.platform === "darwin") {
+    add("/opt/homebrew/bin/gmt", "Homebrew Apple Silicon");
+    add("/usr/local/bin/gmt", "Homebrew Intel");
+    add("/opt/local/bin/gmt", "MacPorts");
+    add("/Applications/GMT-6.5.0.app/Contents/Resources/bin/gmt", "GMT macOS App");
+    add("/Applications/GMT-6.6.0.app/Contents/Resources/bin/gmt", "GMT macOS App");
+    try {
+      const appNames = fs.readdirSync("/Applications").filter((name) => /^GMT-.*\.app$/i.test(name));
+      for (const appName of appNames) {
+        add(path.join("/Applications", appName, "Contents", "Resources", "bin", "gmt"), "GMT macOS App");
+      }
+    } catch {
+      // /Applications can be unavailable on unusual systems.
+    }
+  }
+
+  if (process.platform === "win32") {
+    const roots = [
+      process.env.ProgramFiles,
+      process.env["ProgramFiles(x86)"],
+      process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Programs") : ""
+    ].filter(Boolean);
+    for (const root of roots) {
+      try {
+        const names = fs.readdirSync(root).filter((name) => /^GMT/i.test(name));
+        for (const name of names) add(path.join(root, name, "bin", "gmt.exe"), "Windows install directory");
+      } catch {
+        // Ignore inaccessible system folders.
+      }
+    }
+  }
+
+  return candidates;
+}
+
+function testGMTCandidate(candidatePath, source) {
+  if (!fs.existsSync(candidatePath)) {
+    return { available: false };
+  }
   try {
-    execFileSync(command, ["gmt"], { stdio: "ignore" });
-    return true;
+    const version = execFileSync(candidatePath, ["--version"], {
+      encoding: "utf8",
+      timeout: 8000,
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return {
+      available: true,
+      path: candidatePath,
+      binDir: path.dirname(candidatePath),
+      version,
+      gsLib: ghostscriptLibraryPath(path.dirname(candidatePath)),
+      source,
+      message: `已找到 GMT ${version}：${candidatePath}`
+    };
   } catch {
-    return false;
+    return { available: false };
   }
 }
 
@@ -199,22 +282,27 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
 
   const region = (config.region || "").trim() || autoRegion(records);
   const gridPrefix = config.showGrid ? "g" : "";
+  const frameOption = `-B${gridPrefix}${config.frame}`;
+  const titleOption = (config.title || "").trim() ? ` -B+t${quote(config.title)}` : "";
   const outputPrefix = path.join(outputDirectory, config.outputName || "mt_point_map");
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
   const shell = process.platform === "win32" ? "bat" : "sh";
+  const gmt = resolveGMT();
+  const environmentLines = gmtEnvironmentLines(gmt, shell);
   if (shell === "bat") {
     return [
       "@echo off",
       "setlocal enabledelayedexpansion",
+      ...environmentLines,
       `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
       "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
-      `gmt basemap -R${region} -J${config.projection} -B${gridPrefix}${config.frame}+t${quote(config.title)}`,
-      "gmt coast -R -J -Di -Ggray95 -Swhite -W0.25p,gray45",
-      `gmt plot ${quote(pointsPath)} -R -J -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
-      config.showLabels ? `gmt text ${quote(labelsPath)} -R -J -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-      config.showScale ? "gmt basemap -R -J -LjBR+w20k+o0.5c/0.5c+f+lkm" : "",
-      config.showNorthArrow ? "gmt basemap -R -J -TdjTR+w1.0c+o0.4c/0.4c" : "",
+      `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
+      `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+      `gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+      config.showLabels ? `gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+      config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w20k+o0.5c/0.5c+f+lkm` : "",
+      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
       "gmt end show",
       ""
     ].filter(Boolean).join("\r\n");
@@ -222,15 +310,16 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   return [
     "#!/usr/bin/env bash",
     "set -euo pipefail",
+    ...environmentLines,
     "",
     `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
     "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
-    `  gmt basemap -R${region} -J${config.projection} -B${gridPrefix}${config.frame}+t${quote(config.title)}`,
-    "  gmt coast -R -J -Di -Ggray95 -Swhite -W0.25p,gray45",
-    `  gmt plot ${quote(pointsPath)} -R -J -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
-    config.showLabels ? `  gmt text ${quote(labelsPath)} -R -J -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-    config.showScale ? "  gmt basemap -R -J -LjBR+w20k+o0.5c/0.5c+f+lkm" : "",
-    config.showNorthArrow ? "  gmt basemap -R -J -TdjTR+w1.0c+o0.4c/0.4c" : "",
+    `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
+    `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+    `  gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+    config.showLabels ? `  gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w20k+o0.5c/0.5c+f+lkm` : "",
+    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
     "gmt end show",
     ""
   ].filter(Boolean).join("\n");
@@ -247,16 +336,22 @@ function saveScript(script, outputDirectory, outputName = "mt_point_map") {
 
 function runGMT(script, outputDirectory, outputName, formats) {
   const scriptPath = saveScript(script, outputDirectory, outputName);
-  if (!gmtAvailable()) {
+  const gmt = resolveGMT();
+  if (!gmt.available) {
     return {
       ok: false,
       scriptPath,
-      message: "未找到 GMT 命令。请先安装 GMT 6；macOS 可用 brew install gmt，Windows 请安装 GMT 官方 Windows 版并加入 PATH。"
+      message: "未找到 GMT 命令。请先安装 GMT 6；macOS 可安装 GMT 官方 App 或 brew install gmt，Windows 请安装 GMT 官方 Windows 版。"
     };
   }
   const command = process.platform === "win32" ? "cmd.exe" : "/bin/bash";
   const args = process.platform === "win32" ? ["/c", scriptPath] : [scriptPath];
-  const result = spawnSync(command, args, { cwd: outputDirectory, encoding: "utf8" });
+  const env = {
+    ...process.env,
+    PATH: `${gmt.binDir}${path.delimiter}${process.env.PATH || ""}`
+  };
+  if (gmt.gsLib) env.GS_LIB = gmt.gsLib;
+  const result = spawnSync(command, args, { cwd: outputDirectory, encoding: "utf8", env });
   if (result.status !== 0) {
     return { ok: false, scriptPath, message: result.stderr || result.stdout || "GMT 执行失败。" };
   }
@@ -275,8 +370,31 @@ function quote(value) {
   return `'${text.replace(/'/g, "'\"'\"'")}'`;
 }
 
+function ghostscriptLibraryPath(binDir) {
+  const resourceRoot = path.resolve(binDir, "..");
+  const initDir = path.join(resourceRoot, "share", "ghostscript", "Resource", "Init");
+  const libDir = path.join(resourceRoot, "share", "ghostscript", "lib");
+  const parts = [initDir, libDir].filter((candidate) => fs.existsSync(candidate));
+  return parts.join(path.delimiter);
+}
+
+function gmtEnvironmentLines(gmt, shell) {
+  if (!gmt.available || !gmt.binDir) return [];
+  if (shell === "bat") {
+    return [
+      `set "PATH=${gmt.binDir};%PATH%"`,
+      gmt.gsLib ? `set "GS_LIB=${gmt.gsLib}"` : ""
+    ].filter(Boolean);
+  }
+  return [
+    `export PATH=${quote(gmt.binDir)}:"$PATH"`,
+    gmt.gsLib ? `export GS_LIB=${gmt.gsLib.split(path.delimiter).map(quote).join(":")}` : ""
+  ].filter(Boolean);
+}
+
 module.exports = {
   gmtAvailable,
+  resolveGMT,
   installPlan,
   installerDownloadPlan,
   startGMTInstall,

@@ -2,6 +2,15 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.4 - 2026-06-19
+
+- Fixed GMT detection on macOS when GMT is installed as the official `/Applications/GMT-*.app` bundle.
+- Added the detected GMT bin directory to generated scripts and export runs so map output works even when GUI apps do not inherit terminal PATH.
+- Added visible feedback for the "重新检测 GMT" button, including the detected version and executable path.
+- Fixed GMT 6.5 basemap frame/title syntax by writing the title as a separate `-B+t...` option.
+- Replaced modern-mode shorthand `-R -J` with full region/projection options in generated scripts.
+- Added `GS_LIB` setup for the Ghostscript bundled inside the official GMT macOS app.
+
 ## v0.3.3 - 2026-06-19
 
 - Added visible GMT installer download progress with transferred size, total size, speed, and status.

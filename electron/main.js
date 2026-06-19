@@ -10,6 +10,7 @@ const {
   gmtAvailable,
   installPlan,
   openDownloadedInstaller,
+  resolveGMT,
   runGMT,
   saveScript
 } = require("./gmt");
@@ -46,6 +47,7 @@ app.on("window-all-closed", () => {
 
 ipcMain.handle("app:status", () => ({
   platform: process.platform,
+  gmtInfo: resolveGMT(),
   gmtAvailable: gmtAvailable(),
   installPlan: installPlan(),
   outputDirectory: defaultOutputDirectory(app),
@@ -125,7 +127,11 @@ ipcMain.handle("gmt:downloadCancel", () => {
   currentInstallerDownload.cancel();
   return { ok: true };
 });
-ipcMain.handle("gmt:recheck", () => ({ gmtAvailable: gmtAvailable(), installPlan: installPlan() }));
+ipcMain.handle("gmt:recheck", () => ({
+  gmtInfo: resolveGMT(),
+  gmtAvailable: gmtAvailable(),
+  installPlan: installPlan()
+}));
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));
 
@@ -178,8 +184,9 @@ function loadRenderer(win) {
 }
 
 function startInstallerDownload(webContents) {
-  if (gmtAvailable()) {
-    return { ok: false, message: "GMT 已安装，无需下载。", status: null };
+  const gmtInfo = resolveGMT();
+  if (gmtInfo.available) {
+    return { ok: false, message: `GMT 已安装，无需下载。\n${gmtInfo.path}`, status: null };
   }
   if (currentInstallerDownload && !currentInstallerDownload.done) {
     return { ok: true, message: "GMT 安装包正在下载。", status: currentInstallerDownload.statusPayload() };

@@ -40,7 +40,7 @@ function wireEvents() {
   el.exportPdfBtn.addEventListener("click", () => exportMap(["pdf"], true));
   el.exportBothBtn.addEventListener("click", () => exportMap(["png", "pdf"], true));
   el.saveScriptBtn.addEventListener("click", saveScript);
-  el.recheckBtn.addEventListener("click", refreshStatus);
+  el.recheckBtn.addEventListener("click", recheckGMT);
   el.installBtn.addEventListener("click", installGMT);
   el.pauseDownloadBtn.addEventListener("click", () => window.mtApp.pauseGMTDownload());
   el.resumeDownloadBtn.addEventListener("click", () => window.mtApp.resumeGMTDownload());
@@ -55,11 +55,27 @@ async function refreshStatus() {
   const status = await window.mtApp.status();
   state.outputDirectory = status.outputDirectory;
   el.outputPath.textContent = `输出目录：${state.outputDirectory}`;
-  renderGMTStatus(status.gmtAvailable, status.installPlan);
+  renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
 }
 
-function renderGMTStatus(available, plan) {
-  el.appStatus.textContent = available ? `GMT 已就绪，输出目录：${state.outputDirectory}` : `未检测到 GMT。${plan.message}`;
+async function recheckGMT() {
+  el.recheckBtn.disabled = true;
+  el.recheckBtn.textContent = "检测中...";
+  el.appStatus.textContent = "正在重新检测 GMT...";
+  try {
+    const status = await window.mtApp.recheckGMT();
+    renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
+    notify(status.gmtAvailable ? `已检测到 GMT：\n${status.gmtInfo.path}` : `仍未检测到 GMT。\n${status.installPlan.message}`);
+  } finally {
+    el.recheckBtn.disabled = false;
+    el.recheckBtn.textContent = "重新检测 GMT";
+  }
+}
+
+function renderGMTStatus(available, plan, gmtInfo) {
+  el.appStatus.textContent = available
+    ? `GMT 已就绪：${gmtInfo.version || "未知版本"}，路径：${gmtInfo.path}`
+    : `未检测到 GMT。${plan.message}`;
   const downloadText = plan.download ? `将下载：${plan.download.fileName}` : "请参考官方安装文档";
   el.installPlanText.textContent = `${plan.platform}：${downloadText}`;
   el.installBtn.disabled = available || !plan.canAutoInstall;
@@ -207,7 +223,7 @@ function renderStationRows() {
 }
 
 function renderPreview(filePath) {
-  const url = `file://${filePath.replace(/\\/g, "/")}?t=${Date.now()}`;
+  const url = `file://${encodeURI(filePath.replace(/\\/g, "/"))}?t=${Date.now()}`;
   el.previewBox.innerHTML = `<img src="${url}" alt="GMT 点位图预览" />`;
 }
 
