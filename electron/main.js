@@ -23,12 +23,12 @@ function createWindow() {
     minHeight: 720,
     title: APP_TITLE,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false
+      contextIsolation: false,
+      nodeIntegration: true,
+      sandbox: false
     }
   });
-  win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  loadRenderer(win);
 }
 
 app.whenReady().then(() => {
@@ -123,4 +123,35 @@ function decodeText(buffer) {
   const utf8 = buffer.toString("utf8");
   if (!utf8.includes("\uFFFD")) return utf8;
   return buffer.toString("latin1");
+}
+
+function loadRenderer(win) {
+  const rendererDir = path.join(__dirname, "renderer");
+  const htmlPath = path.join(rendererDir, "index.html");
+  const cssPath = path.join(rendererDir, "styles.css");
+  const jsPath = path.join(rendererDir, "renderer.js");
+  const bridge = `
+    const { ipcRenderer } = require("electron");
+    window.mtApp = {
+      status: () => ipcRenderer.invoke("app:status"),
+      openFile: () => ipcRenderer.invoke("file:open"),
+      loadSample: () => ipcRenderer.invoke("file:sample"),
+      applyMapping: (payload) => ipcRenderer.invoke("data:applyMapping", payload),
+      buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),
+      saveScript: (payload) => ipcRenderer.invoke("gmt:saveScript", payload),
+      exportMap: (payload) => ipcRenderer.invoke("gmt:export", payload),
+      installGMT: () => ipcRenderer.invoke("gmt:install"),
+      recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
+      openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
+      openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)
+    };
+  `;
+
+  let html = fs.readFileSync(htmlPath, "utf8");
+  const css = fs.readFileSync(cssPath, "utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8");
+  html = html
+    .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
+    .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);
+  win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 }

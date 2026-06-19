@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.2 - 2026-06-19
+
+- Fixed the packaged app rendering bug where JavaScript source text could appear above the interface.
+- Changed the Electron renderer loading path to inline CSS and renderer code from the main process.
+- Removed the runtime dependency on the preload bridge for the visible UI.
+
 ## v0.3.1 - 2026-06-19
 
 - Changed the GMT install button to directly download the official GMT installer for the current system.
