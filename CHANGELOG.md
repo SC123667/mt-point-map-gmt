@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.5 - 2026-06-19
+
+- Added support for field-survey TXT files with point name plus 3-degree Gauss-Kruger meter coordinates with zone prefixes, such as `点号 北向坐标/m 东向坐标/m`.
+- Added GB18030/GBK decoding for Chinese TXT coordinate files.
+- Improved whitespace parsing so mixed spaces and tabs are handled as one TXT-style delimiter.
+- Improved header detection so descriptive lines like `线距200 m点距20 m` are ignored instead of breaking column recognition.
+
 ## v0.3.4 - 2026-06-19
 
 - Fixed GMT detection on macOS when GMT is installed as the official `/Applications/GMT-*.app` bundle.

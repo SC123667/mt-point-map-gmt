@@ -3,6 +3,8 @@ const LON_HINTS = ["lon", "lng", "long", "longitude", "x", "经度", "东经"];
 const LAT_HINTS = ["lat", "latitude", "y", "纬度", "北纬"];
 const LINE_HINTS = ["line", "profile", "surveyline", "测线", "剖面", "线号"];
 const ELEVATION_HINTS = ["elev", "alt", "height", "z", "高程", "海拔"];
+const EASTING_HINTS = ["easting", "east", "xcoord", "xcoordinate", "x坐标", "东向", "东坐标", "横坐标"];
+const NORTHING_HINTS = ["northing", "north", "ycoord", "ycoordinate", "y坐标", "北向", "北坐标", "纵坐标"];
 
 function parseStationText(text, filePath = "") {
   const rawRows = splitRows(text);
@@ -40,20 +42,148 @@ function detectMapping(columns, rows, hasHeader = true) {
     lon = guessed.lon;
     lat = guessed.lat;
   }
-  if (!lon || !lat) throw new Error("无法自动识别经度和纬度列，请检查表头或数据列顺序。");
+  if (lon && lat && countValidGeographicRows(rows, lon, lat) > 0) {
+    return {
+      coordinateType: "geographic",
+      name: name || guessNameColumn(columns, rows, lon, lat),
+      lon,
+      lat,
+      line,
+      elevation
+    };
+  }
+
+  const projected = detectProjectedMapping(columns, rows, hasHeader);
+  if (projected) {
+    return {
+      coordinateType: "projected",
+      name: name || guessNameColumn(columns, rows, projected.easting, projected.northing),
+      easting: projected.easting,
+      northing: projected.northing,
+      projectedSystem: projected.system,
+      line,
+      elevation
+    };
+  }
+
+  throw new Error("无法自动识别经纬度或高斯投影坐标列，请检查表头或数据列顺序。");
+}
+
+function countValidGeographicRows(rows, lon, lat) {
+  return rows.filter((row) => {
+    const lonValue = toNumber(row[lon]);
+    const latValue = toNumber(row[lat]);
+    return Number.isFinite(lonValue) && Number.isFinite(latValue) && lonValue >= -180 && lonValue <= 180 && latValue >= -90 && latValue <= 90;
+  }).length;
+}
+
+function detectProjectedMapping(columns, rows, hasHeader) {
+  const numeric = numericColumns(columns, rows);
+  if (numeric.length < 2) return null;
+
+  const hintedEast = hasHeader ? firstHint(columns, EASTING_HINTS) : "";
+  const hintedNorth = hasHeader ? firstHint(columns, NORTHING_HINTS) : "";
+  const candidates = [];
+  const add = (easting, northing, hintBonus = 0) => {
+    if (!easting || !northing || easting === northing) return;
+    candidates.push({ easting, northing, hintBonus });
+  };
+
+  add(hintedEast, hintedNorth, 12);
+  add(hintedNorth, hintedEast, 8);
+  for (const easting of numeric) {
+    for (const northing of numeric) add(easting, northing, 0);
+  }
+
+  let best = null;
+  for (const candidate of candidates) {
+    const tested = scoreProjectedCandidate(candidate, rows);
+    if (!best || tested.score > best.score) best = tested;
+  }
+  return best && best.score > 0 ? best : null;
+}
+
+function scoreProjectedCandidate(candidate, rows) {
+  let score = candidate.hintBonus || 0;
+  let system = null;
+  for (const row of rows.slice(0, 50)) {
+    const easting = toNumber(row[candidate.easting]);
+    const northing = toNumber(row[candidate.northing]);
+    if (!Number.isFinite(easting) || !Number.isFinite(northing)) continue;
+    const converted = convertGaussKruger3Degree(easting, northing);
+    if (!converted) continue;
+    if (converted.lon >= 70 && converted.lon <= 140 && converted.lat >= 15 && converted.lat <= 55) {
+      score += 4;
+      system = converted.system;
+    } else if (converted.lon >= -180 && converted.lon <= 180 && converted.lat >= -90 && converted.lat <= 90) {
+      score += 1;
+      system = converted.system;
+    }
+  }
+  return { ...candidate, score, system };
+}
+
+function convertGaussKruger3Degree(rawEasting, rawNorthing) {
+  const zone = Math.floor(Math.abs(rawEasting) / 1000000);
+  if (zone < 20 || zone > 60) return null;
+  const easting = Math.abs(rawEasting) - zone * 1000000;
+  const northing = rawNorthing;
+  if (easting < 100000 || easting > 900000 || northing < 0) return null;
+  const converted = inverseTransverseMercator(easting, northing, zone * 3);
   return {
-    name: name || guessNameColumn(columns, rows, lon, lat),
-    lon,
-    lat,
-    line,
-    elevation
+    ...converted,
+    system: {
+      type: "gaussKruger3Degree",
+      zone,
+      centralMeridian: zone * 3
+    }
+  };
+}
+
+function inverseTransverseMercator(easting, northing, centralMeridian) {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const e2 = f * (2 - f);
+  const ep2 = e2 / (1 - e2);
+  const x = easting - 500000.0;
+  const y = northing;
+  const m = y;
+  const mu = m / (a * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const phi1 = mu
+    + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu)
+    + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+    + (151 * e1 ** 3 / 96) * Math.sin(6 * mu)
+    + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+  const sinPhi = Math.sin(phi1);
+  const cosPhi = Math.cos(phi1);
+  const tanPhi = Math.tan(phi1);
+  const n1 = a / Math.sqrt(1 - e2 * sinPhi ** 2);
+  const r1 = a * (1 - e2) / (1 - e2 * sinPhi ** 2) ** 1.5;
+  const t1 = tanPhi ** 2;
+  const c1 = ep2 * cosPhi ** 2;
+  const d = x / n1;
+  const lat = phi1 - (n1 * tanPhi / r1) * (
+    d ** 2 / 2
+    - (5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * ep2) * d ** 4 / 24
+    + (61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * ep2 - 3 * c1 ** 2) * d ** 6 / 720
+  );
+  const lon = toRadians(centralMeridian) + (
+    d
+    - (1 + 2 * t1 + c1) * d ** 3 / 6
+    + (5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * ep2 + 24 * t1 ** 2) * d ** 5 / 120
+  ) / cosPhi;
+  return {
+    lon: toDegrees(lon),
+    lat: toDegrees(lat)
   };
 }
 
 function buildRecords(rows, mapping) {
   return rows.map((row, index) => {
-    const lon = toNumber(row[mapping.lon]);
-    const lat = toNumber(row[mapping.lat]);
+    const coordinate = readCoordinate(row, mapping);
+    if (!coordinate) return null;
+    const { lon, lat } = coordinate;
     if (!Number.isFinite(lon) || !Number.isFinite(lat) || lon < -180 || lon > 180 || lat < -90 || lat > 90) return null;
     const rawName = mapping.name ? String(row[mapping.name] || "").trim() : "";
     return {
@@ -66,14 +196,26 @@ function buildRecords(rows, mapping) {
   }).filter(Boolean);
 }
 
+function readCoordinate(row, mapping) {
+  if (mapping.coordinateType === "projected") {
+    const converted = convertGaussKruger3Degree(toNumber(row[mapping.easting]), toNumber(row[mapping.northing]));
+    if (!converted) return null;
+    return { lon: converted.lon, lat: converted.lat };
+  }
+  return {
+    lon: toNumber(row[mapping.lon]),
+    lat: toNumber(row[mapping.lat])
+  };
+}
+
 function splitRows(text) {
   const lines = text.split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#") && !line.startsWith("//") && !line.startsWith(";"));
   if (!lines.length) return [];
   const sample = lines.slice(0, 20).join("\n");
-  if (sample.includes(",") || sample.includes("\t") || sample.includes(";")) {
-    const delimiter = sample.includes(",") ? "," : (sample.includes("\t") ? "\t" : ";");
+  if (sample.includes(",") || sample.includes(";")) {
+    const delimiter = sample.includes(",") ? "," : ";";
     return lines.map((line) => parseDelimitedLine(line, delimiter));
   }
   return lines.map((line) => line.split(/\s+/));
@@ -99,8 +241,12 @@ function parseDelimitedLine(line, delimiter) {
 function looksLikeHeader(rows) {
   const firstNumeric = rows[0].filter((cell) => Number.isFinite(toNumber(cell))).length;
   if (rows.length === 1) return firstNumeric < Math.max(2, Math.floor(rows[0].length / 2));
-  const secondNumeric = rows[1].filter((cell) => Number.isFinite(toNumber(cell))).length;
-  return firstNumeric < 2 && secondNumeric >= 2;
+  const nextDataLike = rows.slice(1, 8).some((row) => {
+    const numeric = row.filter((cell) => Number.isFinite(toNumber(cell))).length;
+    const text = row.filter((cell) => cell && !Number.isFinite(toNumber(cell))).length;
+    return numeric >= 2 && text >= 1;
+  });
+  return firstNumeric < 2 && nextDataLike;
 }
 
 function dedupeColumns(columns) {
@@ -171,6 +317,14 @@ function guessNameColumn(columns, rows, lon, lat) {
 function toNumber(value) {
   if (value === null || value === undefined || value === "") return NaN;
   return Number(String(value).trim().replace(/,/g, "").replace(/°/g, ""));
+}
+
+function toRadians(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+function toDegrees(radians) {
+  return radians * 180 / Math.PI;
 }
 
 module.exports = {

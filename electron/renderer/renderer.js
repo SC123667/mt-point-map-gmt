@@ -122,7 +122,8 @@ function loadParsed(parsed) {
   state.columns = parsed.columns;
   state.mapping = parsed.mapping;
   el.regionInput.value = parsed.region;
-  el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个点位`;
+  const coordinateText = parsed.mapping.coordinateType === "projected" ? "高斯投影坐标点位，已自动转经纬度" : "点位";
+  el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个${coordinateText}`;
   populateColumnSelects();
   renderStationRows();
   renderPlaceholder();
@@ -136,8 +137,8 @@ function populateColumnSelects() {
     for (const column of state.columns) select.append(new Option(column, column));
   }
   el.nameColumn.value = state.mapping.name || "";
-  el.lonColumn.value = state.mapping.lon || "";
-  el.latColumn.value = state.mapping.lat || "";
+  el.lonColumn.value = state.mapping.lon || state.mapping.easting || "";
+  el.latColumn.value = state.mapping.lat || state.mapping.northing || "";
   el.lineColumn.value = state.mapping.line || "";
   el.elevationColumn.value = state.mapping.elevation || "";
 }
@@ -159,12 +160,25 @@ async function applyMapping() {
 }
 
 function readMapping() {
-  return {
+  const base = {
     name: el.nameColumn.value,
-    lon: el.lonColumn.value,
-    lat: el.latColumn.value,
     line: el.lineColumn.value,
     elevation: el.elevationColumn.value
+  };
+  if (state.mapping && state.mapping.coordinateType === "projected") {
+    return {
+      ...base,
+      coordinateType: "projected",
+      easting: el.lonColumn.value,
+      northing: el.latColumn.value,
+      projectedSystem: state.mapping.projectedSystem
+    };
+  }
+  return {
+    ...base,
+    coordinateType: "geographic",
+    lon: el.lonColumn.value,
+    lat: el.latColumn.value
   };
 }
 

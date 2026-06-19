@@ -145,6 +145,14 @@ function loadStationFile(filePath) {
 function decodeText(buffer) {
   const utf8 = buffer.toString("utf8");
   if (!utf8.includes("\uFFFD")) return utf8;
+  for (const encoding of ["gb18030", "gbk"]) {
+    try {
+      const decoded = new TextDecoder(encoding).decode(buffer);
+      if (decoded && !decoded.includes("\uFFFD")) return decoded;
+    } catch {
+      // Fall through to latin1 as a last resort.
+    }
+  }
   return buffer.toString("latin1");
 }
 
