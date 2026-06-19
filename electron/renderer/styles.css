@@ -121,6 +121,24 @@ progress {
   align-items: start;
 }
 
+.output-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.output-row p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.output-row button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .button-row,
 .header-actions {
   display: flex;
@@ -198,6 +216,25 @@ select {
   padding: 4px 8px;
   font: inherit;
   background: #fff;
+}
+
+.color-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-picker {
+  width: 34px;
+  min-width: 34px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.color-picker:disabled {
+  opacity: 1;
+  cursor: default;
 }
 
 table {

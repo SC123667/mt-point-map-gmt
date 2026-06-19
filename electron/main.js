@@ -51,7 +51,7 @@ ipcMain.handle("app:status", () => ({
   gmtInfo: resolveGMT(),
   gmtAvailable: gmtAvailable(),
   installPlan: installPlan(),
-  outputDirectory: defaultOutputDirectory(app),
+  outputDirectory: savedOutputDirectory(),
   version: app.getVersion()
 }));
 
@@ -86,13 +86,13 @@ ipcMain.handle("data:applyMapping", (_event, payload) => {
 });
 
 ipcMain.handle("gmt:buildScript", (_event, payload) => {
-  return buildScript(payload.records, payload.config, defaultOutputDirectory(app), payload.formats || ["png", "pdf"]);
+  return buildScript(payload.records, payload.config, outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf"]);
 });
 
 ipcMain.handle("gmt:saveScript", async (_event, payload) => {
   const result = await dialog.showSaveDialog({
     title: "保存 GMT 脚本",
-    defaultPath: `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`,
+    defaultPath: path.join(outputDirectoryFromPayload(payload), `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`),
     filters: [
       { name: "GMT 脚本", extensions: [process.platform === "win32" ? "bat" : "gmt"] },
       { name: "所有文件", extensions: ["*"] }
@@ -106,7 +106,8 @@ ipcMain.handle("gmt:saveScript", async (_event, payload) => {
 });
 
 ipcMain.handle("gmt:export", async (_event, payload) => {
-  const outputDirectory = defaultOutputDirectory(app);
+  const outputDirectory = outputDirectoryFromPayload(payload);
+  saveOutputDirectory(outputDirectory);
   const formats = payload.formats || ["png"];
   const needsTitleOverlay = shouldOverlayTitle(payload.config);
   const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
@@ -120,6 +121,17 @@ ipcMain.handle("gmt:export", async (_event, payload) => {
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
   }
   return result;
+});
+
+ipcMain.handle("output:chooseDirectory", async (_event, currentDirectory) => {
+  const result = await dialog.showOpenDialog({
+    title: "选择导出目录",
+    defaultPath: currentDirectory || defaultOutputDirectory(app),
+    properties: ["openDirectory", "createDirectory"]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  saveOutputDirectory(result.filePaths[0]);
+  return result.filePaths[0];
 });
 
 ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
@@ -159,6 +171,46 @@ function loadStationFile(filePath) {
   const text = decodeText(buffer);
   const parsed = parseStationText(text, filePath);
   return { ...parsed, region: autoRegion(parsed.records) };
+}
+
+function outputDirectoryFromPayload(payload) {
+  const candidate = String(payload?.outputDirectory || "").trim();
+  return candidate || savedOutputDirectory();
+}
+
+function savedOutputDirectory() {
+  const settings = readSettings();
+  return settings.outputDirectory || defaultOutputDirectory(app);
+}
+
+function saveOutputDirectory(outputDirectory) {
+  const directory = String(outputDirectory || "").trim();
+  if (!directory) return;
+  writeSettings({ ...readSettings(), outputDirectory: directory });
+}
+
+function settingsFilePath() {
+  return path.join(app.getPath("userData"), "settings.json");
+}
+
+function readSettings() {
+  try {
+    const filePath = settingsFilePath();
+    if (!fs.existsSync(filePath)) return {};
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeSettings(settings) {
+  try {
+    const filePath = settingsFilePath();
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
+  } catch {
+    // Settings persistence is helpful but should never block plotting.
+  }
 }
 
 function shouldOverlayTitle(config) {
@@ -297,6 +349,7 @@ function loadRenderer(win) {
       buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),
       saveScript: (payload) => ipcRenderer.invoke("gmt:saveScript", payload),
       exportMap: (payload) => ipcRenderer.invoke("gmt:export", payload),
+      chooseOutputDirectory: (currentDirectory) => ipcRenderer.invoke("output:chooseDirectory", currentDirectory),
       imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
       pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),

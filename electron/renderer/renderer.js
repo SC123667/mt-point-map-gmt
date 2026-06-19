@@ -6,20 +6,39 @@ const state = {
   outputDirectory: ""
 };
 
+const CUSTOM_COLOR_VALUE = "__custom__";
+const COLOR_OPTIONS = [
+  ["#d7191c", "红色 #d7191c"],
+  ["#2b83ba", "蓝色 #2b83ba"],
+  ["#1a9641", "绿色 #1a9641"],
+  ["#fdae61", "橙色 #fdae61"],
+  ["#984ea3", "紫色 #984ea3"],
+  ["#4d4d4d", "深灰 #4d4d4d"],
+  ["black", "黑色 black"],
+  ["white", "白色 white"],
+  ["gray50", "灰色 gray50"],
+  ["yellow", "黄色 yellow"],
+  ["cyan", "青色 cyan"],
+  ["magenta", "品红 magenta"],
+  [CUSTOM_COLOR_VALUE, "自定义 RGB/HEX"]
+];
+
 const ids = [
   "appStatus", "dataSummary", "openBtn", "sampleBtn", "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
-  "installPlanText", "outputPath", "titleInput", "regionInput", "projectionInput", "frameInput",
-  "autoRegionBtn", "symbolInput", "pointSizeInput", "pointFillInput", "penWidthInput", "penColorInput",
-  "showLabelsInput", "labelSizeInput", "labelColorInput", "labelDXInput", "labelDYInput",
+  "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
+  "autoRegionBtn", "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
+  "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
+  "labelDXInput", "labelDYInput",
   "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
 window.addEventListener("DOMContentLoaded", async () => {
+  populateColorControls();
   wireEvents();
   await refreshStatus();
 });
@@ -40,6 +59,7 @@ function wireEvents() {
   el.exportPdfBtn.addEventListener("click", () => exportMap(["pdf"], true));
   el.exportBothBtn.addEventListener("click", () => exportMap(["png", "pdf"], true));
   el.saveScriptBtn.addEventListener("click", saveScript);
+  el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
   el.recheckBtn.addEventListener("click", recheckGMT);
   el.installBtn.addEventListener("click", installGMT);
   el.pauseDownloadBtn.addEventListener("click", () => window.mtApp.pauseGMTDownload());
@@ -54,8 +74,19 @@ function wireEvents() {
 async function refreshStatus() {
   const status = await window.mtApp.status();
   state.outputDirectory = status.outputDirectory;
-  el.outputPath.textContent = `输出目录：${state.outputDirectory}`;
+  renderOutputDirectory();
   renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
+}
+
+function renderOutputDirectory() {
+  el.outputPath.textContent = `输出目录：${state.outputDirectory}`;
+}
+
+async function chooseOutputDirectory() {
+  const selected = await window.mtApp.chooseOutputDirectory(state.outputDirectory);
+  if (!selected) return;
+  state.outputDirectory = selected;
+  renderOutputDirectory();
 }
 
 async function recheckGMT() {
@@ -201,11 +232,11 @@ function readConfig() {
     showNorthArrow: el.showNorthInput.checked,
     pointSymbol: el.symbolInput.value,
     pointSize: Number(el.pointSizeInput.value),
-    pointFill: el.pointFillInput.value,
+    pointFill: readColor("pointFill"),
     pointPenWidth: Number(el.penWidthInput.value),
-    pointPenColor: el.penColorInput.value,
+    pointPenColor: readColor("penColor"),
     labelFontSize: Number(el.labelSizeInput.value),
-    labelColor: el.labelColorInput.value,
+    labelColor: readColor("labelColor"),
     labelDX: Number(el.labelDXInput.value),
     labelDY: Number(el.labelDYInput.value),
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
@@ -215,12 +246,13 @@ function readConfig() {
 async function exportMap(formats, showAlert) {
   if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
   const config = readConfig();
-  const result = await window.mtApp.exportMap({ records: state.records, config, formats });
+  const result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
   if (!result.ok) {
     await refreshStatus();
     return notify(`${result.message}\n脚本已保存：${result.scriptPath}`);
   }
-  el.outputPath.textContent = `输出目录：${result.outputDirectory}`;
+  state.outputDirectory = result.outputDirectory;
+  renderOutputDirectory();
   if (formats.includes("png")) {
     const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
     if (png) await renderPreview(png);
@@ -230,8 +262,65 @@ async function exportMap(formats, showAlert) {
 
 async function saveScript() {
   if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
-  const saved = await window.mtApp.saveScript({ records: state.records, config: readConfig() });
+  const saved = await window.mtApp.saveScript({ records: state.records, config: readConfig(), outputDirectory: state.outputDirectory });
   if (saved) notify(`GMT 脚本已保存：${saved}`);
+}
+
+function populateColorControls() {
+  setupColorControl("pointFill", "#d7191c");
+  setupColorControl("penColor", "black");
+  setupColorControl("labelColor", "black");
+}
+
+function setupColorControl(key, initialValue) {
+  const select = el[`${key}Input`];
+  const picker = el[`${key}Picker`];
+  select.innerHTML = "";
+  for (const [value, label] of COLOR_OPTIONS) {
+    select.append(new Option(label, value));
+  }
+  setColorControlValue(key, initialValue);
+  select.addEventListener("change", () => {
+    if (select.value === CUSTOM_COLOR_VALUE) {
+      picker.disabled = false;
+      picker.click();
+    } else {
+      picker.disabled = true;
+      picker.value = colorToHex(select.value);
+    }
+  });
+  picker.addEventListener("input", () => {
+    select.value = CUSTOM_COLOR_VALUE;
+    picker.disabled = false;
+  });
+}
+
+function setColorControlValue(key, value) {
+  const select = el[`${key}Input`];
+  const picker = el[`${key}Picker`];
+  const known = COLOR_OPTIONS.some(([optionValue]) => optionValue === value);
+  select.value = known ? value : CUSTOM_COLOR_VALUE;
+  picker.value = colorToHex(value);
+  picker.disabled = known;
+}
+
+function readColor(key) {
+  const select = el[`${key}Input`];
+  if (select.value === CUSTOM_COLOR_VALUE) return el[`${key}Picker`].value;
+  return select.value;
+}
+
+function colorToHex(value) {
+  const named = {
+    black: "#000000",
+    white: "#ffffff",
+    gray50: "#808080",
+    yellow: "#ffff00",
+    cyan: "#00ffff",
+    magenta: "#ff00ff"
+  };
+  const text = String(value || "").trim();
+  return named[text] || (/^#[0-9a-f]{6}$/i.test(text) ? text : "#000000");
 }
 
 function renderStationRows() {

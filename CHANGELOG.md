@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.9 - 2026-06-20
+
+- Replaced manual color text boxes with preset color dropdowns plus native color pickers for point fill, point border, and station label text.
+- Added a selectable export directory that is used by preview, PNG/PDF export, and the GMT script save dialog.
+- Remembered the selected export directory across app launches.
+
 ## v0.3.8 - 2026-06-19
 
 - Fixed Chinese map titles rendering as mojibake in GMT output by drawing non-ASCII titles with Electron's native font renderer after GMT creates the base map.
