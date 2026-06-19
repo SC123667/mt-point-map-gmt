@@ -16,6 +16,9 @@ const TERRAIN_RESOLUTIONS = {
   "03s": { seconds: 3, remote: "@earth_relief_03s", label: "3 秒，约 90 m", source: "srtm" },
   "01s": { seconds: 1, remote: "@earth_relief_01s", label: "1 秒，约 30 m", source: "srtm" }
 };
+const TERRAIN_SAFE_CELL_LIMIT = 2_500_000;
+const TERRAIN_WARNING_CELL_LIMIT = 1_000_000;
+const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
 
 function gmtAvailable() {
   return resolveGMT().available;
@@ -454,40 +457,97 @@ function terrainIntensity(value) {
 
 function terrainEstimate(region, resolution) {
   const parsed = parseRegion(region);
-  const seconds = terrainResolutionSeconds(resolution);
   if (!parsed || parsed.east <= parsed.west || parsed.north <= parsed.south) {
     return {
       cells: 0,
+      xCells: 0,
+      yCells: 0,
       gridBytes: 0,
       workingBytes: 0,
+      blocked: false,
+      warning: "",
+      recommendedResolution: "",
+      recommendedLabel: "",
       label: "请先导入点位或设置有效范围"
     };
   }
-  const xCells = Math.max(2, Math.ceil((parsed.east - parsed.west) * 3600 / seconds));
-  const yCells = Math.max(2, Math.ceil((parsed.north - parsed.south) * 3600 / seconds));
-  const cells = xCells * yCells;
+  const { xCells, yCells, cells } = terrainCellStats(parsed, resolution);
   const gridBytes = cells * 2;
   const workingBytes = gridBytes * 2;
+  const safety = terrainSafety(parsed, resolution, cells);
   if (terrainSource(resolution) === "srtm") {
     const tileCount = srtmTileCount(parsed);
     const downloadBytes = tileCount * 8 * 1024 * 1024;
     const cacheBytes = tileCount * 26 * 1024 * 1024;
+    const baseLabel = `预计下载约 ${formatBytes(downloadBytes)} SRTM 高程瓦片，解压缓存约 ${formatBytes(cacheBytes)}，本地网格约 ${formatBytes(workingBytes)}`;
     return {
       cells,
+      xCells,
+      yCells,
       gridBytes,
       workingBytes: workingBytes + downloadBytes,
       downloadBytes,
       cacheBytes,
       tileCount,
-      label: `预计下载约 ${formatBytes(downloadBytes)} SRTM 高程瓦片，解压缓存约 ${formatBytes(cacheBytes)}，本地网格约 ${formatBytes(workingBytes)}`
+      ...safety,
+      label: [baseLabel, safety.warning].filter(Boolean).join("。")
+    };
+  }
+  const baseLabel = `${formatBytes(workingBytes)} 本地工作文件，GMT 实际下载量取决于分块缓存`;
+  return {
+    cells,
+    xCells,
+    yCells,
+    gridBytes,
+    workingBytes,
+    ...safety,
+    label: [baseLabel, safety.warning].filter(Boolean).join("。")
+  };
+}
+
+function terrainCellStats(region, resolution) {
+  const seconds = terrainResolutionSeconds(resolution);
+  const xCells = Math.max(2, Math.ceil((region.east - region.west) * 3600 / seconds));
+  const yCells = Math.max(2, Math.ceil((region.north - region.south) * 3600 / seconds));
+  return { xCells, yCells, cells: xCells * yCells };
+}
+
+function terrainSafety(region, resolution, cells) {
+  if (cells <= TERRAIN_WARNING_CELL_LIMIT) {
+    return { blocked: false, warning: "", recommendedResolution: "", recommendedLabel: "" };
+  }
+  const recommendedResolution = recommendedTerrainResolution(region);
+  const recommendedLabel = recommendedResolution ? terrainResolutionInfo(recommendedResolution).label : "";
+  const detail = `当前范围在 ${terrainResolutionInfo(resolution).label} 下约 ${formatCount(cells)} 个地形格点`;
+  if (cells > TERRAIN_SAFE_CELL_LIMIT) {
+    const advice = recommendedLabel ? `建议改用 ${recommendedLabel}，或先缩小范围后再用高分辨率` : "建议先缩小范围后再使用高分辨率";
+    return {
+      blocked: true,
+      warning: `${detail}，超过安全上限 ${formatCount(TERRAIN_SAFE_CELL_LIMIT)}，为避免软件卡死已停止准备。${advice}`,
+      recommendedResolution,
+      recommendedLabel
     };
   }
   return {
-    cells,
-    gridBytes,
-    workingBytes,
-    label: `${formatBytes(workingBytes)} 本地工作文件，GMT 实际下载量取决于分块缓存`
+    blocked: false,
+    warning: `${detail}，处理可能较慢；若软件变慢，建议改用 ${coarserRecommendedLabel(region, resolution) || "更低分辨率"} 或缩小范围`,
+    recommendedResolution,
+    recommendedLabel
   };
+}
+
+function recommendedTerrainResolution(region) {
+  return TERRAIN_RECOMMENDATION_ORDER.find((resolution) => {
+    return terrainCellStats(region, resolution).cells <= TERRAIN_SAFE_CELL_LIMIT;
+  }) || "";
+}
+
+function coarserRecommendedLabel(region, currentResolution) {
+  const currentSeconds = terrainResolutionSeconds(currentResolution);
+  const resolution = TERRAIN_RECOMMENDATION_ORDER.find((candidate) => {
+    return terrainResolutionSeconds(candidate) > currentSeconds && terrainCellStats(region, candidate).cells <= TERRAIN_SAFE_CELL_LIMIT;
+  });
+  return resolution ? terrainResolutionInfo(resolution).label : "";
 }
 
 function srtmTileCount(region) {
@@ -532,6 +592,13 @@ function formatBytes(bytes) {
     index += 1;
   }
   return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatCount(value) {
+  const count = Math.max(0, Number(value) || 0);
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(Math.round(count));
 }
 
 function scaleForRegion(region) {

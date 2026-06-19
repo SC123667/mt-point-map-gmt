@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.4 - 2026-06-20
+
+- Added a terrain-resolution safety guard that blocks oversized high-resolution SRTM basemaps before they can freeze or crash the app.
+- Added clearer terrain-size warnings with recommended coarser resolutions when the selected map range is too large.
+- Added a defensive SRTM conversion limit so very large grids stop with an explanation instead of locking the Electron main process.
+
 ## v0.4.3 - 2026-06-20
 
 - Moved data import actions into the desktop menu under `文件 > 导入`, with separate TXT/CSV and EDI-folder import entries.
