@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.3.8 - 2026-06-19
+
+- Fixed Chinese map titles rendering as mojibake in GMT output by drawing non-ASCII titles with Electron's native font renderer after GMT creates the base map.
+- Kept ASCII titles in the pure GMT script path while avoiding GMT title rendering for Chinese text.
+
 ## v0.3.7 - 2026-06-19
 
 - Fixed broken in-app preview images by loading generated PNG files through an Electron IPC data URL instead of a `file://` URL.

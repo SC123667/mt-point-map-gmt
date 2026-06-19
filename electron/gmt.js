@@ -286,7 +286,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const regionValues = parseRegion(region);
   const gridPrefix = config.showGrid ? "g" : "";
   const frameOption = `-B${gridPrefix}${config.frame}`;
-  const titleOption = (config.title || "").trim() ? ` -B+t${quote(config.title)}` : "";
+  const title = (config.title || "").trim();
+  const titleOption = title && !needsNativeTextRendering(title) ? ` -B+t${quote(title)}` : "";
   const outputPrefix = path.join(outputDirectory, config.outputName || "mt_point_map");
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
@@ -374,6 +375,10 @@ function quote(value) {
   return `'${text.replace(/'/g, "'\"'\"'")}'`;
 }
 
+function needsNativeTextRendering(value) {
+  return /[^\x00-\x7F]/.test(String(value || ""));
+}
+
 function parseRegion(region) {
   const values = String(region || "").split("/").map((value) => Number(value));
   if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) return null;
@@ -444,5 +449,6 @@ module.exports = {
   autoRegion,
   buildScript,
   saveScript,
-  runGMT
+  runGMT,
+  needsNativeTextRendering
 };

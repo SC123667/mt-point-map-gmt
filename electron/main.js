@@ -1,7 +1,7 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } = require("electron");
 const { parseStationText, buildRecords } = require("./parser");
 const {
   autoRegion,
@@ -9,6 +9,7 @@ const {
   defaultOutputDirectory,
   gmtAvailable,
   installPlan,
+  needsNativeTextRendering,
   openDownloadedInstaller,
   resolveGMT,
   runGMT,
@@ -104,11 +105,21 @@ ipcMain.handle("gmt:saveScript", async (_event, payload) => {
   return result.filePath;
 });
 
-ipcMain.handle("gmt:export", (_event, payload) => {
+ipcMain.handle("gmt:export", async (_event, payload) => {
   const outputDirectory = defaultOutputDirectory(app);
   const formats = payload.formats || ["png"];
-  const script = buildScript(payload.records, payload.config, outputDirectory, formats);
-  return runGMT(script, outputDirectory, payload.config.outputName || "mt_point_map", formats);
+  const needsTitleOverlay = shouldOverlayTitle(payload.config);
+  const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
+  const outputName = payload.config.outputName || "mt_point_map";
+  const script = buildScript(payload.records, payload.config, outputDirectory, gmtFormats);
+  const result = runGMT(script, outputDirectory, outputName, gmtFormats);
+  if (result.ok && needsTitleOverlay) {
+    await overlayNativeTitle(result, payload.config, outputName, formats);
+  }
+  if (result.ok) {
+    result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
+  }
+  return result;
 });
 
 ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
@@ -148,6 +159,113 @@ function loadStationFile(filePath) {
   const text = decodeText(buffer);
   const parsed = parseStationText(text, filePath);
   return { ...parsed, region: autoRegion(parsed.records) };
+}
+
+function shouldOverlayTitle(config) {
+  const title = String(config?.title || "").trim();
+  return title && needsNativeTextRendering(title);
+}
+
+async function overlayNativeTitle(result, config, outputName, requestedFormats) {
+  const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
+  if (!fs.existsSync(pngPath)) throw new Error(`中文标题叠加失败：未找到 PNG 底图 ${pngPath}`);
+  const rendered = await renderTitledMap(pngPath, String(config.title || "").trim());
+  fs.writeFileSync(pngPath, rendered.pngBuffer);
+  if (requestedFormats.includes("pdf")) {
+    fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), rendered.pdfBuffer);
+  }
+  if (!requestedFormats.includes("png")) {
+    try {
+      fs.unlinkSync(pngPath);
+    } catch {
+      // Leaving the intermediate PNG is harmless if the file is locked by the OS.
+    }
+  }
+}
+
+async function renderTitledMap(pngPath, title) {
+  const image = nativeImage.createFromPath(pngPath);
+  const size = image.getSize();
+  if (!size.width || !size.height) throw new Error("中文标题叠加失败：无法读取 GMT PNG 尺寸。");
+  const titleHeight = Math.max(72, Math.round(size.height * 0.085));
+  const titleSize = Math.max(26, Math.min(54, Math.round(size.width * 0.032)));
+  const totalHeight = size.height + titleHeight;
+  const imageData = fs.readFileSync(pngPath).toString("base64");
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page { size: ${size.width}px ${totalHeight}px; margin: 0; }
+    html, body {
+      width: ${size.width}px;
+      height: ${totalHeight}px;
+      margin: 0;
+      overflow: hidden;
+      background: white;
+    }
+    .title {
+      width: ${size.width}px;
+      height: ${titleHeight}px;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      padding-bottom: ${Math.max(10, Math.round(titleHeight * 0.16))}px;
+      box-sizing: border-box;
+      color: #111;
+      font: 700 ${titleSize}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+      line-height: 1.08;
+      white-space: nowrap;
+    }
+    img {
+      display: block;
+      width: ${size.width}px;
+      height: ${size.height}px;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">${escapeHTML(title)}</div>
+  <img src="data:image/png;base64,${imageData}" />
+</body>
+</html>`;
+  const win = new BrowserWindow({
+    show: false,
+    width: size.width,
+    height: totalHeight,
+    useContentSize: true,
+    webPreferences: {
+      offscreen: true,
+      contextIsolation: true,
+      sandbox: true
+    }
+  });
+  try {
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await win.webContents.executeJavaScript(`
+      Promise.resolve(document.fonts && document.fonts.ready)
+        .then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    `);
+    const pngBuffer = win.webContents.capturePage().then((captured) => captured.toPNG());
+    const pdfBuffer = win.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      margins: { marginType: "none" }
+    });
+    const [png, pdf] = await Promise.all([pngBuffer, pdfBuffer]);
+    return { pngBuffer: png, pdfBuffer: pdf };
+  } finally {
+    win.destroy();
+  }
+}
+
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function decodeText(buffer) {
