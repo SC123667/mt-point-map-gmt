@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld("mtApp", {
   resumeGMTDownload: () => ipcRenderer.invoke("gmt:downloadResume"),
   cancelGMTDownload: () => ipcRenderer.invoke("gmt:downloadCancel"),
   onGMTDownloadProgress: (handler) => ipcRenderer.on("gmt:downloadProgress", (_event, payload) => handler(payload)),
+  onMenuOpenFile: (handler) => ipcRenderer.on("menu:openFile", handler),
+  onMenuOpenEdiDirectory: (handler) => ipcRenderer.on("menu:openEdiDirectory", handler),
+  onMenuLoadSample: (handler) => ipcRenderer.on("menu:loadSample", handler),
+  onMenuChooseOutputDirectory: (handler) => ipcRenderer.on("menu:chooseOutputDirectory", handler),
   recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)

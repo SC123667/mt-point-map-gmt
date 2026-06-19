@@ -3,7 +3,7 @@ const https = require("https");
 const path = require("path");
 const zlib = require("zlib");
 const { spawn, spawnSync } = require("child_process");
-const { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
 const { parseStationText, parseEdiStationText, buildEdiParsedResult, buildRecords } = require("./parser");
 const {
   autoRegion,
@@ -41,7 +41,108 @@ function createWindow() {
       sandbox: false
     }
   });
+  configureMenu(win);
   loadRenderer(win);
+}
+
+function configureMenu(win) {
+  const isMac = process.platform === "darwin";
+  const template = [
+    ...(isMac ? [{
+      label: APP_TITLE,
+      submenu: [
+        { role: "about", label: `关于 ${APP_TITLE}` },
+        { type: "separator" },
+        { role: "hide", label: "隐藏" },
+        { role: "hideOthers", label: "隐藏其他" },
+        { role: "unhide", label: "全部显示" },
+        { type: "separator" },
+        { role: "quit", label: "退出" }
+      ]
+    }] : []),
+    {
+      label: "文件",
+      submenu: [
+        {
+          label: "导入",
+          submenu: [
+            {
+              label: "TXT/CSV 点位文件...",
+              accelerator: "CmdOrCtrl+O",
+              click: () => sendMenuAction(win, "menu:openFile")
+            },
+            {
+              label: "EDI 文件夹...",
+              accelerator: "CmdOrCtrl+Shift+O",
+              click: () => sendMenuAction(win, "menu:openEdiDirectory")
+            }
+          ]
+        },
+        {
+          label: "打开示例数据",
+          click: () => sendMenuAction(win, "menu:loadSample")
+        },
+        { type: "separator" },
+        {
+          label: "选择导出目录...",
+          click: () => sendMenuAction(win, "menu:chooseOutputDirectory")
+        },
+        { type: "separator" },
+        isMac ? { role: "close", label: "关闭窗口" } : { role: "quit", label: "退出" }
+      ]
+    },
+    {
+      label: "编辑",
+      submenu: [
+        { role: "undo", label: "撤销" },
+        { role: "redo", label: "重做" },
+        { type: "separator" },
+        { role: "cut", label: "剪切" },
+        { role: "copy", label: "复制" },
+        { role: "paste", label: "粘贴" },
+        { role: "selectAll", label: "全选" }
+      ]
+    },
+    {
+      label: "视图",
+      submenu: [
+        { role: "reload", label: "重新载入" },
+        { role: "toggleDevTools", label: "开发者工具" },
+        { type: "separator" },
+        { role: "resetZoom", label: "实际大小" },
+        { role: "zoomIn", label: "放大" },
+        { role: "zoomOut", label: "缩小" },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "进入全屏" }
+      ]
+    },
+    {
+      label: "窗口",
+      submenu: [
+        { role: "minimize", label: "最小化" },
+        { role: "zoom", label: "缩放" },
+        ...(isMac ? [{ type: "separator" }, { role: "front", label: "全部置于前台" }] : [])
+      ]
+    },
+    {
+      label: "帮助",
+      submenu: [
+        {
+          label: "GMT 中文手册安装页",
+          click: () => shell.openExternal("https://docs.gmt-china.org/latest/install/")
+        },
+        {
+          label: "GMT 官方下载页",
+          click: () => shell.openExternal("https://www.generic-mapping-tools.org/download/")
+        }
+      ]
+    }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function sendMenuAction(win, action) {
+  if (win && !win.isDestroyed()) win.webContents.send(action);
 }
 
 app.whenReady().then(() => {
@@ -469,6 +570,10 @@ function loadRenderer(win) {
       resumeGMTDownload: () => ipcRenderer.invoke("gmt:downloadResume"),
       cancelGMTDownload: () => ipcRenderer.invoke("gmt:downloadCancel"),
       onGMTDownloadProgress: (handler) => ipcRenderer.on("gmt:downloadProgress", (_event, payload) => handler(payload)),
+      onMenuOpenFile: (handler) => ipcRenderer.on("menu:openFile", handler),
+      onMenuOpenEdiDirectory: (handler) => ipcRenderer.on("menu:openEdiDirectory", handler),
+      onMenuLoadSample: (handler) => ipcRenderer.on("menu:loadSample", handler),
+      onMenuChooseOutputDirectory: (handler) => ipcRenderer.on("menu:chooseOutputDirectory", handler),
       recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
       openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
       openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)

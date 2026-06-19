@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.3 - 2026-06-20
+
+- Moved data import actions into the desktop menu under `文件 > 导入`, with separate TXT/CSV and EDI-folder import entries.
+- Removed the crowded import buttons from the left data panel for a cleaner professional layout.
+- Added menu entries for opening sample data and choosing the export directory.
+- Generalized no-data prompts so they apply to both table imports and EDI folder imports.
+
 ## v0.4.2 - 2026-06-20
 
 - Added EDI folder import with recursive scanning of subfolders for `.edi` files.

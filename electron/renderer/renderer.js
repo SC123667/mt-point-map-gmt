@@ -32,8 +32,8 @@ const COLOR_OPTIONS = [
 ];
 
 const ids = [
-  "appStatus", "dataSummary", "openBtn", "sampleBtn", "nameColumn", "lonColumn", "latColumn",
-  "openEdiDirBtn", "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
+  "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
+  "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
@@ -55,19 +55,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 function wireEvents() {
-  el.openBtn.addEventListener("click", async () => {
-    const parsed = await window.mtApp.openFile();
-    if (parsed) loadParsed(parsed);
-  });
-  el.openEdiDirBtn.addEventListener("click", async () => {
-    try {
-      const parsed = await window.mtApp.openEdiDirectory();
-      if (parsed) loadParsed(parsed);
-    } catch (error) {
-      notify(error.message || String(error));
-    }
-  });
-  el.sampleBtn.addEventListener("click", async () => loadParsed(await window.mtApp.loadSample()));
+  window.mtApp.onMenuOpenFile(openPointFile);
+  window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
+  window.mtApp.onMenuLoadSample(loadSampleData);
+  window.mtApp.onMenuChooseOutputDirectory(chooseOutputDirectory);
   el.applyMappingBtn.addEventListener("click", applyMapping);
   el.autoRegionBtn.addEventListener("click", () => {
     if (!state.records.length) return notify("请先导入点位文件。");
@@ -101,6 +92,32 @@ function wireEvents() {
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
+}
+
+async function openPointFile() {
+  try {
+    const parsed = await window.mtApp.openFile();
+    if (parsed) loadParsed(parsed);
+  } catch (error) {
+    notify(error.message || String(error));
+  }
+}
+
+async function openEdiDirectory() {
+  try {
+    const parsed = await window.mtApp.openEdiDirectory();
+    if (parsed) loadParsed(parsed);
+  } catch (error) {
+    notify(error.message || String(error));
+  }
+}
+
+async function loadSampleData() {
+  try {
+    loadParsed(await window.mtApp.loadSample());
+  } catch (error) {
+    notify(error.message || String(error));
+  }
 }
 
 async function refreshStatus() {
@@ -295,7 +312,7 @@ function readConfig() {
 }
 
 async function exportMap(formats, showAlert) {
-  if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
+  if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
@@ -463,7 +480,7 @@ async function clearTerrainCache() {
 }
 
 async function saveScript() {
-  if (!state.records.length) return notify("请先导入 TXT/CSV 点位文件。");
+  if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
