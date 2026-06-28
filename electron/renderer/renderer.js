@@ -815,10 +815,20 @@ function formatPeriod(period) {
 async function renderPreview(filePath) {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
-    el.previewBox.innerHTML = `<img src="${url}" alt="GMT 点位图预览" />`;
+    el.previewBox.innerHTML = "";
+    el.previewBox.style.backgroundImage = `url(${url})`;
+    el.previewBox.classList.add("has-preview");
+    el.previewBox.setAttribute("aria-label", "GMT 点位图预览");
   } catch (error) {
+    clearPreviewImage();
     el.previewBox.innerHTML = `<span>预览图读取失败：${escapeHTML(error.message || String(error))}</span>`;
   }
+}
+
+function clearPreviewImage() {
+  el.previewBox.style.backgroundImage = "";
+  el.previewBox.classList.remove("has-preview");
+  el.previewBox.removeAttribute("aria-label");
 }
 
 function renderPlaceholder() {
@@ -829,6 +839,7 @@ function renderPlaceholder() {
     tipperMap: "选择周期和分量后生成感应矢量图",
     responseCurve: "选择测点后生成视电阻率和相位曲线"
   };
+  clearPreviewImage();
   el.previewBox.innerHTML = `<span>${labels[state.plotType] || labels.stationMap}</span>`;
 }
 

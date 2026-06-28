@@ -421,9 +421,16 @@ td:nth-child(3) {
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: #f6f8fb;
+  background-color: #f6f8fb;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
   color: var(--muted);
   overflow: hidden;
+}
+
+.preview-box.has-preview {
+  place-items: stretch;
 }
 
 .table-help-dialog {

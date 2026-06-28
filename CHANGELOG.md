@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.4 - 2026-06-28
+
+- Reworked the in-app preview renderer to place generated PNGs as a contained preview-panel background, avoiding Electron image-element clipping when MT sounding-curve figures are taller than the viewport.
+- Cleared stale preview backgrounds whenever placeholders or read errors are shown, so switching plot types cannot leave an old image behind.
+
 ## v0.5.3 - 2026-06-28
 
 - Strengthened preview image fitting by making the rendered PNG fill the preview viewport with `object-fit: contain`, preventing MT curve previews from being displayed by width only.
