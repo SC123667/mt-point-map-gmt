@@ -18,15 +18,18 @@ const state = {
     panX: 0,
     panY: 0,
     selecting: false,
+    panning: false,
     selectionStart: null,
-    selectionEnd: null
+    selectionEnd: null,
+    dragStart: null,
+    dragPanStart: null
   },
   terrainWaiter: null
 };
 
 const PREVIEW_MIN_ZOOM = 1;
 const PREVIEW_MAX_ZOOM = 16;
-const PREVIEW_WHEEL_STEP = 1.18;
+const PREVIEW_WHEEL_SENSITIVITY = 0.00075;
 const CUSTOM_COLOR_VALUE = "__custom__";
 const COLOR_OPTIONS = [
   ["#d7191c", "红色 #d7191c"],
@@ -115,7 +118,7 @@ function wireEvents() {
   el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
   el.previewBox.addEventListener("pointermove", handlePreviewPointerMove);
   el.previewBox.addEventListener("pointerup", handlePreviewPointerUp);
-  el.previewBox.addEventListener("pointercancel", cancelPreviewSelection);
+  el.previewBox.addEventListener("pointercancel", cancelPreviewInteraction);
   el.prepareTerrainBtn.addEventListener("click", () => prepareTerrain(false));
   el.pauseTerrainBtn.addEventListener("click", () => window.mtApp.pauseTerrain());
   el.resumeTerrainBtn.addEventListener("click", () => window.mtApp.resumeTerrain());
@@ -854,15 +857,18 @@ function clearPreviewImage() {
   state.preview.panX = 0;
   state.preview.panY = 0;
   state.preview.selecting = false;
+  state.preview.panning = false;
   state.preview.selectionStart = null;
   state.preview.selectionEnd = null;
+  state.preview.dragStart = null;
+  state.preview.dragPanStart = null;
   el.previewImageLayer.style.backgroundImage = "";
   el.previewImageLayer.style.transform = "";
   el.previewSelection.classList.remove("active");
   el.previewSelection.style.cssText = "";
   el.previewZoomControls.classList.add("hidden");
   el.previewZoomLabel.textContent = "100%";
-  el.previewBox.classList.remove("has-preview");
+  el.previewBox.classList.remove("has-preview", "is-zoomed", "is-panning");
   el.previewBox.removeAttribute("aria-label");
 }
 
@@ -889,6 +895,7 @@ function resetPreviewView() {
 function updatePreviewTransform() {
   el.previewImageLayer.style.transform = `translate(${state.preview.panX.toFixed(2)}px, ${state.preview.panY.toFixed(2)}px) scale(${state.preview.zoom.toFixed(4)})`;
   el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
+  el.previewBox.classList.toggle("is-zoomed", state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001);
 }
 
 function handlePreviewWheel(event) {
@@ -896,8 +903,8 @@ function handlePreviewWheel(event) {
   event.preventDefault();
   el.previewBox.focus({ preventScroll: true });
   const point = previewPoint(event);
-  const direction = event.deltaY < 0 ? 1 : -1;
-  const factor = direction > 0 ? PREVIEW_WHEEL_STEP : 1 / PREVIEW_WHEEL_STEP;
+  const delta = clamp(-event.deltaY, -120, 120);
+  const factor = Math.exp(delta * PREVIEW_WHEEL_SENSITIVITY);
   zoomPreviewAt(point, state.preview.zoom * factor);
 }
 
@@ -905,23 +912,44 @@ function handlePreviewPointerDown(event) {
   if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls")) return;
   event.preventDefault();
   el.previewBox.focus({ preventScroll: true });
+  const point = previewPoint(event);
+  if (state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001 && !event.shiftKey) {
+    state.preview.panning = true;
+    state.preview.dragStart = point;
+    state.preview.dragPanStart = { x: state.preview.panX, y: state.preview.panY };
+    el.previewBox.classList.add("is-panning");
+    el.previewBox.setPointerCapture(event.pointerId);
+    return;
+  }
   state.preview.selecting = true;
-  state.preview.selectionStart = previewPoint(event);
+  state.preview.selectionStart = point;
   state.preview.selectionEnd = state.preview.selectionStart;
   el.previewBox.setPointerCapture(event.pointerId);
   updatePreviewSelection();
 }
 
 function handlePreviewPointerMove(event) {
-  if (!state.preview.selecting) return;
+  if (!state.preview.selecting && !state.preview.panning) return;
   event.preventDefault();
+  if (state.preview.panning) {
+    const point = previewPoint(event);
+    state.preview.panX = state.preview.dragPanStart.x + point.x - state.preview.dragStart.x;
+    state.preview.panY = state.preview.dragPanStart.y + point.y - state.preview.dragStart.y;
+    clampPreviewPan();
+    updatePreviewTransform();
+    return;
+  }
   state.preview.selectionEnd = previewPoint(event);
   updatePreviewSelection();
 }
 
 function handlePreviewPointerUp(event) {
-  if (!state.preview.selecting) return;
+  if (!state.preview.selecting && !state.preview.panning) return;
   event.preventDefault();
+  if (state.preview.panning) {
+    cancelPreviewPan();
+    return;
+  }
   state.preview.selectionEnd = previewPoint(event);
   const selection = previewSelectionRect();
   cancelPreviewSelection();
@@ -935,6 +963,18 @@ function cancelPreviewSelection() {
   state.preview.selectionEnd = null;
   el.previewSelection.classList.remove("active");
   el.previewSelection.style.cssText = "";
+}
+
+function cancelPreviewPan() {
+  state.preview.panning = false;
+  state.preview.dragStart = null;
+  state.preview.dragPanStart = null;
+  el.previewBox.classList.remove("is-panning");
+}
+
+function cancelPreviewInteraction() {
+  cancelPreviewSelection();
+  cancelPreviewPan();
 }
 
 function updatePreviewSelection() {
@@ -977,12 +1017,21 @@ function zoomPreviewAt(point, targetZoom) {
     state.preview.panX = 0;
     state.preview.panY = 0;
   } else {
-    const padX = box.width * 0.75;
-    const padY = box.height * 0.75;
-    state.preview.panX = clamp(state.preview.panX, box.width - box.width * newZoom - padX, padX);
-    state.preview.panY = clamp(state.preview.panY, box.height - box.height * newZoom - padY, padY);
+    clampPreviewPan(box);
   }
   updatePreviewTransform();
+}
+
+function clampPreviewPan(box = el.previewBox.getBoundingClientRect()) {
+  if (state.preview.zoom <= PREVIEW_MIN_ZOOM + 0.001) {
+    state.preview.panX = 0;
+    state.preview.panY = 0;
+    return;
+  }
+  const padX = box.width * 0.75;
+  const padY = box.height * 0.75;
+  state.preview.panX = clamp(state.preview.panX, box.width - box.width * state.preview.zoom - padX, padX);
+  state.preview.panY = clamp(state.preview.panY, box.height - box.height * state.preview.zoom - padY, padY);
 }
 
 function previewPoint(event) {

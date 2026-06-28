@@ -438,6 +438,14 @@ td:nth-child(3) {
   cursor: crosshair;
 }
 
+.preview-box.has-preview.is-zoomed {
+  cursor: grab;
+}
+
+.preview-box.has-preview.is-panning {
+  cursor: grabbing;
+}
+
 .preview-box:focus {
   box-shadow: 0 0 0 2px rgba(45, 110, 112, 0.16);
 }

@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.7 - 2026-06-29
+
+- Added drag-to-pan behavior after a preview has been zoomed, so enlarged maps and MT curves can be moved left, right, up, and down inside the preview area.
+- Reduced mouse-wheel zoom sensitivity for smoother preview zooming while keeping Shift-drag available for additional box zooming after a view is already enlarged.
+
 ## v0.5.6 - 2026-06-29
 
 - Added interactive preview zooming: when the pointer is over the preview area, mouse-wheel scrolling zooms the generated map or MT curve without rerunning GMT.
