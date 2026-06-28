@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.6 - 2026-06-28
+
+- Changed the Windows internal executable name to `MTPointMapGMT.exe` while keeping the Chinese app title, avoiding NSIS installer close-detection problems with the previous Chinese executable name.
+- Added a Windows install-repair batch file that closes old MT Point Map GMT processes before starting the x64 installer.
+- Kept installer and portable build names unchanged for user-facing distribution.
+
 ## v0.4.5 - 2026-06-28
 
 - Fixed Windows GMT export failures when the output directory contains Chinese characters by running GMT in an ASCII temporary workspace and copying completed files back afterward.
