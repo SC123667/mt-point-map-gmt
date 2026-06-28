@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.3 - 2026-06-28
+
+- Strengthened preview image fitting by making the rendered PNG fill the preview viewport with `object-fit: contain`, preventing MT curve previews from being displayed by width only.
+- Replaced the previously copied app after quitting any running old instance, so reopening the app loads the updated preview code.
+
 ## v0.5.2 - 2026-06-28
 
 - Fixed in-app preview scaling so tall MT sounding-curve figures fit completely inside the preview panel instead of being clipped vertically.
