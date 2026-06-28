@@ -494,18 +494,21 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const bottomRegion = `${curve.xMin}/${curve.xMax}/-180/180`;
   const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya1f0.5g1+l${q("log10 rho_s (Ohm m)")} -BWSen+t${q(`${station.name} site: sounding curve`)}`;
   const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya45f15g45+l${q("phase (degree)")} -BWSen`;
+  const plotWidth = "16c";
+  const plotHeight = "5.0c";
+  const topOffset = "7.0c";
   const pointSize = "0.16c";
   const commands = [
-    `${p}gmt basemap -R${topRegion} -JX-16c/5.4c ${topFrame} -X1.4c`,
-    curve.hasRhoXYError ? `${p}gmt plot ${q(f("curve_rho_xy_err.tsv"))} -W0.7p,black` : "",
-    curve.hasRhoYXError ? `${p}gmt plot ${q(f("curve_rho_yx_err.tsv"))} -W0.7p,black` : "",
-    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
-    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : "",
-    `${p}gmt basemap -R${bottomRegion} -JX-16c/5.4c ${bottomFrame} -Y-7.4c`,
+    `${p}gmt basemap -R${bottomRegion} -JX-${plotWidth}/${plotHeight} ${bottomFrame} -X1.6c -Y1.5c`,
     curve.hasPhaseXYError ? `${p}gmt plot ${q(f("curve_phase_xy_err.tsv"))} -W0.7p,black` : "",
     curve.hasPhaseYXError ? `${p}gmt plot ${q(f("curve_phase_yx_err.tsv"))} -W0.7p,black` : "",
     curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
-    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : ""
+    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : "",
+    `${p}gmt basemap -R${topRegion} -JX-${plotWidth}/${plotHeight} ${topFrame} -Y${topOffset}`,
+    curve.hasRhoXYError ? `${p}gmt plot ${q(f("curve_rho_xy_err.tsv"))} -W0.7p,black` : "",
+    curve.hasRhoYXError ? `${p}gmt plot ${q(f("curve_rho_yx_err.tsv"))} -W0.7p,black` : "",
+    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
+    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : ""
   ].filter(Boolean);
   if (shell === "bat") {
     return ["@echo off", "setlocal enabledelayedexpansion", "cd /d \"%~dp0\"", ...environmentLines,

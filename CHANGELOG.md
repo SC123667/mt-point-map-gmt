@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.5 - 2026-06-28
+
+- Fixed the MT apparent-resistivity/phase curve layout by drawing the phase panel at the page base and placing the resistivity panel above it, preventing GMT from clipping the lower phase subplot.
+- Kept the discrete square-marker rho/phase style and error-bar overlays unchanged while giving the two panels a stable vertical layout.
+
 ## v0.5.4 - 2026-06-28
 
 - Reworked the in-app preview renderer to place generated PNGs as a contained preview-panel background, avoiding Electron image-element clipping when MT sounding-curve figures are taller than the viewport.

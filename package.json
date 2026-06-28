@@ -1,6 +1,6 @@
 {
   "name": "mt-point-map-gmt",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "MT点位图制作工具—GMT：跨平台大地电磁野外点位图制图软件",
   "main": "electron/main.js",
   "author": "CWN",
