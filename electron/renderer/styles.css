@@ -423,7 +423,7 @@ td:nth-child(3) {
   place-items: center;
   background: #f6f8fb;
   color: var(--muted);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .table-help-dialog {
@@ -457,8 +457,10 @@ td:nth-child(3) {
 }
 
 .preview-box img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
 }
 

@@ -529,6 +529,8 @@ function parseEdiResponses(text) {
     zyxi: readEdiArray(text, "ZYXI"),
     zyyr: readEdiArray(text, "ZYYR"),
     zyyi: readEdiArray(text, "ZYYI"),
+    zxyVar: readEdiArray(text, "ZXY.VAR"),
+    zyxVar: readEdiArray(text, "ZYX.VAR"),
     txr: readEdiArray(text, "TXR"),
     txi: readEdiArray(text, "TXI"),
     tyr: readEdiArray(text, "TYR"),
@@ -552,6 +554,10 @@ function parseEdiResponses(text) {
       tipper: {
         x: complexAt(arrays.txr, arrays.txi, index),
         y: complexAt(arrays.tyr, arrays.tyi, index)
+      },
+      variance: {
+        xy: Number.isFinite(arrays.zxyVar[index]) ? arrays.zxyVar[index] : NaN,
+        yx: Number.isFinite(arrays.zyxVar[index]) ? arrays.zyxVar[index] : NaN
       },
       provided: {}
     };

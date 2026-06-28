@@ -2,6 +2,14 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.1 - 2026-06-28
+
+- Changed MT sounding curves from connected lines to discrete red/green square markers matching common MT apparent-resistivity and phase curve style.
+- Switched the response-curve x axis to reversed `log10 frequency (Hz)` instead of `log10 Period (s)`.
+- Parsed EDI `ZXY.VAR` and `ZYX.VAR` arrays and used them to draw approximate black vertical error bars when available.
+- Added light grid lines and adjusted curve plot margins so axis labels are not clipped.
+- Made the in-app preview area scrollable so tall curve figures display fully inside the software.
+
 ## v0.5.0 - 2026-06-28
 
 - Redesigned the app into a professional workbench layout with top analysis tabs for station maps, impedance strike, phase tensor ellipses, tipper vectors, and apparent-resistivity/phase curves.

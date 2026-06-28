@@ -488,28 +488,36 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const environmentLines = gmtEnvironmentLines(gmt, shell);
   const curve = buildCurveFiles(station, outputDirectory);
   const q = (value) => quote(value);
+  const f = (name) => shell === "bat" ? name : path.join(outputDirectory, name);
+  const p = shell === "bat" ? "" : "  ";
+  const topRegion = `${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax}`;
+  const bottomRegion = `${curve.xMin}/${curve.xMax}/-180/180`;
+  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya1f0.5g1+l${q("log10 rho_s (Ohm m)")} -BWSen+t${q(`${station.name} site: sounding curve`)}`;
+  const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya45f15g45+l${q("phase (degree)")} -BWSen`;
+  const pointSize = "0.16c";
+  const commands = [
+    `${p}gmt basemap -R${topRegion} -JX-16c/5.4c ${topFrame} -X1.4c`,
+    curve.hasRhoXYError ? `${p}gmt plot ${q(f("curve_rho_xy_err.tsv"))} -W0.7p,black` : "",
+    curve.hasRhoYXError ? `${p}gmt plot ${q(f("curve_rho_yx_err.tsv"))} -W0.7p,black` : "",
+    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
+    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : "",
+    `${p}gmt basemap -R${bottomRegion} -JX-16c/5.4c ${bottomFrame} -Y-7.4c`,
+    curve.hasPhaseXYError ? `${p}gmt plot ${q(f("curve_phase_xy_err.tsv"))} -W0.7p,black` : "",
+    curve.hasPhaseYXError ? `${p}gmt plot ${q(f("curve_phase_yx_err.tsv"))} -W0.7p,black` : "",
+    curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
+    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : ""
+  ].filter(Boolean);
   if (shell === "bat") {
     return ["@echo off", "setlocal enabledelayedexpansion", "cd /d \"%~dp0\"", ...environmentLines,
       `gmt begin ${q(config.outputName || "mt_response_curve")} ${q(formats.join(","))}`,
-      "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p",
-      `gmt basemap -R${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax} -JX16c/7c -Bxa1f0.5+l\"log10 Period (s)\" -Bya1f0.5+l\"log10 Rho\" -BWSen+t${q(station.name)}`,
-      `gmt plot ${q("curve_rho_xy.tsv")} -W1.4p,#d7191c`,
-      `gmt plot ${q("curve_rho_yx.tsv")} -W1.4p,#2b83ba`,
-      "-",
-      `gmt basemap -R${curve.xMin}/${curve.xMax}/-180/180 -JX16c/5c -Bxa1f0.5+l\"log10 Period (s)\" -Bya45f15+l\"Phase\" -BWSen -Y-7.8c`,
-      `gmt plot ${q("curve_phase_xy.tsv")} -W1.4p,#d7191c`,
-      `gmt plot ${q("curve_phase_yx.tsv")} -W1.4p,#2b83ba`,
+      "gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
+      ...commands,
       "gmt end", ""].filter((line) => line !== "-").join("\r\n");
   }
   return ["#!/usr/bin/env bash", "set -euo pipefail", ...environmentLines, "",
     `gmt begin ${q(outputPrefix)} ${q(formats.join(","))}`,
-    "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p",
-    `  gmt basemap -R${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax} -JX16c/7c -Bxa1f0.5+l"log10 Period (s)" -Bya1f0.5+l"log10 Rho" -BWSen+t${q(station.name)}`,
-    `  gmt plot ${q(path.join(outputDirectory, "curve_rho_xy.tsv"))} -W1.4p,#d7191c`,
-    `  gmt plot ${q(path.join(outputDirectory, "curve_rho_yx.tsv"))} -W1.4p,#2b83ba`,
-    `  gmt basemap -R${curve.xMin}/${curve.xMax}/-180/180 -JX16c/5c -Bxa1f0.5+l"log10 Period (s)" -Bya45f15+l"Phase" -BWSen -Y-7.8c`,
-    `  gmt plot ${q(path.join(outputDirectory, "curve_phase_xy.tsv"))} -W1.4p,#d7191c`,
-    `  gmt plot ${q(path.join(outputDirectory, "curve_phase_yx.tsv"))} -W1.4p,#2b83ba`,
+    "  gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
+    ...commands,
     "gmt end", ""].join("\n");
 }
 
@@ -520,33 +528,89 @@ function buildCurveFiles(station, outputDirectory) {
   const series = {
     rhoXY: [],
     rhoYX: [],
+    rhoXYError: [],
+    rhoYXError: [],
     phaseXY: [],
-    phaseYX: []
+    phaseYX: [],
+    phaseXYError: [],
+    phaseYXError: []
   };
   for (const item of rows) {
-    const x = Math.log10(item.response.period);
+    const x = Math.log10(item.response.frequency);
     const impedance = item.metrics.impedance;
-    if (Number.isFinite(impedance.rhoXY) && impedance.rhoXY > 0) series.rhoXY.push([x, Math.log10(impedance.rhoXY)]);
-    if (Number.isFinite(impedance.rhoYX) && impedance.rhoYX > 0) series.rhoYX.push([x, Math.log10(impedance.rhoYX)]);
-    if (Number.isFinite(impedance.phaseXY)) series.phaseXY.push([x, impedance.phaseXY]);
-    if (Number.isFinite(impedance.phaseYX)) series.phaseYX.push([x, impedance.phaseYX]);
+    const xyError = impedanceErrors(item.response.z?.xy, item.response.variance?.xy, item.response.period, impedance.rhoXY);
+    const yxError = impedanceErrors(item.response.z?.yx, item.response.variance?.yx, item.response.period, impedance.rhoYX);
+    if (Number.isFinite(impedance.rhoXY) && impedance.rhoXY > 0) {
+      const value = Math.log10(impedance.rhoXY);
+      series.rhoXY.push([x, value]);
+      if (xyError.logRho) series.rhoXYError.push([x, value, xyError.logRho]);
+    }
+    if (Number.isFinite(impedance.rhoYX) && impedance.rhoYX > 0) {
+      const value = Math.log10(impedance.rhoYX);
+      series.rhoYX.push([x, value]);
+      if (yxError.logRho) series.rhoYXError.push([x, value, yxError.logRho]);
+    }
+    if (Number.isFinite(impedance.phaseXY)) {
+      series.phaseXY.push([x, impedance.phaseXY]);
+      if (xyError.phase) series.phaseXYError.push([x, impedance.phaseXY, xyError.phase]);
+    }
+    if (Number.isFinite(impedance.phaseYX)) {
+      series.phaseYX.push([x, impedance.phaseYX]);
+      if (yxError.phase) series.phaseYXError.push([x, impedance.phaseYX, yxError.phase]);
+    }
   }
   writeXY(path.join(outputDirectory, "curve_rho_xy.tsv"), series.rhoXY);
   writeXY(path.join(outputDirectory, "curve_rho_yx.tsv"), series.rhoYX);
+  writeErrorSegments(path.join(outputDirectory, "curve_rho_xy_err.tsv"), series.rhoXYError);
+  writeErrorSegments(path.join(outputDirectory, "curve_rho_yx_err.tsv"), series.rhoYXError);
   writeXY(path.join(outputDirectory, "curve_phase_xy.tsv"), series.phaseXY);
   writeXY(path.join(outputDirectory, "curve_phase_yx.tsv"), series.phaseYX);
+  writeErrorSegments(path.join(outputDirectory, "curve_phase_xy_err.tsv"), series.phaseXYError);
+  writeErrorSegments(path.join(outputDirectory, "curve_phase_yx_err.tsv"), series.phaseYXError);
   const xs = Object.values(series).flat().map((row) => row[0]);
-  const rhos = [...series.rhoXY, ...series.rhoYX].map((row) => row[1]);
+  const rhos = [...series.rhoXY, ...series.rhoYX, ...errorExtents(series.rhoXYError), ...errorExtents(series.rhoYXError)].map((row) => row[1]);
   return {
     xMin: floorPad(Math.min(...xs), 0.2),
     xMax: ceilPad(Math.max(...xs), 0.2),
     rhoMin: floorPad(Math.min(...rhos), 0.5),
-    rhoMax: ceilPad(Math.max(...rhos), 0.5)
+    rhoMax: ceilPad(Math.max(...rhos), 0.5),
+    hasRhoXY: series.rhoXY.length > 0,
+    hasRhoYX: series.rhoYX.length > 0,
+    hasRhoXYError: series.rhoXYError.length > 0,
+    hasRhoYXError: series.rhoYXError.length > 0,
+    hasPhaseXY: series.phaseXY.length > 0,
+    hasPhaseYX: series.phaseYX.length > 0,
+    hasPhaseXYError: series.phaseXYError.length > 0,
+    hasPhaseYXError: series.phaseYXError.length > 0
   };
 }
 
 function writeXY(filePath, rows) {
   fs.writeFileSync(filePath, rows.map((row) => `${row[0].toFixed(6)}\t${row[1].toFixed(6)}`).join("\n") + "\n", "utf8");
+}
+
+function writeErrorSegments(filePath, rows) {
+  const lines = [];
+  for (const [x, y, error] of rows) {
+    lines.push(">", `${x.toFixed(6)}\t${(y - error).toFixed(6)}`, `${x.toFixed(6)}\t${(y + error).toFixed(6)}`);
+  }
+  fs.writeFileSync(filePath, lines.join("\n") + (lines.length ? "\n" : ""), "utf8");
+}
+
+function errorExtents(rows) {
+  return rows.flatMap(([x, y, error]) => [[x, y - error], [x, y + error]]);
+}
+
+function impedanceErrors(z, variance, period, rho) {
+  if (!Number.isFinite(variance) || variance <= 0 || !Number.isFinite(z?.re) || !Number.isFinite(z?.im)) return {};
+  const amplitude = Math.hypot(z.re, z.im);
+  if (!Number.isFinite(amplitude) || amplitude <= 0) return {};
+  const sigma = Math.sqrt(variance);
+  const rhoSigma = Number.isFinite(period) && Number.isFinite(rho) && rho > 0 ? 0.4 * period * amplitude * sigma : NaN;
+  return {
+    logRho: Number.isFinite(rhoSigma) ? Math.min(1.2, Math.max(0.02, rhoSigma / Math.max(rho, 1e-12) / Math.log(10))) : 0,
+    phase: Math.min(90, Math.max(2, toDegrees(Math.atan2(sigma, amplitude))))
+  };
 }
 
 function floorPad(value, pad) {
@@ -835,6 +899,10 @@ function niceDistanceKm(value) {
 
 function toRadians(degrees) {
   return degrees * Math.PI / 180;
+}
+
+function toDegrees(radians) {
+  return radians * 180 / Math.PI;
 }
 
 function ghostscriptLibraryPath(binDir) {
