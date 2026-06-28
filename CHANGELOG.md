@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.2 - 2026-06-28
+
+- Fixed in-app preview scaling so tall MT sounding-curve figures fit completely inside the preview panel instead of being clipped vertically.
+- Kept exported PNG/PDF resolution unchanged; only the renderer preview sizing was adjusted.
+
 ## v0.5.1 - 2026-06-28
 
 - Changed MT sounding curves from connected lines to discrete red/green square markers matching common MT apparent-resistivity and phase curve style.
