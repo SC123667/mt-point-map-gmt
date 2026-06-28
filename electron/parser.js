@@ -5,6 +5,27 @@ const LINE_HINTS = ["line", "profile", "surveyline", "测线", "剖面", "线号
 const ELEVATION_HINTS = ["elev", "alt", "height", "z", "高程", "海拔"];
 const EASTING_HINTS = ["easting", "east", "xcoord", "xcoordinate", "x坐标", "东向", "东坐标", "横坐标"];
 const NORTHING_HINTS = ["northing", "north", "ycoord", "ycoordinate", "y坐标", "北向", "北坐标", "纵坐标"];
+const MT_HINTS = {
+  frequency: ["freq", "frequency", "频率", "hz"],
+  period: ["period", "t", "周期", "秒"],
+  zxxr: ["zxxr", "zxxreal", "zxx_re", "zxx实部"],
+  zxxi: ["zxxi", "zxximag", "zxx_im", "zxx虚部"],
+  zxyr: ["zxyr", "zxyreal", "zxy_re", "zxy实部"],
+  zxyi: ["zxyi", "zxyimag", "zxy_im", "zxy虚部"],
+  zyxr: ["zyxr", "zyxreal", "zyx_re", "zyx实部"],
+  zyxi: ["zyxi", "zyximag", "zyx_im", "zyx虚部"],
+  zyyr: ["zyyr", "zyyreal", "zyy_re", "zyy实部"],
+  zyyi: ["zyyi", "zyyimag", "zyy_im", "zyy虚部"],
+  txr: ["txr", "txreal", "tx_re", "tipperxr", "tx实部"],
+  txi: ["txi", "tximag", "tx_im", "tipperxi", "tx虚部"],
+  tyr: ["tyr", "tyreal", "ty_re", "tipperyr", "ty实部"],
+  tyi: ["tyi", "tyimag", "ty_im", "tipperyi", "ty虚部"],
+  strike: ["strike", "azimuth", "走向", "方位"],
+  ptAzimuth: ["ptazimuth", "phaseazimuth", "tensorazimuth", "相位张量方位"],
+  ptMax: ["phimax", "ptmax", "相位最大"],
+  ptMin: ["phimin", "ptmin", "相位最小"],
+  beta: ["beta", "skew", "β", "偏斜"]
+};
 
 function parseStationText(text, filePath = "") {
   const rawRows = splitRows(text);
@@ -51,6 +72,7 @@ function parseEdiStationText(text, filePath = "") {
     lat,
     line: "",
     elevation: Number.isFinite(elevation) ? elevation : null,
+    mtResponses: parseEdiResponses(text),
     sourcePath: filePath
   };
 }
@@ -75,6 +97,8 @@ function buildEdiParsedResult(records, skipped = [], directory = "") {
       lat: "纬度",
       line: "",
       elevation: "高程"
+      ,
+      mt: {}
     },
     records,
     hasHeader: true,
@@ -101,7 +125,8 @@ function detectMapping(columns, rows, hasHeader = true) {
       lon,
       lat,
       line,
-      elevation
+      elevation,
+      mt: detectMTMapping(columns, rows, hasHeader)
     };
   }
 
@@ -114,7 +139,8 @@ function detectMapping(columns, rows, hasHeader = true) {
       northing: projected.northing,
       projectedSystem: projected.system,
       line,
-      elevation
+      elevation,
+      mt: detectMTMapping(columns, rows, hasHeader)
     };
   }
 
@@ -232,6 +258,10 @@ function inverseTransverseMercator(easting, northing, centralMeridian) {
 }
 
 function buildRecords(rows, mapping) {
+  if (mapping?.mt && (mapping.mt.period || mapping.mt.frequency)) {
+    const grouped = buildMTTableRecords(rows, mapping);
+    if (grouped.length) return grouped;
+  }
   return rows.map((row, index) => {
     const coordinate = readCoordinate(row, mapping);
     if (!coordinate) return null;
@@ -243,9 +273,100 @@ function buildRecords(rows, mapping) {
       lon,
       lat,
       line: mapping.line ? String(row[mapping.line] || "").trim() : "",
-      elevation: mapping.elevation ? toNumber(row[mapping.elevation]) : null
+      elevation: mapping.elevation ? toNumber(row[mapping.elevation]) : null,
+      mtResponses: buildMTResponsesFromRow(row, mapping.mt)
     };
   }).filter(Boolean);
+}
+
+function buildMTTableRecords(rows, mapping) {
+  const groups = new Map();
+  rows.forEach((row, index) => {
+    const coordinate = readCoordinate(row, mapping);
+    if (!coordinate) return;
+    const response = buildMTResponseFromRow(row, mapping.mt);
+    if (!response) return;
+    const rawName = mapping.name ? String(row[mapping.name] || "").trim() : "";
+    const name = rawName || `MT${String(index + 1).padStart(3, "0")}`;
+    if (!groups.has(name)) {
+      groups.set(name, {
+        name,
+        lon: coordinate.lon,
+        lat: coordinate.lat,
+        line: mapping.line ? String(row[mapping.line] || "").trim() : "",
+        elevation: mapping.elevation ? toNumber(row[mapping.elevation]) : null,
+        mtResponses: []
+      });
+    }
+    groups.get(name).mtResponses.push(response);
+  });
+  return Array.from(groups.values()).map((record) => ({
+    ...record,
+    mtResponses: record.mtResponses.sort((a, b) => a.period - b.period)
+  }));
+}
+
+function detectMTMapping(columns, rows, hasHeader) {
+  if (!hasHeader) return {};
+  const mapping = {};
+  for (const [key, hints] of Object.entries(MT_HINTS)) {
+    mapping[key] = firstHint(columns, hints);
+  }
+  if (!mapping.frequency && !mapping.period) return {};
+  const numericCount = Object.values(mapping).filter(Boolean).filter((column) => numericColumns([column], rows).length).length;
+  return numericCount >= 1 ? mapping : {};
+}
+
+function buildMTResponsesFromRow(row, mtMapping) {
+  const response = buildMTResponseFromRow(row, mtMapping);
+  return response ? [response] : [];
+}
+
+function buildMTResponseFromRow(row, mtMapping = {}) {
+  if (!mtMapping || (!mtMapping.period && !mtMapping.frequency)) return null;
+  const period = mtMapping.period ? toNumber(row[mtMapping.period]) : 1 / toNumber(row[mtMapping.frequency]);
+  if (!Number.isFinite(period) || period <= 0) return null;
+  const response = {
+    period,
+    frequency: 1 / period,
+    z: {
+      xx: complexFromRow(row, mtMapping.zxxr, mtMapping.zxxi),
+      xy: complexFromRow(row, mtMapping.zxyr, mtMapping.zxyi),
+      yx: complexFromRow(row, mtMapping.zyxr, mtMapping.zyxi),
+      yy: complexFromRow(row, mtMapping.zyyr, mtMapping.zyyi)
+    },
+    tipper: {
+      x: complexFromRow(row, mtMapping.txr, mtMapping.txi),
+      y: complexFromRow(row, mtMapping.tyr, mtMapping.tyi)
+    },
+    provided: {
+      strike: mtMapping.strike ? toNumber(row[mtMapping.strike]) : NaN,
+      ptAzimuth: mtMapping.ptAzimuth ? toNumber(row[mtMapping.ptAzimuth]) : NaN,
+      ptMax: mtMapping.ptMax ? toNumber(row[mtMapping.ptMax]) : NaN,
+      ptMin: mtMapping.ptMin ? toNumber(row[mtMapping.ptMin]) : NaN,
+      beta: mtMapping.beta ? toNumber(row[mtMapping.beta]) : NaN
+    }
+  };
+  return responseHasData(response) ? response : null;
+}
+
+function complexFromRow(row, realColumn, imagColumn) {
+  const re = realColumn ? toNumber(row[realColumn]) : NaN;
+  const im = imagColumn ? toNumber(row[imagColumn]) : NaN;
+  return {
+    re: Number.isFinite(re) ? re : NaN,
+    im: Number.isFinite(im) ? im : NaN
+  };
+}
+
+function responseHasData(response) {
+  return Object.values(response.z).some(hasComplex)
+    || Object.values(response.tipper).some(hasComplex)
+    || Object.values(response.provided).some(Number.isFinite);
+}
+
+function hasComplex(value) {
+  return Number.isFinite(value?.re) || Number.isFinite(value?.im);
 }
 
 function readCoordinate(row, mapping) {
@@ -397,6 +518,64 @@ function firstEdiValue(text, key) {
   return match ? match[1].trim() : "";
 }
 
+function parseEdiResponses(text) {
+  const arrays = {
+    frequency: readEdiArray(text, "FREQ"),
+    zxxr: readEdiArray(text, "ZXXR"),
+    zxxi: readEdiArray(text, "ZXXI"),
+    zxyr: readEdiArray(text, "ZXYR"),
+    zxyi: readEdiArray(text, "ZXYI"),
+    zyxr: readEdiArray(text, "ZYXR"),
+    zyxi: readEdiArray(text, "ZYXI"),
+    zyyr: readEdiArray(text, "ZYYR"),
+    zyyi: readEdiArray(text, "ZYYI"),
+    txr: readEdiArray(text, "TXR"),
+    txi: readEdiArray(text, "TXI"),
+    tyr: readEdiArray(text, "TYR"),
+    tyi: readEdiArray(text, "TYI")
+  };
+  const count = arrays.frequency.length;
+  if (!count) return [];
+  const responses = [];
+  for (let index = 0; index < count; index += 1) {
+    const frequency = arrays.frequency[index];
+    if (!Number.isFinite(frequency) || frequency <= 0) continue;
+    const response = {
+      period: 1 / frequency,
+      frequency,
+      z: {
+        xx: complexAt(arrays.zxxr, arrays.zxxi, index),
+        xy: complexAt(arrays.zxyr, arrays.zxyi, index),
+        yx: complexAt(arrays.zyxr, arrays.zyxi, index),
+        yy: complexAt(arrays.zyyr, arrays.zyyi, index)
+      },
+      tipper: {
+        x: complexAt(arrays.txr, arrays.txi, index),
+        y: complexAt(arrays.tyr, arrays.tyi, index)
+      },
+      provided: {}
+    };
+    if (responseHasData(response)) responses.push(response);
+  }
+  return responses.sort((a, b) => a.period - b.period);
+}
+
+function readEdiArray(text, key) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = String(text || "").match(new RegExp(`>\\s*${escaped}(?:[.A-Z0-9_+-]+)?(?:\\s+[^\\r\\n]*)?//\\s*(\\d+)([\\s\\S]*?)(?=\\n\\s*>|\\n\\s*$)`, "i"));
+  if (!match) return [];
+  const expected = Number(match[1]);
+  const values = (match[2].match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[Ee][+-]?\d+)?/g) || []).map(Number).filter(Number.isFinite);
+  return values.slice(0, Number.isFinite(expected) && expected > 0 ? expected : values.length);
+}
+
+function complexAt(realValues, imagValues, index) {
+  return {
+    re: Number.isFinite(realValues[index]) ? realValues[index] : NaN,
+    im: Number.isFinite(imagValues[index]) ? imagValues[index] : NaN
+  };
+}
+
 function parseEdiCoordinate(value) {
   const text = unquote(value).trim();
   const suffix = text.match(/[NSEW]$/i)?.[0].toUpperCase() || "";
@@ -442,5 +621,6 @@ module.exports = {
   parseEdiStationText,
   buildEdiParsedResult,
   detectMapping,
-  buildRecords
+  buildRecords,
+  parseEdiResponses
 };

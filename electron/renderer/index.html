@@ -38,6 +38,22 @@
       </div>
     </section>
 
+    <nav class="workspace-toolbar" aria-label="图件类型">
+      <div class="tool-tabs" role="tablist">
+        <button class="tool-tab active" data-plot-type="stationMap" type="button">点位图</button>
+        <button class="tool-tab" data-plot-type="strikeMap" type="button">走向</button>
+        <button class="tool-tab" data-plot-type="phaseTensorMap" type="button">相位张量</button>
+        <button class="tool-tab" data-plot-type="tipperMap" type="button">感应矢量</button>
+        <button class="tool-tab" data-plot-type="responseCurve" type="button">电阻率/相位曲线</button>
+      </div>
+      <div class="toolbar-context">
+        <label>周期
+          <select id="mtPeriodInput"></select>
+        </label>
+        <button id="tableHelpBtn" type="button">表格格式</button>
+      </div>
+    </nav>
+
     <main class="layout">
       <section class="pane data-pane">
         <div class="section-title">
@@ -53,6 +69,32 @@
           <label>高程<select id="elevationColumn"></select></label>
           <button id="applyMappingBtn">应用字段映射</button>
         </fieldset>
+
+        <details class="mt-field-details">
+          <summary>MT 响应字段</summary>
+          <div class="mt-field-grid">
+            <label>周期<select id="periodColumn"></select></label>
+            <label>频率<select id="frequencyColumn"></select></label>
+            <label>ZXX实<select id="zxxrColumn"></select></label>
+            <label>ZXX虚<select id="zxxiColumn"></select></label>
+            <label>ZXY实<select id="zxyrColumn"></select></label>
+            <label>ZXY虚<select id="zxyiColumn"></select></label>
+            <label>ZYX实<select id="zyxrColumn"></select></label>
+            <label>ZYX虚<select id="zyxiColumn"></select></label>
+            <label>ZYY实<select id="zyyrColumn"></select></label>
+            <label>ZYY虚<select id="zyyiColumn"></select></label>
+            <label>TX实<select id="txrColumn"></select></label>
+            <label>TX虚<select id="txiColumn"></select></label>
+            <label>TY实<select id="tyrColumn"></select></label>
+            <label>TY虚<select id="tyiColumn"></select></label>
+            <label>走向<select id="strikeColumn"></select></label>
+            <label>张量方位<select id="ptAzimuthColumn"></select></label>
+            <label>PhiMax<select id="ptMaxColumn"></select></label>
+            <label>PhiMin<select id="ptMinColumn"></select></label>
+            <label>Beta/Skew<select id="betaColumn"></select></label>
+          </div>
+          <p class="field-note">表格可一行一个周期，按测点名分组；也可只提供预计算走向、相位张量或 tipper 列。</p>
+        </details>
 
         <table>
           <thead>
@@ -94,8 +136,11 @@
       </section>
 
       <section class="pane parameter-pane">
-        <h2>绘图参数</h2>
-        <fieldset>
+        <div class="section-title">
+          <h2 id="inspectorTitle">绘图参数</h2>
+          <p id="plotTypeHint">点位图模式</p>
+        </div>
+        <fieldset class="map-settings">
           <legend>图幅</legend>
           <label>标题<input id="titleInput" value="MT Survey Stations" /></label>
           <label>范围 -R<input id="regionInput" /></label>
@@ -104,7 +149,7 @@
           <button id="autoRegionBtn">根据点位自动范围</button>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="map-settings">
           <legend>地形底图</legend>
           <label class="check"><input id="showTerrainInput" type="checkbox" />启用地形晕渲底图</label>
           <label>分辨率
@@ -150,7 +195,41 @@
           </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="analysis-settings">
+          <legend>MT 图件参数</legend>
+          <label class="analysis-only curve-only">曲线测点<select id="curveStationInput"></select></label>
+          <label class="analysis-only strike-only">走向长度<input id="strikeLengthInput" type="number" min="0.005" max="0.12" step="0.005" value="0.035" /></label>
+          <label class="analysis-only strike-only">走向颜色
+            <select id="strikeColorInput">
+              <option value="blue">蓝色</option>
+              <option value="black">黑色</option>
+              <option value="#d7191c">红色</option>
+            </select>
+          </label>
+          <label class="analysis-only tensor-only">椭圆尺度<input id="tensorScaleInput" type="number" min="0.005" max="0.10" step="0.005" value="0.030" /></label>
+          <label class="analysis-only tensor-only">椭圆边框色
+            <select id="tensorPenColorInput">
+              <option value="black">黑色</option>
+              <option value="gray30">深灰</option>
+              <option value="white">白色</option>
+            </select>
+          </label>
+          <label class="analysis-only tipper-only">矢量分量
+            <select id="tipperComponentInput">
+              <option value="real">实部</option>
+              <option value="imag">虚部</option>
+            </select>
+          </label>
+          <label class="analysis-only tipper-only">约定
+            <select id="tipperConventionInput">
+              <option value="parkinson">Parkinson</option>
+              <option value="wiese">Wiese</option>
+            </select>
+          </label>
+          <label class="analysis-only tipper-only">箭头尺度<input id="tipperScaleInput" type="number" min="0.005" max="0.15" step="0.005" value="0.055" /></label>
+        </fieldset>
+
+        <fieldset class="map-settings">
           <legend>点位符号</legend>
           <label>形状
             <select id="symbolInput">
@@ -176,7 +255,7 @@
           </label>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="map-settings">
           <legend>测点标签</legend>
           <label class="check"><input id="showLabelsInput" type="checkbox" checked />显示测点名</label>
           <label>字号 pt<input id="labelSizeInput" type="number" min="5" max="18" step="0.5" value="8" /></label>
@@ -190,7 +269,7 @@
           <label>上移 cm<input id="labelDYInput" type="number" min="-0.5" max="0.8" step="0.01" value="0.08" /></label>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="map-settings">
           <legend>图件元素</legend>
           <label class="check"><input id="showGridInput" type="checkbox" checked />经纬网</label>
           <label class="check"><input id="showScaleInput" type="checkbox" checked />比例尺</label>
@@ -199,6 +278,26 @@
         </fieldset>
       </section>
     </main>
+
+    <dialog id="tableHelpDialog" class="table-help-dialog">
+      <div class="dialog-head">
+        <h2>MT 表格格式说明</h2>
+        <button id="closeTableHelpBtn" type="button">关闭</button>
+      </div>
+      <div class="help-content">
+        <p>支持 TXT/CSV/Excel。基础列：测点名、经度、纬度、高程、测线。MT 响应表建议一行一个测点的一个周期。</p>
+        <table>
+          <thead><tr><th>用途</th><th>推荐列名</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>周期或频率</td><td>period 或 freq</td><td>二选一；freq 单位 Hz，period 单位 s。</td></tr>
+            <tr><td>阻抗张量</td><td>ZXXR/ZXXI, ZXYR/ZXYI, ZYXR/ZYXI, ZYYR/ZYYI</td><td>用于走向、相位张量、视电阻率和相位曲线。</td></tr>
+            <tr><td>Tipper</td><td>TXR/TXI, TYR/TYI</td><td>用于实部/虚部感应矢量箭头。</td></tr>
+            <tr><td>预计算相位张量</td><td>ptAzimuth, phiMax, phiMin, beta</td><td>如果没有阻抗张量，也可以直接提供这些列画椭圆。</td></tr>
+            <tr><td>预计算走向</td><td>strike</td><td>优先使用该列；没有时根据阻抗近似计算。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </dialog>
 
     <script src="renderer.js"></script>
   </body>

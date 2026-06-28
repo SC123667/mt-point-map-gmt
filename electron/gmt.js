@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const https = require("https");
 const path = require("path");
 const { execFileSync, spawn, spawnSync } = require("child_process");
+const { nearestResponse, metricsForResponse } = require("./mt");
 
 const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
@@ -290,6 +291,9 @@ function autoRegion(records) {
 
 function buildScript(records, config, outputDirectory, formats = ["png"]) {
   fs.mkdirSync(outputDirectory, { recursive: true });
+  if (config.plotType === "responseCurve") {
+    return buildResponseCurveScript(records, config, outputDirectory, formats);
+  }
   const pointsPath = path.join(outputDirectory, "stations_points.tsv");
   const labelsPath = path.join(outputDirectory, "stations_labels.tsv");
   const pointLines = records.map((record) => `${record.lon.toFixed(8)}\t${record.lat.toFixed(8)}\t${record.name}`).join("\n") + "\n";
@@ -312,6 +316,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell);
   const terrain = terrainScriptParts(config, region, outputDirectory, shell);
+  const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
   if (shell === "bat") {
     return [
       "@echo off",
@@ -324,6 +329,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
       terrain.imageCommand || `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
       `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+      ...mtOverlay.commands,
       config.showLabels ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
       config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
       config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
@@ -342,12 +348,213 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
     terrain.imageCommand || `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
     `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+    ...mtOverlay.commands,
     config.showLabels ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
     config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
     config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
     "gmt end",
     ""
   ].filter(Boolean).join("\n");
+}
+
+function mtOverlayScriptParts(records, config, outputDirectory, regionText, region, shell) {
+  const plotType = config.plotType || "stationMap";
+  if (!["strikeMap", "phaseTensorMap", "tipperMap"].includes(plotType)) return { commands: [] };
+  const prefix = shell === "bat" ? "" : "  ";
+  const scriptPath = (name) => shell === "bat" ? name : path.join(outputDirectory, name);
+  if (plotType === "strikeMap") {
+    const fileName = "mt_strike_segments.tsv";
+    const rows = buildStrikeSegments(records, config, region);
+    fs.writeFileSync(path.join(outputDirectory, fileName), rows, "utf8");
+    return { commands: rows.trim() ? [`${prefix}gmt plot ${quote(scriptPath(fileName))} -R${regionText} -J${config.projection} -W${Number(config.strikeWidth || 1.2).toFixed(2)}p,${config.strikeColor || "blue"}`] : [] };
+  }
+  if (plotType === "tipperMap") {
+    const fileName = "mt_tipper_arrows.tsv";
+    const rows = buildTipperArrows(records, config, region);
+    fs.writeFileSync(path.join(outputDirectory, fileName), rows, "utf8");
+    return { commands: rows.trim() ? [`${prefix}gmt plot ${quote(scriptPath(fileName))} -R${regionText} -J${config.projection} -W${Number(config.tipperWidth || 1).toFixed(2)}p,${config.tipperColor || "purple"}`] : [] };
+  }
+  const fileName = "mt_phase_tensor_ellipses.tsv";
+  const rows = buildPhaseTensorEllipses(records, config, region);
+  fs.writeFileSync(path.join(outputDirectory, fileName), rows, "utf8");
+  return { commands: rows.trim() ? [`${prefix}gmt plot ${quote(scriptPath(fileName))} -R${regionText} -J${config.projection}`] : [] };
+}
+
+function buildStrikeSegments(records, config, region) {
+  const length = mapLengthDegrees(region, Number(config.strikeLength || 0.025));
+  const period = Number(config.mtPeriod);
+  const lines = [];
+  for (const record of records) {
+    const metrics = metricsForResponse(nearestResponse(record, period));
+    const angle = Number.isFinite(metrics?.impedance?.strike) ? metrics.impedance.strike : Number(metrics?.phaseTensor?.azimuth);
+    if (!Number.isFinite(angle)) continue;
+    const [a, b] = segmentEndpoints(record.lon, record.lat, angle, length);
+    lines.push(">", `${a.lon.toFixed(8)}\t${a.lat.toFixed(8)}`, `${b.lon.toFixed(8)}\t${b.lat.toFixed(8)}`);
+  }
+  return lines.join("\n") + (lines.length ? "\n" : "");
+}
+
+function buildTipperArrows(records, config, region) {
+  const base = mapLengthDegrees(region, Number(config.tipperScale || 0.04));
+  const period = Number(config.mtPeriod);
+  const component = config.tipperComponent || "real";
+  const convention = config.tipperConvention || "parkinson";
+  const lines = [];
+  for (const record of records) {
+    const metrics = metricsForResponse(nearestResponse(record, period));
+    const vector = metrics?.tipper?.[component];
+    if (!vector || !Number.isFinite(vector.magnitude) || vector.magnitude <= 0) continue;
+    const sign = convention === "wiese" ? 1 : -1;
+    const dx = sign * vector.x * base;
+    const dy = sign * vector.y * base;
+    appendArrow(lines, record.lon, record.lat, record.lon + dx / Math.max(Math.cos(toRadians(record.lat)), 0.2), record.lat + dy);
+  }
+  return lines.join("\n") + (lines.length ? "\n" : "");
+}
+
+function buildPhaseTensorEllipses(records, config, region) {
+  const base = mapLengthDegrees(region, Number(config.tensorScale || 0.022));
+  const period = Number(config.mtPeriod);
+  const lines = [];
+  for (const record of records) {
+    const metrics = metricsForResponse(nearestResponse(record, period));
+    const tensor = metrics?.phaseTensor;
+    if (!tensor || !Number.isFinite(tensor.phiMax) || !Number.isFinite(tensor.phiMin) || tensor.phiMax <= 0) continue;
+    const major = base;
+    const minor = base * Math.max(0.12, Math.min(1, Math.abs(tensor.phiMin / tensor.phiMax)));
+    const color = tensorColor(tensor.beta);
+    lines.push(`> -G${color} -W${Number(config.tensorPenWidth || 0.35).toFixed(2)}p,${config.tensorPenColor || "black"}`);
+    for (let index = 0; index <= 48; index += 1) {
+      const t = (Math.PI * 2 * index) / 48;
+      const point = ellipsePoint(record.lon, record.lat, tensor.azimuth, major, minor, t);
+      lines.push(`${point.lon.toFixed(8)}\t${point.lat.toFixed(8)}`);
+    }
+  }
+  return lines.join("\n") + (lines.length ? "\n" : "");
+}
+
+function appendArrow(lines, lon1, lat1, lon2, lat2) {
+  lines.push(">", `${lon1.toFixed(8)}\t${lat1.toFixed(8)}`, `${lon2.toFixed(8)}\t${lat2.toFixed(8)}`);
+  const angle = Math.atan2(lat2 - lat1, (lon2 - lon1) * Math.max(Math.cos(toRadians((lat1 + lat2) / 2)), 0.2));
+  const head = Math.hypot(lat2 - lat1, lon2 - lon1) * 0.22;
+  for (const turn of [2.55, -2.55]) {
+    const a = angle + turn;
+    lines.push(">", `${lon2.toFixed(8)}\t${lat2.toFixed(8)}`, `${(lon2 + head * Math.cos(a)).toFixed(8)}\t${(lat2 + head * Math.sin(a)).toFixed(8)}`);
+  }
+}
+
+function ellipsePoint(lon, lat, azimuth, major, minor, t) {
+  const angle = toRadians(azimuth);
+  const x = major * Math.cos(t);
+  const y = minor * Math.sin(t);
+  const east = x * Math.sin(angle) + y * Math.cos(angle);
+  const north = x * Math.cos(angle) - y * Math.sin(angle);
+  return { lon: lon + east / Math.max(Math.cos(toRadians(lat)), 0.2), lat: lat + north };
+}
+
+function segmentEndpoints(lon, lat, azimuth, length) {
+  const angle = toRadians(azimuth);
+  const east = Math.sin(angle) * length / 2;
+  const north = Math.cos(angle) * length / 2;
+  const lonScale = Math.max(Math.cos(toRadians(lat)), 0.2);
+  return [
+    { lon: lon - east / lonScale, lat: lat - north },
+    { lon: lon + east / lonScale, lat: lat + north }
+  ];
+}
+
+function mapLengthDegrees(region, fraction) {
+  const width = Math.max(0.001, region.east - region.west);
+  const height = Math.max(0.001, region.north - region.south);
+  return Math.min(width, height) * Math.max(0.002, fraction);
+}
+
+function tensorColor(beta) {
+  if (!Number.isFinite(beta)) return "#bdbdbd";
+  const value = Math.max(-12, Math.min(12, beta));
+  if (value < -6) return "#2b83ba";
+  if (value < -2) return "#abdda4";
+  if (value <= 2) return "#ffffbf";
+  if (value <= 6) return "#fdae61";
+  return "#d7191c";
+}
+
+function buildResponseCurveScript(records, config, outputDirectory, formats = ["png"]) {
+  const station = records.find((record) => record.name === config.curveStation) || records.find((record) => record.mtResponses?.length);
+  if (!station || !station.mtResponses?.length) throw new Error("当前数据没有可绘制的阻抗曲线。");
+  const shell = process.platform === "win32" ? "bat" : "sh";
+  const outputPrefix = shell === "bat" ? config.outputName || "mt_response_curve" : path.join(outputDirectory, config.outputName || "mt_response_curve");
+  const gmt = resolveGMT();
+  const environmentLines = gmtEnvironmentLines(gmt, shell);
+  const curve = buildCurveFiles(station, outputDirectory);
+  const q = (value) => quote(value);
+  if (shell === "bat") {
+    return ["@echo off", "setlocal enabledelayedexpansion", "cd /d \"%~dp0\"", ...environmentLines,
+      `gmt begin ${q(config.outputName || "mt_response_curve")} ${q(formats.join(","))}`,
+      "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p",
+      `gmt basemap -R${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax} -JX16c/7c -Bxa1f0.5+l\"log10 Period (s)\" -Bya1f0.5+l\"log10 Rho\" -BWSen+t${q(station.name)}`,
+      `gmt plot ${q("curve_rho_xy.tsv")} -W1.4p,#d7191c`,
+      `gmt plot ${q("curve_rho_yx.tsv")} -W1.4p,#2b83ba`,
+      "-",
+      `gmt basemap -R${curve.xMin}/${curve.xMax}/-180/180 -JX16c/5c -Bxa1f0.5+l\"log10 Period (s)\" -Bya45f15+l\"Phase\" -BWSen -Y-7.8c`,
+      `gmt plot ${q("curve_phase_xy.tsv")} -W1.4p,#d7191c`,
+      `gmt plot ${q("curve_phase_yx.tsv")} -W1.4p,#2b83ba`,
+      "gmt end", ""].filter((line) => line !== "-").join("\r\n");
+  }
+  return ["#!/usr/bin/env bash", "set -euo pipefail", ...environmentLines, "",
+    `gmt begin ${q(outputPrefix)} ${q(formats.join(","))}`,
+    "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p",
+    `  gmt basemap -R${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax} -JX16c/7c -Bxa1f0.5+l"log10 Period (s)" -Bya1f0.5+l"log10 Rho" -BWSen+t${q(station.name)}`,
+    `  gmt plot ${q(path.join(outputDirectory, "curve_rho_xy.tsv"))} -W1.4p,#d7191c`,
+    `  gmt plot ${q(path.join(outputDirectory, "curve_rho_yx.tsv"))} -W1.4p,#2b83ba`,
+    `  gmt basemap -R${curve.xMin}/${curve.xMax}/-180/180 -JX16c/5c -Bxa1f0.5+l"log10 Period (s)" -Bya45f15+l"Phase" -BWSen -Y-7.8c`,
+    `  gmt plot ${q(path.join(outputDirectory, "curve_phase_xy.tsv"))} -W1.4p,#d7191c`,
+    `  gmt plot ${q(path.join(outputDirectory, "curve_phase_yx.tsv"))} -W1.4p,#2b83ba`,
+    "gmt end", ""].join("\n");
+}
+
+function buildCurveFiles(station, outputDirectory) {
+  const rows = station.mtResponses.map((response) => ({ response, metrics: metricsForResponse(response) }))
+    .filter((item) => item.metrics?.impedance)
+    .sort((a, b) => a.response.period - b.response.period);
+  const series = {
+    rhoXY: [],
+    rhoYX: [],
+    phaseXY: [],
+    phaseYX: []
+  };
+  for (const item of rows) {
+    const x = Math.log10(item.response.period);
+    const impedance = item.metrics.impedance;
+    if (Number.isFinite(impedance.rhoXY) && impedance.rhoXY > 0) series.rhoXY.push([x, Math.log10(impedance.rhoXY)]);
+    if (Number.isFinite(impedance.rhoYX) && impedance.rhoYX > 0) series.rhoYX.push([x, Math.log10(impedance.rhoYX)]);
+    if (Number.isFinite(impedance.phaseXY)) series.phaseXY.push([x, impedance.phaseXY]);
+    if (Number.isFinite(impedance.phaseYX)) series.phaseYX.push([x, impedance.phaseYX]);
+  }
+  writeXY(path.join(outputDirectory, "curve_rho_xy.tsv"), series.rhoXY);
+  writeXY(path.join(outputDirectory, "curve_rho_yx.tsv"), series.rhoYX);
+  writeXY(path.join(outputDirectory, "curve_phase_xy.tsv"), series.phaseXY);
+  writeXY(path.join(outputDirectory, "curve_phase_yx.tsv"), series.phaseYX);
+  const xs = Object.values(series).flat().map((row) => row[0]);
+  const rhos = [...series.rhoXY, ...series.rhoYX].map((row) => row[1]);
+  return {
+    xMin: floorPad(Math.min(...xs), 0.2),
+    xMax: ceilPad(Math.max(...xs), 0.2),
+    rhoMin: floorPad(Math.min(...rhos), 0.5),
+    rhoMax: ceilPad(Math.max(...rhos), 0.5)
+  };
+}
+
+function writeXY(filePath, rows) {
+  fs.writeFileSync(filePath, rows.map((row) => `${row[0].toFixed(6)}\t${row[1].toFixed(6)}`).join("\n") + "\n", "utf8");
+}
+
+function floorPad(value, pad) {
+  return Number.isFinite(value) ? Math.floor((value - pad) * 10) / 10 : -1;
+}
+
+function ceilPad(value, pad) {
+  return Number.isFinite(value) ? Math.ceil((value + pad) * 10) / 10 : 1;
 }
 
 function terrainScriptParts(config, region, outputDirectory, shell) {

@@ -4,6 +4,7 @@ const path = require("path");
 const zlib = require("zlib");
 const { spawn, spawnSync } = require("child_process");
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
+const XLSX = require("xlsx");
 const { parseStationText, parseEdiStationText, buildEdiParsedResult, buildRecords } = require("./parser");
 const {
   autoRegion,
@@ -68,7 +69,7 @@ function configureMenu(win) {
           label: "导入",
           submenu: [
             {
-              label: "TXT/CSV 点位文件...",
+              label: "TXT/CSV/Excel 点位或 MT 表格...",
               accelerator: "CmdOrCtrl+O",
               click: () => sendMenuAction(win, "menu:openFile")
             },
@@ -135,6 +136,11 @@ function configureMenu(win) {
         {
           label: "GMT 官方下载页",
           click: () => shell.openExternal("https://www.generic-mapping-tools.org/download/")
+        },
+        { type: "separator" },
+        {
+          label: "表格格式说明",
+          click: () => sendMenuAction(win, "menu:showTableHelp")
         }
       ]
     }
@@ -168,10 +174,10 @@ ipcMain.handle("app:status", () => ({
 
 ipcMain.handle("file:open", async () => {
   const result = await dialog.showOpenDialog({
-    title: "选择点位 TXT/CSV 文件",
+    title: "选择点位或 MT 响应表格",
     properties: ["openFile"],
     filters: [
-      { name: "点位文件", extensions: ["txt", "csv", "dat", "tsv"] },
+      { name: "表格文件", extensions: ["txt", "csv", "dat", "tsv", "xlsx", "xls"] },
       { name: "所有文件", extensions: ["*"] }
     ]
   });
@@ -329,10 +335,21 @@ ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));
 
 function loadStationFile(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  const text = decodeText(buffer);
+  const text = spreadsheetText(filePath);
   const parsed = parseStationText(text, filePath);
   return { ...parsed, region: autoRegion(parsed.records) };
+}
+
+function spreadsheetText(filePath) {
+  if (/\.(xlsx|xls)$/i.test(filePath)) {
+    const workbook = XLSX.readFile(filePath);
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new Error("Excel 文件中没有可读取的工作表。");
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, defval: "" });
+    return rows.map((row) => row.map((cell) => String(cell ?? "").replace(/\t/g, " ")).join("\t")).join("\n");
+  }
+  const buffer = fs.readFileSync(filePath);
+  return decodeText(buffer);
 }
 
 function loadEdiDirectory(directory) {
@@ -657,6 +674,7 @@ function loadRenderer(win) {
       onMenuOpenEdiDirectory: (handler) => ipcRenderer.on("menu:openEdiDirectory", handler),
       onMenuLoadSample: (handler) => ipcRenderer.on("menu:loadSample", handler),
       onMenuChooseOutputDirectory: (handler) => ipcRenderer.on("menu:chooseOutputDirectory", handler),
+      onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),
       recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
       openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
       openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)

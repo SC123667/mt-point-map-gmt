@@ -2,6 +2,14 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.0 - 2026-06-28
+
+- Redesigned the app into a professional workbench layout with top analysis tabs for station maps, impedance strike, phase tensor ellipses, tipper vectors, and apparent-resistivity/phase curves.
+- Added EDI impedance/tipper response parsing across all periods, including `ZXX/ZXY/ZYX/ZYY` real/imaginary arrays and `TX/TY` tipper arrays.
+- Added Excel `.xlsx/.xls` table import and manual MT column mapping for period/frequency, impedance tensor, tipper, provided strike, phase-tensor axes, and beta/skew columns.
+- Added GMT overlay generation for electric/impedance strike segments, phase tensor ellipses colored by beta, Parkinson/Wiese tipper arrows, and single-station rho/phase curves.
+- Added in-app table-format help and clearer messages when MT-specific plots are requested from coordinate-only data.
+
 ## v0.4.6 - 2026-06-28
 
 - Changed the Windows internal executable name to `MTPointMapGMT.exe` while keeping the Chinese app title, avoiding NSIS installer close-detection problems with the previous Chinese executable name.

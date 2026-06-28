@@ -1,6 +1,6 @@
 {
   "name": "mt-point-map-gmt",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "description": "MT点位图制作工具—GMT：跨平台大地电磁野外点位图制图软件",
   "main": "electron/main.js",
   "author": "CWN",
@@ -61,5 +61,8 @@
       "artifactName": "${productName}-${version}-win-${arch}-portable.${ext}"
     },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
   }
 }

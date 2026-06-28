@@ -23,13 +23,66 @@ body {
 }
 
 .app-header {
-  height: 76px;
+  height: 70px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 18px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+}
+
+.workspace-toolbar {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.tool-tab {
+  min-width: 76px;
+  white-space: nowrap;
+  border-color: transparent;
+  background: transparent;
+  color: #415066;
+}
+
+.tool-tab.active {
+  background: #dfecee;
+  border-color: #a8c3c7;
+  color: #163d42;
+  font-weight: 700;
+}
+
+.toolbar-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.toolbar-context label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.toolbar-context select {
+  width: 150px;
 }
 
 h1, h2, p {
@@ -53,10 +106,10 @@ p {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(280px, 330px) minmax(420px, 1fr) minmax(300px, 350px);
+  grid-template-columns: minmax(280px, 330px) minmax(440px, 1fr) minmax(320px, 370px);
   gap: 12px;
   padding: 12px;
-  height: calc(100vh - 76px);
+  height: calc(100vh - 120px);
 }
 
 .download-panel {
@@ -71,8 +124,8 @@ p {
   display: none;
 }
 
-.download-panel:not(.hidden) + .layout {
-  height: calc(100vh - 76px - 94px);
+.download-panel:not(.hidden) ~ .layout {
+  height: calc(100vh - 120px - 94px);
 }
 
 .download-head,
@@ -108,6 +161,11 @@ progress {
   padding: 14px;
   min-height: 0;
   overflow: auto;
+}
+
+.data-pane,
+.parameter-pane {
+  background: #fbfcfe;
 }
 
 .section-title {
@@ -196,6 +254,59 @@ fieldset {
   border-radius: 8px;
   padding: 10px;
   margin: 12px 0;
+}
+
+.mt-field-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 12px 0;
+  background: #fff;
+}
+
+.mt-field-details summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mt-field-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.mt-field-grid label {
+  grid-template-columns: 72px minmax(0, 1fr);
+  margin: 4px 0;
+}
+
+.analysis-settings {
+  border-color: #b8cbd0;
+  background: #f8fbfb;
+}
+
+.analysis-only {
+  display: none;
+}
+
+body[data-plot-type="strikeMap"] .strike-only,
+body[data-plot-type="phaseTensorMap"] .tensor-only,
+body[data-plot-type="tipperMap"] .tipper-only,
+body[data-plot-type="responseCurve"] .curve-only {
+  display: grid;
+}
+
+body[data-plot-type="stationMap"] .analysis-settings {
+  display: none;
+}
+
+body[data-plot-type="responseCurve"] .map-settings {
+  display: none;
+}
+
+body[data-plot-type="responseCurve"] .analysis-settings {
+  display: block;
 }
 
 legend {
@@ -313,6 +424,36 @@ td:nth-child(3) {
   background: #f6f8fb;
   color: var(--muted);
   overflow: hidden;
+}
+
+.table-help-dialog {
+  width: min(760px, calc(100vw - 48px));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
+}
+
+.dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+
+.help-content {
+  padding: 14px 16px 18px;
+}
+
+.help-content table {
+  margin-top: 12px;
+}
+
+.help-content th:first-child,
+.help-content td:first-child {
+  width: 110px;
 }
 
 .preview-box img {

@@ -3,6 +3,7 @@ const state = {
   records: [],
   columns: [],
   mapping: null,
+  plotType: "stationMap",
   outputDirectory: "",
   terrain: {
     key: "",
@@ -47,11 +48,16 @@ const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", 
 const ids = [
   "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
+  "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
+  "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
+  "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
   "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
+  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
+  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
   "terrainAllowDownloadInput", "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
   "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
   "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
@@ -64,6 +70,7 @@ const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)])
 window.addEventListener("DOMContentLoaded", async () => {
   populateColorControls();
   wireEvents();
+  setPlotType("stationMap");
   await refreshStatus();
 });
 
@@ -72,6 +79,12 @@ function wireEvents() {
   window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
   window.mtApp.onMenuLoadSample(loadSampleData);
   window.mtApp.onMenuChooseOutputDirectory(chooseOutputDirectory);
+  window.mtApp.onMenuShowTableHelp(showTableHelp);
+  document.querySelectorAll(".tool-tab").forEach((button) => {
+    button.addEventListener("click", () => setPlotType(button.dataset.plotType));
+  });
+  el.tableHelpBtn.addEventListener("click", showTableHelp);
+  el.closeTableHelpBtn.addEventListener("click", () => el.tableHelpDialog.close());
   el.applyMappingBtn.addEventListener("click", applyMapping);
   el.autoRegionBtn.addEventListener("click", () => {
     if (!state.records.length) return notify("请先导入点位文件。");
@@ -105,6 +118,41 @@ function wireEvents() {
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
+}
+
+function setPlotType(plotType) {
+  state.plotType = plotType || "stationMap";
+  document.querySelectorAll(".tool-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.plotType === state.plotType);
+  });
+  document.body.dataset.plotType = state.plotType;
+  const labels = {
+    stationMap: ["绘图参数", "点位图模式"],
+    strikeMap: ["电性主轴 / 阻抗张量走向", "按选定周期叠加走向线段"],
+    phaseTensorMap: ["相位张量椭圆", "按选定周期叠加相位张量椭圆"],
+    tipperMap: ["感应矢量 / Tipper", "按选定周期叠加实部或虚部箭头"],
+    responseCurve: ["视电阻率和相位曲线", "选择单个测点绘制 rho/phase 曲线"]
+  };
+  const [title, hint] = labels[state.plotType] || labels.stationMap;
+  el.inspectorTitle.textContent = title;
+  el.plotTypeHint.textContent = hint;
+  el.outputNameInput.value = defaultOutputNameForPlot(state.plotType);
+  renderPlaceholder();
+}
+
+function defaultOutputNameForPlot(plotType) {
+  return {
+    stationMap: "mt_point_map",
+    strikeMap: "mt_strike_map",
+    phaseTensorMap: "mt_phase_tensor_map",
+    tipperMap: "mt_tipper_map",
+    responseCurve: "mt_response_curve"
+  }[plotType] || "mt_point_map";
+}
+
+function showTableHelp() {
+  if (typeof el.tableHelpDialog.showModal === "function") el.tableHelpDialog.showModal();
+  else notify("表格格式：基础列为测点名、经度、纬度；MT 列为 period/freq、ZXXR/ZXXI、ZXYR/ZXYI、ZYXR/ZYXI、ZYYR/ZYYI、TXR/TXI、TYR/TYI。");
 }
 
 async function openPointFile() {
@@ -229,6 +277,7 @@ function loadParsed(parsed) {
     el.showLabelsInput.checked = false;
   }
   populateColumnSelects();
+  populateMTControls();
   renderStationRows();
   renderPlaceholder();
   resetTerrainPaths();
@@ -236,7 +285,12 @@ function loadParsed(parsed) {
 }
 
 function populateColumnSelects() {
-  const selects = [el.nameColumn, el.lonColumn, el.latColumn, el.lineColumn, el.elevationColumn];
+  const selects = [
+    el.nameColumn, el.lonColumn, el.latColumn, el.lineColumn, el.elevationColumn,
+    el.periodColumn, el.frequencyColumn, el.zxxrColumn, el.zxxiColumn, el.zxyrColumn, el.zxyiColumn,
+    el.zyxrColumn, el.zyxiColumn, el.zyyrColumn, el.zyyiColumn, el.txrColumn, el.txiColumn, el.tyrColumn, el.tyiColumn,
+    el.strikeColumn, el.ptAzimuthColumn, el.ptMaxColumn, el.ptMinColumn, el.betaColumn
+  ];
   for (const select of selects) {
     select.innerHTML = "";
     select.append(new Option("无", ""));
@@ -247,6 +301,34 @@ function populateColumnSelects() {
   el.latColumn.value = state.mapping.lat || state.mapping.northing || "";
   el.lineColumn.value = state.mapping.line || "";
   el.elevationColumn.value = state.mapping.elevation || "";
+  setMTColumnValues(state.mapping.mt || {});
+}
+
+function setMTColumnValues(mapping) {
+  const map = {
+    periodColumn: "period",
+    frequencyColumn: "frequency",
+    zxxrColumn: "zxxr",
+    zxxiColumn: "zxxi",
+    zxyrColumn: "zxyr",
+    zxyiColumn: "zxyi",
+    zyxrColumn: "zyxr",
+    zyxiColumn: "zyxi",
+    zyyrColumn: "zyyr",
+    zyyiColumn: "zyyi",
+    txrColumn: "txr",
+    txiColumn: "txi",
+    tyrColumn: "tyr",
+    tyiColumn: "tyi",
+    strikeColumn: "strike",
+    ptAzimuthColumn: "ptAzimuth",
+    ptMaxColumn: "ptMax",
+    ptMinColumn: "ptMin",
+    betaColumn: "beta"
+  };
+  for (const [id, key] of Object.entries(map)) {
+    if (el[id]) el[id].value = mapping[key] || "";
+  }
 }
 
 async function applyMapping() {
@@ -263,6 +345,7 @@ async function applyMapping() {
     state.records = result.records;
     el.regionInput.value = result.region;
     renderStationRows();
+    populateMTControls();
     resetTerrainPaths();
     updateTerrainEstimate();
     notify("字段映射已更新。");
@@ -275,7 +358,8 @@ function readMapping() {
   const base = {
     name: el.nameColumn.value,
     line: el.lineColumn.value,
-    elevation: el.elevationColumn.value
+    elevation: el.elevationColumn.value,
+    mt: readMTMapping()
   };
   if (state.mapping && state.mapping.coordinateType === "projected") {
     return {
@@ -294,9 +378,43 @@ function readMapping() {
   };
 }
 
-function readConfig() {
+function readMTMapping() {
   return {
+    period: el.periodColumn.value,
+    frequency: el.frequencyColumn.value,
+    zxxr: el.zxxrColumn.value,
+    zxxi: el.zxxiColumn.value,
+    zxyr: el.zxyrColumn.value,
+    zxyi: el.zxyiColumn.value,
+    zyxr: el.zyxrColumn.value,
+    zyxi: el.zyxiColumn.value,
+    zyyr: el.zyyrColumn.value,
+    zyyi: el.zyyiColumn.value,
+    txr: el.txrColumn.value,
+    txi: el.txiColumn.value,
+    tyr: el.tyrColumn.value,
+    tyi: el.tyiColumn.value,
+    strike: el.strikeColumn.value,
+    ptAzimuth: el.ptAzimuthColumn.value,
+    ptMax: el.ptMaxColumn.value,
+    ptMin: el.ptMinColumn.value,
+    beta: el.betaColumn.value
+  };
+}
+
+function readConfig() {
+  const config = {
     title: el.titleInput.value,
+    plotType: state.plotType,
+    mtPeriod: Number(el.mtPeriodInput.value),
+    curveStation: el.curveStationInput.value,
+    strikeLength: Number(el.strikeLengthInput.value),
+    strikeColor: el.strikeColorInput.value,
+    tensorScale: Number(el.tensorScaleInput.value),
+    tensorPenColor: el.tensorPenColorInput.value,
+    tipperComponent: el.tipperComponentInput.value,
+    tipperConvention: el.tipperConventionInput.value,
+    tipperScale: Number(el.tipperScaleInput.value),
     region: el.regionInput.value,
     projection: el.projectionInput.value,
     frame: el.frameInput.value,
@@ -322,18 +440,27 @@ function readConfig() {
     terrainShadePath: state.terrain.shadePath,
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   };
+  if (state.plotType === "responseCurve") config.showTerrain = false;
+  return config;
 }
 
 async function exportMap(formats, showAlert) {
   if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
+  if (!validatePlotReadiness(config)) return;
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
     if (!ready) return;
     config.terrainGridPath = state.terrain.gridPath;
     config.terrainShadePath = state.terrain.shadePath;
   }
-  const result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
+  let result;
+  try {
+    result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
+  } catch (error) {
+    notify(error.message || String(error));
+    return;
+  }
   if (!result.ok) {
     await refreshStatus();
     return notify(`${result.message}\n脚本已保存：${result.scriptPath}`);
@@ -555,14 +682,36 @@ async function clearTerrainCache() {
 async function saveScript() {
   if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
+  if (!validatePlotReadiness(config)) return;
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
     if (!ready) return;
     config.terrainGridPath = state.terrain.gridPath;
     config.terrainShadePath = state.terrain.shadePath;
   }
-  const saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory });
+  let saved;
+  try {
+    saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory });
+  } catch (error) {
+    notify(error.message || String(error));
+    return;
+  }
   if (saved) notify(`GMT 脚本已保存：${saved}`);
+}
+
+function validatePlotReadiness(config) {
+  if (["strikeMap", "phaseTensorMap", "tipperMap", "responseCurve"].includes(config.plotType)) {
+    const hasMT = state.records.some((record) => record.mtResponses?.length);
+    if (!hasMT) {
+      notify("当前数据只有点位坐标，没有可用于走向、相位张量、Tipper 或曲线图的 MT 响应数据。请导入 EDI 文件夹，或在表格中提供周期/频率与阻抗张量列。");
+      return false;
+    }
+  }
+  if (config.plotType === "responseCurve" && !config.curveStation) {
+    notify("请选择一个包含 MT 响应数据的测点。");
+    return false;
+  }
+  return true;
 }
 
 function populateColorControls() {
@@ -631,6 +780,38 @@ function renderStationRows() {
   }
 }
 
+function populateMTControls() {
+  const periods = availablePeriodsClient();
+  el.mtPeriodInput.innerHTML = "";
+  if (!periods.length) {
+    el.mtPeriodInput.append(new Option("无 MT 周期数据", ""));
+  } else {
+    for (const period of periods) {
+      el.mtPeriodInput.append(new Option(`${formatPeriod(period)} s`, String(period)));
+    }
+    el.mtPeriodInput.value = String(periods[Math.floor(periods.length / 2)] || periods[0]);
+  }
+  el.curveStationInput.innerHTML = "";
+  const curveRecords = state.records.filter((record) => record.mtResponses?.length);
+  for (const record of curveRecords) el.curveStationInput.append(new Option(record.name, record.name));
+}
+
+function availablePeriodsClient() {
+  const values = [];
+  for (const record of state.records) {
+    for (const response of record.mtResponses || []) {
+      if (Number.isFinite(response.period) && response.period > 0) values.push(Number(response.period.toPrecision(8)));
+    }
+  }
+  return Array.from(new Set(values)).sort((a, b) => a - b);
+}
+
+function formatPeriod(period) {
+  if (period >= 1000) return period.toExponential(2);
+  if (period >= 1) return period.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+  return period.toExponential(2);
+}
+
 async function renderPreview(filePath) {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
@@ -641,7 +822,14 @@ async function renderPreview(filePath) {
 }
 
 function renderPlaceholder() {
-  el.previewBox.innerHTML = "<span>点击“生成预览”绘制点位图</span>";
+  const labels = {
+    stationMap: "点击“生成预览”绘制点位图",
+    strikeMap: "选择周期后生成走向图",
+    phaseTensorMap: "选择周期后生成相位张量椭圆图",
+    tipperMap: "选择周期和分量后生成感应矢量图",
+    responseCurve: "选择测点后生成视电阻率和相位曲线"
+  };
+  el.previewBox.innerHTML = `<span>${labels[state.plotType] || labels.stationMap}</span>`;
 }
 
 function autoRegionClient(records) {
