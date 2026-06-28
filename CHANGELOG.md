@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.4.5 - 2026-06-28
+
+- Fixed Windows GMT export failures when the output directory contains Chinese characters by running GMT in an ASCII temporary workspace and copying completed files back afterward.
+- Changed generated Windows GMT scripts to use relative station files and output names, avoiding Ghostscript failures on non-ASCII absolute paths.
+- Made saved Windows `.bat` scripts switch to their own folder before running so double-click execution is more reliable.
+
 ## v0.4.4 - 2026-06-20
 
 - Added a terrain-resolution safety guard that blocks oversized high-resolution SRTM basemaps before they can freeze or crash the app.

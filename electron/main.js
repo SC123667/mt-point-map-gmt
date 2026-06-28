@@ -232,13 +232,16 @@ ipcMain.handle("gmt:export", async (_event, payload) => {
   const needsTitleOverlay = shouldOverlayTitle(payload.config);
   const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
   const outputName = payload.config.outputName || "mt_point_map";
-  const script = buildScript(payload.records, payload.config, outputDirectory, gmtFormats);
-  const result = runGMT(script, outputDirectory, outputName, gmtFormats);
+  const gmtWorkspace = createGMTWorkspace(outputDirectory, payload.config, outputName);
+  const script = buildScript(payload.records, gmtWorkspace.config, gmtWorkspace.directory, gmtFormats);
+  const result = runGMT(script, gmtWorkspace.directory, outputName, gmtFormats);
   if (result.ok && needsTitleOverlay) {
     await overlayNativeTitle(result, payload.config, outputName, formats);
   }
+  finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, formats);
   if (result.ok) {
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
+    result.outputDirectory = outputDirectory;
   }
   return result;
 });
@@ -416,6 +419,85 @@ function writeSettings(settings) {
   } catch {
     // Settings persistence is helpful but should never block plotting.
   }
+}
+
+function createGMTWorkspace(outputDirectory, config, outputName) {
+  if (process.platform !== "win32") {
+    return { temporary: false, directory: outputDirectory, config };
+  }
+  const directory = createAsciiTempDirectory();
+  return {
+    temporary: true,
+    directory,
+    config: copyTerrainInputsToWorkspace(config, directory),
+    finalOutputDirectory: outputDirectory,
+    outputName
+  };
+}
+
+function createAsciiTempDirectory() {
+  const roots = [
+    process.env.PUBLIC ? path.join(process.env.PUBLIC, "MTPointMapGMT") : "",
+    process.env.ProgramData ? path.join(process.env.ProgramData, "MTPointMapGMT") : "",
+    path.join(app.getPath("temp"), "MTPointMapGMT")
+  ].filter(Boolean);
+  for (const root of roots) {
+    if (!isAsciiPath(root)) continue;
+    try {
+      fs.mkdirSync(root, { recursive: true });
+      return fs.mkdtempSync(path.join(root, "run-"));
+    } catch {
+      // Try the next writable ASCII path.
+    }
+  }
+  const fallbackRoot = path.join(app.getPath("temp"), "MTPointMapGMT");
+  fs.mkdirSync(fallbackRoot, { recursive: true });
+  return fs.mkdtempSync(path.join(fallbackRoot, "run-"));
+}
+
+function isAsciiPath(targetPath) {
+  return /^[\x00-\x7F]+$/.test(String(targetPath || ""));
+}
+
+function copyTerrainInputsToWorkspace(config, workspaceDirectory) {
+  const nextConfig = { ...(config || {}) };
+  if (!nextConfig.showTerrain) return nextConfig;
+  if (nextConfig.terrainGridPath && fs.existsSync(nextConfig.terrainGridPath)) {
+    const target = path.join(workspaceDirectory, "terrain_grid.nc");
+    fs.copyFileSync(nextConfig.terrainGridPath, target);
+    nextConfig.terrainGridPath = target;
+  }
+  if (nextConfig.terrainShadePath && fs.existsSync(nextConfig.terrainShadePath)) {
+    const target = path.join(workspaceDirectory, "terrain_shade.nc");
+    fs.copyFileSync(nextConfig.terrainShadePath, target);
+    nextConfig.terrainShadePath = target;
+  }
+  return nextConfig;
+}
+
+function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, formats) {
+  if (!workspace.temporary) return;
+  fs.mkdirSync(outputDirectory, { recursive: true });
+  const scriptExtension = process.platform === "win32" ? "bat" : "gmt";
+  const finalScriptPath = path.join(outputDirectory, `${outputName}.${scriptExtension}`);
+  copyIfExists(result.scriptPath, finalScriptPath);
+  result.scriptPath = finalScriptPath;
+
+  if (result.ok) {
+    for (const format of formats) {
+      copyIfExists(path.join(workspace.directory, `${outputName}.${format}`), path.join(outputDirectory, `${outputName}.${format}`));
+    }
+    copyIfExists(path.join(workspace.directory, "stations_points.tsv"), path.join(outputDirectory, "stations_points.tsv"));
+    copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
+    fs.rmSync(workspace.directory, { recursive: true, force: true });
+  }
+}
+
+function copyIfExists(source, target) {
+  if (!source || !target || !fs.existsSync(source)) return;
+  if (path.resolve(source) === path.resolve(target)) return;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(source, target);
 }
 
 function shouldOverlayTitle(config) {

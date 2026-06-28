@@ -298,15 +298,17 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
 
   const region = (config.region || "").trim() || autoRegion(records);
   const regionValues = parseRegion(region);
+  const shell = process.platform === "win32" ? "bat" : "sh";
   const gridPrefix = config.showGrid ? "g" : "";
   const frameOption = `-B${gridPrefix}${config.frame}`;
   const title = (config.title || "").trim();
   const titleOption = title && !needsNativeTextRendering(title) ? ` -B+t${quote(title)}` : "";
-  const outputPrefix = path.join(outputDirectory, config.outputName || "mt_point_map");
+  const outputPrefix = shell === "bat" ? config.outputName || "mt_point_map" : path.join(outputDirectory, config.outputName || "mt_point_map");
+  const pointsPathForScript = shell === "bat" ? "stations_points.tsv" : pointsPath;
+  const labelsPathForScript = shell === "bat" ? "stations_labels.tsv" : labelsPath;
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
   const scale = scaleForRegion(regionValues);
-  const shell = process.platform === "win32" ? "bat" : "sh";
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell);
   const terrain = terrainScriptParts(config, region, outputDirectory, shell);
@@ -314,14 +316,15 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     return [
       "@echo off",
       "setlocal enabledelayedexpansion",
+      "cd /d \"%~dp0\"",
       ...environmentLines,
       `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
       "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
       ...terrain.preCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
       terrain.imageCommand || `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
-      `gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
-      config.showLabels ? `gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+      `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+      config.showLabels ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
       config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
       config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
       "gmt end",
@@ -338,8 +341,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     ...terrain.preCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
     terrain.imageCommand || `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
-    `  gmt plot ${quote(pointsPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
-    config.showLabels ? `  gmt text ${quote(labelsPath)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+    `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+    config.showLabels ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
     config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
     config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
     "gmt end",
