@@ -12,9 +12,21 @@ const state = {
     region: "",
     resolution: ""
   },
+  preview: {
+    hasImage: false,
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    selecting: false,
+    selectionStart: null,
+    selectionEnd: null
+  },
   terrainWaiter: null
 };
 
+const PREVIEW_MIN_ZOOM = 1;
+const PREVIEW_MAX_ZOOM = 16;
+const PREVIEW_WHEEL_STEP = 1.18;
 const CUSTOM_COLOR_VALUE = "__custom__";
 const COLOR_OPTIONS = [
   ["#d7191c", "红色 #d7191c"],
@@ -48,6 +60,7 @@ const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", 
 const ids = [
   "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
+  "previewImageLayer", "previewSelection", "previewZoomControls", "previewZoomLabel", "previewFitBtn", "previewPlaceholder",
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
@@ -97,6 +110,12 @@ function wireEvents() {
   el.saveScriptBtn.addEventListener("click", saveScript);
   el.deleteOutputBtn.addEventListener("click", deleteCurrentOutputs);
   el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
+  el.previewFitBtn.addEventListener("click", () => resetPreviewView());
+  el.previewBox.addEventListener("wheel", handlePreviewWheel, { passive: false });
+  el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
+  el.previewBox.addEventListener("pointermove", handlePreviewPointerMove);
+  el.previewBox.addEventListener("pointerup", handlePreviewPointerUp);
+  el.previewBox.addEventListener("pointercancel", cancelPreviewSelection);
   el.prepareTerrainBtn.addEventListener("click", () => prepareTerrain(false));
   el.pauseTerrainBtn.addEventListener("click", () => window.mtApp.pauseTerrain());
   el.resumeTerrainBtn.addEventListener("click", () => window.mtApp.resumeTerrain());
@@ -815,18 +834,34 @@ function formatPeriod(period) {
 async function renderPreview(filePath) {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
-    el.previewBox.innerHTML = "";
-    el.previewBox.style.backgroundImage = `url(${url})`;
+    el.previewImageLayer.style.backgroundImage = `url(${url})`;
+    el.previewPlaceholder.hidden = true;
+    el.previewZoomControls.classList.remove("hidden");
     el.previewBox.classList.add("has-preview");
     el.previewBox.setAttribute("aria-label", "GMT 点位图预览");
+    state.preview.hasImage = true;
+    resetPreviewView();
   } catch (error) {
     clearPreviewImage();
-    el.previewBox.innerHTML = `<span>预览图读取失败：${escapeHTML(error.message || String(error))}</span>`;
+    el.previewPlaceholder.hidden = false;
+    el.previewPlaceholder.textContent = `预览图读取失败：${error.message || String(error)}`;
   }
 }
 
 function clearPreviewImage() {
-  el.previewBox.style.backgroundImage = "";
+  state.preview.hasImage = false;
+  state.preview.zoom = 1;
+  state.preview.panX = 0;
+  state.preview.panY = 0;
+  state.preview.selecting = false;
+  state.preview.selectionStart = null;
+  state.preview.selectionEnd = null;
+  el.previewImageLayer.style.backgroundImage = "";
+  el.previewImageLayer.style.transform = "";
+  el.previewSelection.classList.remove("active");
+  el.previewSelection.style.cssText = "";
+  el.previewZoomControls.classList.add("hidden");
+  el.previewZoomLabel.textContent = "100%";
   el.previewBox.classList.remove("has-preview");
   el.previewBox.removeAttribute("aria-label");
 }
@@ -840,7 +875,123 @@ function renderPlaceholder() {
     responseCurve: "选择测点后生成视电阻率和相位曲线"
   };
   clearPreviewImage();
-  el.previewBox.innerHTML = `<span>${labels[state.plotType] || labels.stationMap}</span>`;
+  el.previewPlaceholder.hidden = false;
+  el.previewPlaceholder.textContent = labels[state.plotType] || labels.stationMap;
+}
+
+function resetPreviewView() {
+  state.preview.zoom = 1;
+  state.preview.panX = 0;
+  state.preview.panY = 0;
+  updatePreviewTransform();
+}
+
+function updatePreviewTransform() {
+  el.previewImageLayer.style.transform = `translate(${state.preview.panX.toFixed(2)}px, ${state.preview.panY.toFixed(2)}px) scale(${state.preview.zoom.toFixed(4)})`;
+  el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
+}
+
+function handlePreviewWheel(event) {
+  if (!state.preview.hasImage) return;
+  event.preventDefault();
+  el.previewBox.focus({ preventScroll: true });
+  const point = previewPoint(event);
+  const direction = event.deltaY < 0 ? 1 : -1;
+  const factor = direction > 0 ? PREVIEW_WHEEL_STEP : 1 / PREVIEW_WHEEL_STEP;
+  zoomPreviewAt(point, state.preview.zoom * factor);
+}
+
+function handlePreviewPointerDown(event) {
+  if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls")) return;
+  event.preventDefault();
+  el.previewBox.focus({ preventScroll: true });
+  state.preview.selecting = true;
+  state.preview.selectionStart = previewPoint(event);
+  state.preview.selectionEnd = state.preview.selectionStart;
+  el.previewBox.setPointerCapture(event.pointerId);
+  updatePreviewSelection();
+}
+
+function handlePreviewPointerMove(event) {
+  if (!state.preview.selecting) return;
+  event.preventDefault();
+  state.preview.selectionEnd = previewPoint(event);
+  updatePreviewSelection();
+}
+
+function handlePreviewPointerUp(event) {
+  if (!state.preview.selecting) return;
+  event.preventDefault();
+  state.preview.selectionEnd = previewPoint(event);
+  const selection = previewSelectionRect();
+  cancelPreviewSelection();
+  if (selection.width < 12 || selection.height < 12) return;
+  zoomPreviewToSelection(selection);
+}
+
+function cancelPreviewSelection() {
+  state.preview.selecting = false;
+  state.preview.selectionStart = null;
+  state.preview.selectionEnd = null;
+  el.previewSelection.classList.remove("active");
+  el.previewSelection.style.cssText = "";
+}
+
+function updatePreviewSelection() {
+  const selection = previewSelectionRect();
+  el.previewSelection.classList.add("active");
+  el.previewSelection.style.left = `${selection.left}px`;
+  el.previewSelection.style.top = `${selection.top}px`;
+  el.previewSelection.style.width = `${selection.width}px`;
+  el.previewSelection.style.height = `${selection.height}px`;
+}
+
+function previewSelectionRect() {
+  const start = state.preview.selectionStart || { x: 0, y: 0 };
+  const end = state.preview.selectionEnd || start;
+  const box = el.previewBox.getBoundingClientRect();
+  const x1 = clamp(Math.min(start.x, end.x), 0, box.width);
+  const y1 = clamp(Math.min(start.y, end.y), 0, box.height);
+  const x2 = clamp(Math.max(start.x, end.x), 0, box.width);
+  const y2 = clamp(Math.max(start.y, end.y), 0, box.height);
+  return { left: x1, top: y1, width: x2 - x1, height: y2 - y1 };
+}
+
+function zoomPreviewToSelection(selection) {
+  const box = el.previewBox.getBoundingClientRect();
+  const factor = Math.min(box.width / selection.width, box.height / selection.height);
+  const center = { x: selection.left + selection.width / 2, y: selection.top + selection.height / 2 };
+  zoomPreviewAt(center, state.preview.zoom * factor);
+}
+
+function zoomPreviewAt(point, targetZoom) {
+  const box = el.previewBox.getBoundingClientRect();
+  const oldZoom = state.preview.zoom;
+  const newZoom = clamp(targetZoom, PREVIEW_MIN_ZOOM, PREVIEW_MAX_ZOOM);
+  if (Math.abs(newZoom - oldZoom) < 0.001) return;
+  const ratio = newZoom / oldZoom;
+  state.preview.panX = point.x - ratio * (point.x - state.preview.panX);
+  state.preview.panY = point.y - ratio * (point.y - state.preview.panY);
+  state.preview.zoom = newZoom;
+  if (newZoom <= PREVIEW_MIN_ZOOM + 0.001) {
+    state.preview.panX = 0;
+    state.preview.panY = 0;
+  } else {
+    const padX = box.width * 0.75;
+    const padY = box.height * 0.75;
+    state.preview.panX = clamp(state.preview.panX, box.width - box.width * newZoom - padX, padX);
+    state.preview.panY = clamp(state.preview.panY, box.height - box.height * newZoom - padY, padY);
+  }
+  updatePreviewTransform();
+}
+
+function previewPoint(event) {
+  const box = el.previewBox.getBoundingClientRect();
+  return { x: event.clientX - box.left, y: event.clientY - box.top };
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function autoRegionClient(records) {

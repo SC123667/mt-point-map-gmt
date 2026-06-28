@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.6 - 2026-06-29
+
+- Added interactive preview zooming: when the pointer is over the preview area, mouse-wheel scrolling zooms the generated map or MT curve without rerunning GMT.
+- Added drag-box local magnification in the preview area, plus an in-preview zoom readout and fit-reset control.
+
 ## v0.5.5 - 2026-06-28
 
 - Fixed the MT apparent-resistivity/phase curve layout by drawing the phase panel at the page base and placing the resistivity panel above it, preventing GMT from clipping the lower phase subplot.

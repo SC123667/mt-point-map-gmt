@@ -115,8 +115,14 @@
           </div>
           <button id="previewBtn" class="primary">生成预览</button>
         </div>
-        <div class="preview-box" id="previewBox">
-          <span>导入点位后生成预览</span>
+        <div class="preview-box" id="previewBox" tabindex="0">
+          <div class="preview-image-layer" id="previewImageLayer" aria-hidden="true"></div>
+          <div class="preview-selection" id="previewSelection" aria-hidden="true"></div>
+          <div class="preview-zoom-controls hidden" id="previewZoomControls">
+            <span id="previewZoomLabel">100%</span>
+            <button id="previewFitBtn" type="button">适配</button>
+          </div>
+          <span id="previewPlaceholder">导入点位后生成预览</span>
         </div>
         <div class="button-row export-row">
           <button id="exportPngBtn">导出 PNG</button>

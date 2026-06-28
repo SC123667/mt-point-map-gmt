@@ -421,16 +421,86 @@ td:nth-child(3) {
   border-radius: 8px;
   display: grid;
   place-items: center;
+  position: relative;
   background-color: #f6f8fb;
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
   color: var(--muted);
   overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  outline: none;
 }
 
 .preview-box.has-preview {
   place-items: stretch;
+  cursor: crosshair;
+}
+
+.preview-box:focus {
+  box-shadow: 0 0 0 2px rgba(45, 110, 112, 0.16);
+}
+
+.preview-image-layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.preview-selection {
+  position: absolute;
+  display: none;
+  border: 1px solid #0f766e;
+  background: rgba(20, 184, 166, 0.14);
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+.preview-selection.active {
+  display: block;
+}
+
+.preview-zoom-controls {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.preview-zoom-controls.hidden {
+  display: none;
+}
+
+.preview-zoom-controls span {
+  min-width: 42px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-zoom-controls button {
+  min-height: 24px;
+  padding: 2px 7px;
+  font-size: 12px;
+}
+
+#previewPlaceholder {
+  position: relative;
+  z-index: 1;
 }
 
 .table-help-dialog {
