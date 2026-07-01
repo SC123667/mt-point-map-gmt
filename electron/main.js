@@ -278,6 +278,19 @@ ipcMain.handle("terrain:estimate", (_event, payload) => {
   };
 });
 
+ipcMain.handle("terrain:chooseLocalGrid", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "选择本地 GRD 地形图",
+    properties: ["openFile"],
+    filters: [
+      { name: "GMT 网格文件", extensions: ["grd", "nc"] },
+      { name: "所有文件", extensions: ["*"] }
+    ]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  return result.filePaths[0];
+});
+
 ipcMain.handle("terrain:prepare", (event, payload) => startTerrainTask(event.sender, payload));
 ipcMain.handle("terrain:pause", () => {
   if (!currentTerrainTask) return { ok: false, message: "当前没有正在准备的地形底图。" };
@@ -480,9 +493,11 @@ function copyTerrainInputsToWorkspace(config, workspaceDirectory) {
   const nextConfig = { ...(config || {}) };
   if (!nextConfig.showTerrain) return nextConfig;
   if (nextConfig.terrainGridPath && fs.existsSync(nextConfig.terrainGridPath)) {
-    const target = path.join(workspaceDirectory, "terrain_grid.nc");
+    const extension = path.extname(nextConfig.terrainGridPath) || ".grd";
+    const target = path.join(workspaceDirectory, `terrain_grid${extension}`);
     fs.copyFileSync(nextConfig.terrainGridPath, target);
     nextConfig.terrainGridPath = target;
+    if (nextConfig.localTerrainGridPath) nextConfig.localTerrainGridPath = target;
   }
   if (nextConfig.terrainShadePath && fs.existsSync(nextConfig.terrainShadePath)) {
     const target = path.join(workspaceDirectory, "terrain_shade.nc");
@@ -658,6 +673,7 @@ function loadRenderer(win) {
       deleteCurrentOutputs: (payload) => ipcRenderer.invoke("output:deleteCurrent", payload),
       estimateTerrain: (payload) => ipcRenderer.invoke("terrain:estimate", payload),
       prepareTerrain: (payload) => ipcRenderer.invoke("terrain:prepare", payload),
+      chooseLocalTerrainGrid: () => ipcRenderer.invoke("terrain:chooseLocalGrid"),
       pauseTerrain: () => ipcRenderer.invoke("terrain:pause"),
       resumeTerrain: () => ipcRenderer.invoke("terrain:resume"),
       cancelTerrain: () => ipcRenderer.invoke("terrain:cancel"),

@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded in this file.
 
+## v0.5.8 - 2026-07-01
+
+- Added local `.grd` terrain import in the terrain basemap panel, with controls to choose or clear a local GMT grid file.
+- Routed local terrain grids directly into GMT `grdgradient`/`grdimage`, avoiding online terrain downloads while still producing shaded relief.
+- Preserved Windows export reliability by copying local terrain grids into the ASCII temporary GMT workspace before rendering.
+
 ## v0.5.7 - 2026-06-29
 
 - Added drag-to-pan behavior after a preview has been zoomed, so enlarged maps and MT curves can be moved left, right, up, and down inside the preview area.

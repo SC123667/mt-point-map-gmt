@@ -627,7 +627,10 @@ function ceilPad(value, pad) {
 function terrainScriptParts(config, region, outputDirectory, shell) {
   if (!config.showTerrain) return { preCommands: [], imageCommand: "" };
   const paths = terrainPaths(outputDirectory, config, region);
-  const grid = config.terrainGridPath && fs.existsSync(config.terrainGridPath) ? config.terrainGridPath : paths.gridPath;
+  fs.mkdirSync(paths.directory, { recursive: true });
+  const configuredGrid = config.terrainGridPath && fs.existsSync(config.terrainGridPath) ? config.terrainGridPath : "";
+  const localGrid = config.localTerrainGridPath && fs.existsSync(config.localTerrainGridPath) ? config.localTerrainGridPath : configuredGrid;
+  const grid = localGrid || paths.gridPath;
   const shade = config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
   const remote = terrainRemoteName(config.terrainResolution);
   const intensity = terrainIntensity(config.terrainIntensity);
@@ -636,7 +639,9 @@ function terrainScriptParts(config, region, outputDirectory, shell) {
   const preCommands = [];
   preCommands.push(`${prefix}gmt set GMT_DATA_SERVER oceania`);
   preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
-  if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
+  if (localGrid) {
+    if (!fs.existsSync(shade)) preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
+  } else if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
     preCommands.push(`${prefix}gmt grdcut ${remote} -R${region} -G${quote(grid)} -V`);
     preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
   }
@@ -854,7 +859,8 @@ function terrainKey(outputDirectory, config, region = config.region) {
       path.resolve(outputDirectory || "."),
       String(region || ""),
       String(config.terrainResolution || "06m"),
-      String(config.terrainIntensity || "0.65")
+      String(config.terrainIntensity || "0.65"),
+      String(config.localTerrainGridPath || config.terrainGridPath || "")
     ].join("|"))
     .digest("hex")
     .slice(0, 12);

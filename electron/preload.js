@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("mtApp", {
   deleteCurrentOutputs: (payload) => ipcRenderer.invoke("output:deleteCurrent", payload),
   estimateTerrain: (payload) => ipcRenderer.invoke("terrain:estimate", payload),
   prepareTerrain: (payload) => ipcRenderer.invoke("terrain:prepare", payload),
+  chooseLocalTerrainGrid: () => ipcRenderer.invoke("terrain:chooseLocalGrid"),
   pauseTerrain: () => ipcRenderer.invoke("terrain:pause"),
   resumeTerrain: () => ipcRenderer.invoke("terrain:resume"),
   cancelTerrain: () => ipcRenderer.invoke("terrain:cancel"),

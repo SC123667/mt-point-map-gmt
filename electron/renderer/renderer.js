@@ -10,7 +10,8 @@ const state = {
     gridPath: "",
     shadePath: "",
     region: "",
-    resolution: ""
+    resolution: "",
+    localGridPath: ""
   },
   preview: {
     hasImage: false,
@@ -76,7 +77,8 @@ const ids = [
   "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
   "terrainAllowDownloadInput", "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
   "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
-  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
+  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "chooseLocalTerrainBtn", "clearLocalTerrainBtn", "localTerrainText",
+  "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
   "labelDXInput", "labelDYInput",
   "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput", "deleteOutputBtn"
@@ -86,6 +88,7 @@ const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)])
 window.addEventListener("DOMContentLoaded", async () => {
   populateColorControls();
   wireEvents();
+  renderLocalTerrainGrid();
   setPlotType("stationMap");
   await refreshStatus();
 });
@@ -125,6 +128,8 @@ function wireEvents() {
   el.cancelTerrainBtn.addEventListener("click", () => window.mtApp.cancelTerrain());
   el.deleteTerrainBtn.addEventListener("click", deleteLocalTerrain);
   el.clearTerrainCacheBtn.addEventListener("click", clearTerrainCache);
+  el.chooseLocalTerrainBtn.addEventListener("click", chooseLocalTerrainGrid);
+  el.clearLocalTerrainBtn.addEventListener("click", clearLocalTerrainGrid);
   el.terrainDocsBtn.addEventListener("click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
   [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput].forEach((control) => {
     control.addEventListener("input", updateTerrainEstimate);
@@ -458,7 +463,8 @@ function readConfig() {
     terrainCpt: el.terrainCptInput.value,
     terrainIntensity: Number(el.terrainIntensityInput.value),
     terrainAllowDownload: el.terrainAllowDownloadInput.checked,
-    terrainGridPath: state.terrain.gridPath,
+    localTerrainGridPath: state.terrain.localGridPath,
+    terrainGridPath: state.terrain.localGridPath || state.terrain.gridPath,
     terrainShadePath: state.terrain.shadePath,
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   };
@@ -473,8 +479,13 @@ async function exportMap(formats, showAlert) {
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
     if (!ready) return;
-    config.terrainGridPath = state.terrain.gridPath;
-    config.terrainShadePath = state.terrain.shadePath;
+    if (config.localTerrainGridPath) {
+      config.terrainGridPath = config.localTerrainGridPath;
+      config.terrainShadePath = "";
+    } else {
+      config.terrainGridPath = state.terrain.gridPath;
+      config.terrainShadePath = state.terrain.shadePath;
+    }
   }
   let result;
   try {
@@ -506,6 +517,7 @@ async function deleteCurrentOutputs() {
 }
 
 async function ensureTerrainReady(config) {
+  if (config.localTerrainGridPath) return true;
   const key = terrainKeyClient(config);
   if (state.terrain.key === key && state.terrain.gridPath && state.terrain.shadePath) return true;
   if (!config.terrainAllowDownload) {
@@ -575,7 +587,8 @@ function renderTerrainProgress(status) {
       gridPath: status.gridPath,
       shadePath: status.shadePath,
       region: status.region,
-      resolution: status.resolution
+      resolution: status.resolution,
+      localGridPath: state.terrain.localGridPath
     };
     if (state.terrainWaiter) state.terrainWaiter.resolve(true);
     state.terrainWaiter = null;
@@ -588,6 +601,11 @@ function renderTerrainProgress(status) {
 }
 
 async function updateTerrainEstimate() {
+  if (state.terrain.localGridPath) {
+    el.terrainEstimateText.textContent = "将使用本地 GRD 地形图，不需要联网下载。";
+    el.prepareTerrainBtn.disabled = true;
+    return;
+  }
   const region = el.regionInput.value.trim();
   if (!region) {
     el.terrainEstimateText.textContent = "导入点位后显示预计大小";
@@ -680,12 +698,13 @@ function terrainKeyClient(config) {
     state.outputDirectory,
     config.region,
     config.terrainResolution,
-    config.terrainIntensity
+    config.terrainIntensity,
+    config.localTerrainGridPath || ""
   ].join("|");
 }
 
 function resetTerrainPaths() {
-  state.terrain = { key: "", gridPath: "", shadePath: "", region: "", resolution: "" };
+  state.terrain = { ...state.terrain, key: "", gridPath: "", shadePath: "", region: "", resolution: "" };
 }
 
 async function deleteLocalTerrain() {
@@ -693,6 +712,39 @@ async function deleteLocalTerrain() {
   resetTerrainPaths();
   el.terrainProgressPanel.classList.add("hidden");
   notify(result.message);
+}
+
+async function chooseLocalTerrainGrid() {
+  const selected = await window.mtApp.chooseLocalTerrainGrid();
+  if (!selected) return;
+  state.terrain.localGridPath = selected;
+  resetTerrainPaths();
+  renderLocalTerrainGrid();
+  el.showTerrainInput.checked = true;
+  el.terrainProgressPanel.classList.add("hidden");
+  updateTerrainEstimate();
+  notify(`已导入本地 GRD 地形图：\n${selected}`);
+}
+
+function clearLocalTerrainGrid() {
+  state.terrain.localGridPath = "";
+  resetTerrainPaths();
+  renderLocalTerrainGrid();
+  updateTerrainEstimate();
+}
+
+function renderLocalTerrainGrid() {
+  if (!state.terrain.localGridPath) {
+    el.localTerrainText.textContent = "未导入本地 GRD 地形图";
+    el.clearLocalTerrainBtn.disabled = true;
+    return;
+  }
+  el.localTerrainText.textContent = `本地 GRD：${baseName(state.terrain.localGridPath)}`;
+  el.clearLocalTerrainBtn.disabled = false;
+}
+
+function baseName(filePath) {
+  return String(filePath || "").split(/[\\/]/).filter(Boolean).pop() || String(filePath || "");
 }
 
 async function clearTerrainCache() {
@@ -708,8 +760,13 @@ async function saveScript() {
   if (config.showTerrain) {
     const ready = await ensureTerrainReady(config);
     if (!ready) return;
-    config.terrainGridPath = state.terrain.gridPath;
-    config.terrainShadePath = state.terrain.shadePath;
+    if (config.localTerrainGridPath) {
+      config.terrainGridPath = config.localTerrainGridPath;
+      config.terrainShadePath = "";
+    } else {
+      config.terrainGridPath = state.terrain.gridPath;
+      config.terrainShadePath = state.terrain.shadePath;
+    }
   }
   let saved;
   try {
