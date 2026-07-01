@@ -5,6 +5,7 @@ All notable changes to this project are recorded in this file.
 ## Unreleased
 
 - Prepared the project for public GitHub distribution with a bilingual README, repository metadata, and an explicit MIT license file.
+- Added Chinese/English parallel public documentation and package description for GitHub exposure.
 
 ## v0.5.8 - 2026-07-01
 
