@@ -2,6 +2,10 @@
 
 All notable changes to this project are recorded in this file.
 
+## Unreleased
+
+- Prepared the project for public GitHub distribution with a bilingual README, repository metadata, and an explicit MIT license file.
+
 ## v0.5.8 - 2026-07-01
 
 - Added local `.grd` terrain import in the terrain basemap panel, with controls to choose or clear a local GMT grid file.

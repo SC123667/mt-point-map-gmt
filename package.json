@@ -1,10 +1,30 @@
 {
   "name": "mt-point-map-gmt",
   "version": "0.5.8",
-  "description": "MT点位图制作工具—GMT：跨平台大地电磁野外点位图制图软件",
+  "description": "Cross-platform GMT desktop tool for magnetotelluric station maps, EDI parsing, phase tensor, tipper, and MT sounding curves.",
   "main": "electron/main.js",
   "author": "CWN",
   "license": "MIT",
+  "keywords": [
+    "magnetotelluric",
+    "gmt",
+    "geophysics",
+    "edi",
+    "phase-tensor",
+    "tipper",
+    "apparent-resistivity",
+    "earth-science",
+    "mapping",
+    "electron"
+  ],
+  "homepage": "https://github.com/SC123667/mt-point-map-gmt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SC123667/mt-point-map-gmt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SC123667/mt-point-map-gmt/issues"
+  },
   "scripts": {
     "start": "electron .",
     "test:node": "node tests/parser_edi.test.js",

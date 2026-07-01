@@ -1,34 +1,56 @@
-# MT点位图制作工具—GMT
+# MT Point Map GMT
 
-面向大地电磁测深野外工作的 GMT 点位图桌面工具。目标是把常见论文点位图流程做成图形界面：导入 TXT/CSV 点位文件，调整符号、标签、经纬网、比例尺、指北针等参数，然后一键预览、导出 PNG/PDF，并保存可复现的 GMT 脚本。
+**MT点位图制作工具-GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production.
 
-## 当前版本
+It turns common GMT plotting workflows into a graphical interface: import TXT/CSV/Excel station tables or recursively scan EDI folders, preview the map, adjust publication-style parameters, and export PNG/PDF plus reproducible GMT scripts.
 
-`v0.1.0`
+> 中文名：MT点位图制作工具-GMT  
+> Domain: magnetotellurics, geophysics, GMT mapping, EDI data, phase tensor, tipper, apparent resistivity and phase curves.
 
-## 已实现
+## Why This Tool
 
-- 导入 TXT/CSV 点位文件。
-- 自动识别测点名、经度、纬度列。
-- 自动计算绘图范围并支持手动修改。
-- 支持测点标签开关。
-- 支持点大小、颜色、形状、边框调整。
-- 支持标签字体大小、颜色、偏移量调整。
-- 支持经纬网、比例尺、指北针。
-- 支持 GMT PNG/PDF 预览与导出。
-- 支持保存 GMT 脚本。
+MT field work usually needs many quick maps: station distribution maps, line maps, terrain-backed figures, and paper-ready exports. Writing GMT scripts every time is powerful but repetitive. This app keeps GMT as the rendering engine while providing a desktop UI for routine MT plotting.
 
-## 点位文件格式
+## Highlights
 
-推荐使用带表头的 CSV 或空格分隔 TXT：
+- Import TXT, CSV, DAT, TSV, XLSX, and XLS station tables.
+- Recursively scan folders for `.edi` files and extract station coordinates plus MT response data.
+- Auto-detect station name, longitude, latitude, line, and elevation columns.
+- Support longitude/latitude tables and common 3-degree Gauss projected field coordinates.
+- Draw MT station maps with labels, symbols, grid, scale bar, and north arrow.
+- Add GMT terrain shaded-relief basemaps from online/cache terrain data.
+- Import local GMT `.grd`/`.nc` terrain grids as basemaps without downloading terrain data.
+- Draw impedance/electric strike maps by period.
+- Draw phase tensor ellipses by period.
+- Draw Tipper induction vectors with Parkinson/Wiese convention choices.
+- Draw apparent-resistivity and phase sounding curves from EDI impedance tensors.
+- Preview images inside the app with wheel zoom, box zoom, and drag-to-pan.
+- Export PNG, PDF, PNG+PDF, and save reproducible GMT scripts.
+- Build distributable macOS and Windows desktop packages.
 
-```text
+## Screens and Figure Types
+
+The app currently supports five main plotting modes:
+
+- Station map
+- Impedance strike / electric principal axis
+- Phase tensor ellipse map
+- Tipper / induction vector map
+- Apparent resistivity and phase sounding curve
+
+## Input Data
+
+### Station Table
+
+Recommended CSV:
+
+```csv
 station,lon,lat,line,elevation
 A01,101.23,36.45,L1,1850
 A02,101.51,36.62,L1,1878
 ```
 
-中文表头也支持，例如：
+Chinese headers are supported:
 
 ```text
 测点 经度 纬度 测线 高程
@@ -36,85 +58,101 @@ A01 101.23 36.45 L1 1850
 A02 101.51 36.62 L1 1878
 ```
 
-也支持野外测线 TXT 里常见的 3 度带高斯投影米坐标。软件会识别带号前缀并自动转换成经纬度：
+Tables without headers are also accepted. The app tries to infer coordinate columns from numeric ranges.
+
+### Gauss Projected Coordinates
+
+Common field files with 3-degree Gauss projected coordinates are supported:
 
 ```text
 点号 北向坐标/m 东向坐标/m
 线距200 m点距20 m
 L3401 38515597.72 4079993.372
 L3402 38515597.72 4080013.372
-L3403 38515597.72 4080033.372
 ```
 
-其中 `38515597.72` 这类数值会按 `38` 带、中央经线 `114°` 的 3 度带高斯坐标处理。
+Values such as `38515597.72` are interpreted as belt-prefixed Gauss coordinates where appropriate.
 
-没有表头时，程序会尝试从数值范围自动判断经纬度列，并自动生成测点名。
+### EDI Folder
 
-## 推荐运行方式：Electron 跨平台版
+Use `File > Import EDI Folder` to scan all `.edi` files in a directory and its subfolders. The parser reads station coordinates and MT response arrays when available.
 
-开发运行：
+### Local Terrain Grid
+
+In the terrain panel, use **Import Local GRD** to select a GMT grid file:
+
+- `.grd`
+- `.nc`
+
+The app uses the selected grid directly with GMT `grdgradient` and `grdimage`, so no online terrain download is required.
+
+## Requirements
+
+- GMT 6.x must be installed and available to the app.
+- macOS or Windows for the Electron desktop app.
+- Node.js for development/building from source.
+
+The app can detect GMT and offers an installer/download workflow for supported platforms. If GMT is not available, data import and GMT script saving still work, but preview/export rendering needs GMT.
+
+## Development
 
 ```bash
 npm install
 npm start
 ```
 
-生成 macOS App：
+## Tests
+
+```bash
+npm run test:node
+```
+
+## Build
+
+macOS:
 
 ```bash
 npm run dist:mac
 ```
 
-生成 Windows 包需要在 Windows 机器或 CI 上运行：
+Windows:
 
 ```bash
-npm install
 npm run dist:win
 ```
 
-## Python 原型
+The project uses Electron Builder and writes release artifacts to `release/`.
 
-仓库里仍保留 Python/Tk 原型，主要作为制图逻辑参考：
+## Output
 
-```bash
-python3 run.py
-```
-
-如果你的 macOS 上 Tk 不可用，请使用 Electron 跨平台版。
-
-## 旧版 macOS 原生实验
-
-```bash
-python3 scripts/build_mac_app.py
-```
-
-默认会生成并复制到：
+Default output directory:
 
 ```text
-/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app
+~/Documents/MT点位图制作工具-GMT输出
 ```
 
-当前推荐使用 Electron 版作为对外分发版本。
-
-## GMT 依赖
-
-本工具通过调用本机 `gmt` 命令制图。请先安装 GMT 6：
-
-```bash
-brew install gmt
-```
-
-Electron 分发版会自动检测 GMT。没有安装时，点击软件里的安装按钮会直接下载当前系统对应的 GMT 官方安装包；如果网络不可用或 GitHub 下载失败，会提示具体错误。没有安装 GMT 时，软件仍可导入数据和保存 GMT 脚本，但无法生成预览图或导出正式图片。
-
-## 输出
-
-默认输出到：
-
-```text
-~/Documents/MT点位图制作工具—GMT输出
-```
+Typical files:
 
 - `mt_point_map.png`
 - `mt_point_map.pdf`
 - `mt_point_map.gmt`
-- 中间数据文件
+- intermediate station and terrain files
+
+## Technology
+
+- Electron desktop app
+- GMT command-line rendering
+- Node.js data parsing
+- XLSX table import
+- EDI coordinate and response parsing
+- Optional local GMT terrain grids
+
+## Repository Topics
+
+Suggested GitHub topics:
+
+`magnetotelluric`, `gmt`, `geophysics`, `edi`, `phase-tensor`, `tipper`, `apparent-resistivity`, `earth-science`, `electron`, `mapping`
+
+## License
+
+MIT License. See [LICENSE](LICENSE).

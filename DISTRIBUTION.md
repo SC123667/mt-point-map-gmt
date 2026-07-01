@@ -2,6 +2,12 @@
 
 `MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。
 
+公开源码仓库：
+
+- https://github.com/SC123667/mt-point-map-gmt
+
+建议从 GitHub Releases 下载正式安装包；从源码构建适合二次开发和本地调试。
+
 ## macOS
 
 在 macOS 上运行：
@@ -14,7 +20,7 @@ npm run dist:mac
 产物：
 
 - `release/mac-arm64/MT点位图制作工具—GMT.app`
-- `release/MT点位图制作工具—GMT-0.3.0-mac-arm64.dmg`
+- `release/MT点位图制作工具—GMT-0.5.8-mac-arm64.dmg`
 
 如果要公开分发给陌生用户，后续需要 Apple Developer ID 签名和 notarization。当前本地构建包适合自己或熟人测试使用。
 
@@ -29,10 +35,10 @@ npm run dist:win
 
 产物包括：
 
-- Windows x64 安装器
-- Windows x64 便携版
-- Windows arm64 安装器
-- Windows arm64 便携版
+- `release/MT点位图制作工具—GMT-0.5.8-win-x64-setup.exe`
+- `release/MT点位图制作工具—GMT-0.5.8-win-x64-portable.exe`
+- `release/MT点位图制作工具—GMT-0.5.8-win-arm64-setup.exe`
+- `release/MT点位图制作工具—GMT-0.5.8-win-arm64-portable.exe`
 
 ## GMT 依赖
 
