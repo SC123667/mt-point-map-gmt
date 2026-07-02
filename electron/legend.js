@@ -5,12 +5,18 @@ const DEFAULT_LEGEND_FILE = "map_legend.txt";
 
 const DEFAULT_LEGEND_CONFIG = {
   title: "Legend",
-  titleFont: "11p,Helvetica-Bold,black",
-  labelFont: "8.5p,Helvetica,black",
+  titleFontSize: 11,
+  labelFontSize: 8.5,
+  textColor: "black",
   position: "n0.98/0.98+jTR",
   width: "4.2c",
-  frame: "+p0.5p,gray40+gwhite@8+r2p",
-  clearance: "0.12c"
+  borderWidth: 0.5,
+  borderColor: "gray40",
+  backgroundColor: "white",
+  backgroundTransparency: 8,
+  cornerRadius: 2,
+  clearance: "0.12c",
+  delimiterPen: "0.35p,gray70"
 };
 
 function buildLegendEntries(config) {
@@ -35,7 +41,7 @@ function buildLegendEntries(config) {
 }
 
 function buildLegendSpec(entries, config = {}) {
-  const settings = { ...DEFAULT_LEGEND_CONFIG, ...config };
+  const settings = normalizeLegendConfig(config);
   const lines = [
     `H ${settings.titleFont} ${settings.title || "Legend"}`,
     `D ${settings.clearance} ${settings.delimiterPen || "0.35p,gray70"}`
@@ -53,7 +59,7 @@ function buildLegendSpec(entries, config = {}) {
 }
 
 function writeLegendFile(entries, outputDirectory, config = {}) {
-  const settings = { ...DEFAULT_LEGEND_CONFIG, ...config };
+  const settings = normalizeLegendConfig(config);
   const filename = settings.filename || DEFAULT_LEGEND_FILE;
   const legendPath = path.join(outputDirectory, filename);
   fs.mkdirSync(outputDirectory, { recursive: true });
@@ -62,10 +68,60 @@ function writeLegendFile(entries, outputDirectory, config = {}) {
 }
 
 function legendCommand(legendPath, region, projection, shell, config = {}) {
-  const settings = { ...DEFAULT_LEGEND_CONFIG, ...config };
+  const settings = normalizeLegendConfig(config);
   const prefix = shell === "bat" ? "" : "  ";
   const frame = settings.frame ? ` -F${settings.frame}+c${settings.clearance}` : "";
   return `${prefix}gmt legend ${quote(legendPath, shell)} -D${settings.position}+w${settings.width}${frame} -R${region} -J${projection}`;
+}
+
+function normalizeLegendConfig(config = {}) {
+  const settings = { ...DEFAULT_LEGEND_CONFIG, ...config };
+  const titleFontSize = clampNumber(settings.titleFontSize, 6, 28, DEFAULT_LEGEND_CONFIG.titleFontSize);
+  const labelFontSize = clampNumber(settings.labelFontSize, 5, 24, DEFAULT_LEGEND_CONFIG.labelFontSize);
+  const borderWidth = clampNumber(settings.borderWidth, 0, 5, DEFAULT_LEGEND_CONFIG.borderWidth);
+  const backgroundTransparency = clampNumber(settings.backgroundTransparency, 0, 100, DEFAULT_LEGEND_CONFIG.backgroundTransparency);
+  const cornerRadius = clampNumber(settings.cornerRadius, 0, 12, DEFAULT_LEGEND_CONFIG.cornerRadius);
+  const clearance = normalizeLength(settings.clearance, DEFAULT_LEGEND_CONFIG.clearance);
+  const width = normalizeLength(settings.width, DEFAULT_LEGEND_CONFIG.width);
+  const textColor = sanitizeColor(settings.textColor, DEFAULT_LEGEND_CONFIG.textColor);
+  const borderColor = sanitizeColor(settings.borderColor, DEFAULT_LEGEND_CONFIG.borderColor);
+  const backgroundColor = sanitizeColor(settings.backgroundColor, DEFAULT_LEGEND_CONFIG.backgroundColor);
+  return {
+    ...settings,
+    titleFontSize,
+    labelFontSize,
+    borderWidth,
+    backgroundTransparency,
+    cornerRadius,
+    clearance,
+    width,
+    textColor,
+    borderColor,
+    backgroundColor,
+    titleFont: settings.titleFont || `${titleFontSize.toFixed(1)}p,Helvetica-Bold,${textColor}`,
+    labelFont: settings.labelFont || `${labelFontSize.toFixed(1)}p,Helvetica,${textColor}`,
+    frame: settings.frame || `+p${borderWidth.toFixed(2)}p,${borderColor}+g${backgroundColor}@${backgroundTransparency.toFixed(0)}+r${cornerRadius.toFixed(0)}p`
+  };
+}
+
+function normalizeLength(value, fallback) {
+  const text = String(value || "").trim();
+  if (/^\d+(\.\d+)?[cip]$/.test(text)) return text;
+  const number = Number(text);
+  if (Number.isFinite(number) && number > 0) return `${number.toFixed(2)}c`;
+  return fallback;
+}
+
+function sanitizeColor(value, fallback) {
+  const text = String(value || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(text) || /^[A-Za-z][A-Za-z0-9_]*([0-9]+)?$/.test(text)) return text;
+  return fallback;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
 }
 
 function quote(value, shell) {
@@ -80,6 +136,7 @@ module.exports = {
   DEFAULT_LEGEND_CONFIG,
   buildLegendEntries,
   buildLegendSpec,
+  normalizeLegendConfig,
   writeLegendFile,
   legendCommand
 };

@@ -15,23 +15,35 @@ const state = {
   },
   preview: {
     hasImage: false,
+    imageWidth: 0,
+    imageHeight: 0,
     zoom: 1,
     panX: 0,
     panY: 0,
     selecting: false,
     panning: false,
+    rendering: false,
+    queuedAuto: false,
+    autoTimer: null,
     selectionStart: null,
     selectionEnd: null,
     dragStart: null,
     dragPanStart: null
   },
   terrainWaiter: null,
-  faultLayers: []
+  faultLayers: [],
+  legendPosition: {
+    x: 0.98,
+    y: 0.98,
+    justify: "TR",
+    dragging: false
+  }
 };
 
 const PREVIEW_MIN_ZOOM = 1;
 const PREVIEW_MAX_ZOOM = 16;
 const PREVIEW_WHEEL_SENSITIVITY = 0.00075;
+const AUTO_PREVIEW_DELAY_MS = 700;
 const CUSTOM_COLOR_VALUE = "__custom__";
 const COLOR_OPTIONS = [
   ["#d7191c", "红色 #d7191c"],
@@ -66,6 +78,7 @@ const ids = [
   "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "previewImageLayer", "previewSelection", "previewZoomControls", "previewZoomLabel", "previewFitBtn", "previewPlaceholder",
+  "previewStatus", "legendDragHandle",
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
@@ -84,7 +97,10 @@ const ids = [
   "labelDXInput", "labelDYInput",
   "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput",
   "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
-  "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput",
+  "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput", "legendPositionHint",
+  "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
+  "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
+  "legendBorderColorPicker", "legendBorderWidthInput",
   "deleteOutputBtn"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
@@ -123,22 +139,17 @@ function wireEvents() {
   el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
   el.importFaultBtn.addEventListener("click", importFaultLayers);
   el.clearFaultsBtn.addEventListener("click", clearFaultLayers);
-  el.showLegendInput.addEventListener("change", () => {
-    renderFaultLayers();
-    markPreviewStale("图例设置已更改，点击“生成预览”更新图件");
-  });
-  el.legendIncludeFaultsInput.addEventListener("change", () => {
-    renderFaultLayers();
-    markPreviewStale("图例设置已更改，点击“生成预览”更新图件");
-  });
-  el.legendTitleInput.addEventListener("input", () => markPreviewStale("图例标题已更改，点击“生成预览”更新图件"));
-  el.legendPositionInput.addEventListener("change", () => markPreviewStale("图例位置已更改，点击“生成预览”更新图件"));
+  wireLegendControls();
   el.previewFitBtn.addEventListener("click", () => resetPreviewView());
   el.previewBox.addEventListener("wheel", handlePreviewWheel, { passive: false });
   el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
   el.previewBox.addEventListener("pointermove", handlePreviewPointerMove);
   el.previewBox.addEventListener("pointerup", handlePreviewPointerUp);
   el.previewBox.addEventListener("pointercancel", cancelPreviewInteraction);
+  el.legendDragHandle.addEventListener("pointerdown", handleLegendPointerDown);
+  el.legendDragHandle.addEventListener("pointermove", handleLegendPointerMove);
+  el.legendDragHandle.addEventListener("pointerup", handleLegendPointerUp);
+  el.legendDragHandle.addEventListener("pointercancel", cancelLegendDrag);
   el.prepareTerrainBtn.addEventListener("click", () => prepareTerrain(false));
   el.pauseTerrainBtn.addEventListener("click", () => window.mtApp.pauseTerrain());
   el.resumeTerrainBtn.addEventListener("click", () => window.mtApp.resumeTerrain());
@@ -161,6 +172,31 @@ function wireEvents() {
   window.mtApp.onTerrainProgress(renderTerrainProgress);
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
+  });
+}
+
+function wireLegendControls() {
+  const queueLegendPreview = (message = "图例设置已更改，正在自动更新预览...") => {
+    renderFaultLayers();
+    renderLegendDragHandle();
+    scheduleAutoPreview(message);
+  };
+  el.showLegendInput.addEventListener("change", () => queueLegendPreview("图例显示状态已更改，正在自动更新预览..."));
+  el.legendIncludeFaultsInput.addEventListener("change", () => queueLegendPreview("图例内容已更改，正在自动更新预览..."));
+  el.legendTitleInput.addEventListener("input", () => queueLegendPreview("图例标题已更改，正在自动更新预览..."));
+  el.legendPositionInput.addEventListener("change", () => {
+    const next = parseLegendPosition(el.legendPositionInput.value);
+    if (next) state.legendPosition = { ...state.legendPosition, ...next, dragging: false };
+    queueLegendPreview("图例位置已更改，正在自动更新预览...");
+  });
+  [
+    el.legendWidthInput,
+    el.legendTitleSizeInput,
+    el.legendLabelSizeInput,
+    el.legendBackgroundAlphaInput,
+    el.legendBorderWidthInput
+  ].forEach((control) => {
+    control.addEventListener("input", () => queueLegendPreview("图例样式已更改，正在自动更新预览..."));
   });
 }
 
@@ -491,8 +527,16 @@ function readConfig() {
     legend: {
       show: el.showLegendInput.checked,
       title: el.legendTitleInput.value.trim() || "Legend",
-      position: el.legendPositionInput.value,
-      includeFaults: el.legendIncludeFaultsInput.checked
+      position: legendPositionValue(),
+      includeFaults: el.legendIncludeFaultsInput.checked,
+      width: `${clamp(Number(el.legendWidthInput.value), 2, 8).toFixed(2)}c`,
+      titleFontSize: Number(el.legendTitleSizeInput.value),
+      labelFontSize: Number(el.legendLabelSizeInput.value),
+      textColor: readColor("legendTextColor"),
+      backgroundColor: readColor("legendBackground"),
+      backgroundTransparency: Number(el.legendBackgroundAlphaInput.value),
+      borderColor: readColor("legendBorderColor"),
+      borderWidth: Number(el.legendBorderWidthInput.value)
     },
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   };
@@ -523,7 +567,7 @@ async function importFaultLayers() {
       imported += 1;
     }
     renderFaultLayers();
-    markPreviewStale("构造线叠加层已更改，点击“生成预览”更新图件");
+    scheduleAutoPreview("构造线叠加层已更改，正在自动更新预览...");
     if (imported) notify(`已导入 ${imported} 个构造线文件。`);
   } catch (error) {
     notify(error.message || String(error));
@@ -534,13 +578,13 @@ function clearFaultLayers() {
   if (!state.faultLayers.length) return;
   state.faultLayers = [];
   renderFaultLayers();
-  markPreviewStale("构造线叠加层已清空，点击“生成预览”更新图件");
+  scheduleAutoPreview("构造线叠加层已清空，正在自动更新预览...");
 }
 
 function removeFaultLayer(index) {
   state.faultLayers.splice(index, 1);
   renderFaultLayers();
-  markPreviewStale("构造线叠加层已更改，点击“生成预览”更新图件");
+  scheduleAutoPreview("构造线叠加层已更改，正在自动更新预览...");
 }
 
 function renderFaultLayers() {
@@ -579,39 +623,60 @@ function renderFaultLayers() {
   });
 }
 
-async function exportMap(formats, showAlert) {
+async function exportMap(formats, showAlert, options = {}) {
   if (!state.records.length) return notify("请先导入点位数据。");
+  if (!options.auto && state.preview.autoTimer) {
+    clearTimeout(state.preview.autoTimer);
+    state.preview.autoTimer = null;
+  }
+  if (state.preview.rendering) {
+    if (options.auto) state.preview.queuedAuto = true;
+    return false;
+  }
+  state.preview.rendering = true;
+  setPreviewBusy(true, options.auto ? "正在自动更新预览..." : "正在生成预览...");
   const config = readConfig();
-  if (!validatePlotReadiness(config)) return;
-  if (config.showTerrain) {
-    const ready = await ensureTerrainReady(config);
-    if (!ready) return;
-    if (config.localTerrainGridPath) {
-      config.terrainGridPath = config.localTerrainGridPath;
-      config.terrainShadePath = "";
-    } else {
-      config.terrainGridPath = state.terrain.gridPath;
-      config.terrainShadePath = state.terrain.shadePath;
+  try {
+    if (!validatePlotReadiness(config)) return false;
+    if (config.showTerrain) {
+      const ready = await ensureTerrainReady(config, { auto: Boolean(options.auto) });
+      if (!ready) return false;
+      if (config.localTerrainGridPath) {
+        config.terrainGridPath = config.localTerrainGridPath;
+        config.terrainShadePath = "";
+      } else {
+        config.terrainGridPath = state.terrain.gridPath;
+        config.terrainShadePath = state.terrain.shadePath;
+      }
+    }
+    let result;
+    try {
+      result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
+    } catch (error) {
+      notify(error.message || String(error));
+      return false;
+    }
+    if (!result.ok) {
+      await refreshStatus();
+      notify(`${result.message}\n脚本已保存：${result.scriptPath}`);
+      return false;
+    }
+    state.outputDirectory = result.outputDirectory;
+    renderOutputDirectory();
+    if (formats.includes("png")) {
+      const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
+      if (png) await renderPreview(png);
+    }
+    if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
+    return true;
+  } finally {
+    state.preview.rendering = false;
+    setPreviewBusy(false);
+    if (state.preview.queuedAuto) {
+      state.preview.queuedAuto = false;
+      scheduleAutoPreview("设置继续变化，正在自动更新预览...");
     }
   }
-  let result;
-  try {
-    result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
-  } catch (error) {
-    notify(error.message || String(error));
-    return;
-  }
-  if (!result.ok) {
-    await refreshStatus();
-    return notify(`${result.message}\n脚本已保存：${result.scriptPath}`);
-  }
-  state.outputDirectory = result.outputDirectory;
-  renderOutputDirectory();
-  if (formats.includes("png")) {
-    const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
-    if (png) await renderPreview(png);
-  }
-  if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
 }
 
 async function deleteCurrentOutputs() {
@@ -623,10 +688,14 @@ async function deleteCurrentOutputs() {
   notify(result.message);
 }
 
-async function ensureTerrainReady(config) {
+async function ensureTerrainReady(config, options = {}) {
   if (config.localTerrainGridPath) return true;
   const key = terrainKeyClient(config);
   if (state.terrain.key === key && state.terrain.gridPath && state.terrain.shadePath) return true;
+  if (options.auto) {
+    setPreviewStatus("地形底图尚未准备，先点“生成预览”或“下载/准备底图”后再自动更新。");
+    return false;
+  }
   if (!config.terrainAllowDownload) {
     const confirmed = confirm("当前未准备本地地形底图，并且关闭了联网下载。是否仍然尝试只使用 GMT 本地缓存准备底图？");
     if (!confirmed) return false;
@@ -904,9 +973,21 @@ function populateColorControls() {
   setupColorControl("pointFill", "#d7191c");
   setupColorControl("penColor", "black");
   setupColorControl("labelColor", "black");
+  setupColorControl("legendTextColor", "black", () => {
+    renderLegendDragHandle();
+    scheduleAutoPreview("图例文字色已更改，正在自动更新预览...");
+  });
+  setupColorControl("legendBackground", "white", () => {
+    renderLegendDragHandle();
+    scheduleAutoPreview("图例底色已更改，正在自动更新预览...");
+  });
+  setupColorControl("legendBorderColor", "gray50", () => {
+    renderLegendDragHandle();
+    scheduleAutoPreview("图例边框色已更改，正在自动更新预览...");
+  });
 }
 
-function setupColorControl(key, initialValue) {
+function setupColorControl(key, initialValue, onChange) {
   const select = el[`${key}Input`];
   const picker = el[`${key}Picker`];
   select.innerHTML = "";
@@ -922,10 +1003,12 @@ function setupColorControl(key, initialValue) {
       picker.disabled = true;
       picker.value = colorToHex(select.value);
     }
+    if (onChange) onChange();
   });
   picker.addEventListener("input", () => {
     select.value = CUSTOM_COLOR_VALUE;
     picker.disabled = false;
+    if (onChange) onChange();
   });
 }
 
@@ -948,6 +1031,7 @@ function colorToHex(value) {
   const named = {
     black: "#000000",
     white: "#ffffff",
+    gray40: "#666666",
     gray50: "#808080",
     yellow: "#ffff00",
     cyan: "#00ffff",
@@ -1001,8 +1085,12 @@ function formatPeriod(period) {
 async function renderPreview(filePath) {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
+    const dimensions = await imageDimensions(url);
+    state.preview.imageWidth = dimensions.width;
+    state.preview.imageHeight = dimensions.height;
     el.previewImageLayer.style.backgroundImage = `url(${url})`;
     el.previewPlaceholder.hidden = true;
+    hidePreviewStatus();
     el.previewZoomControls.classList.remove("hidden");
     el.previewBox.classList.add("has-preview");
     el.previewBox.setAttribute("aria-label", "GMT 点位图预览");
@@ -1017,6 +1105,8 @@ async function renderPreview(filePath) {
 
 function clearPreviewImage() {
   state.preview.hasImage = false;
+  state.preview.imageWidth = 0;
+  state.preview.imageHeight = 0;
   state.preview.zoom = 1;
   state.preview.panX = 0;
   state.preview.panY = 0;
@@ -1030,6 +1120,8 @@ function clearPreviewImage() {
   el.previewImageLayer.style.transform = "";
   el.previewSelection.classList.remove("active");
   el.previewSelection.style.cssText = "";
+  el.legendDragHandle.classList.add("hidden");
+  hidePreviewStatus();
   el.previewZoomControls.classList.add("hidden");
   el.previewZoomLabel.textContent = "100%";
   el.previewBox.classList.remove("has-preview", "is-zoomed", "is-panning");
@@ -1051,9 +1143,166 @@ function renderPlaceholder() {
 
 function markPreviewStale(message) {
   if (!state.preview.hasImage) return;
-  clearPreviewImage();
-  el.previewPlaceholder.hidden = false;
-  el.previewPlaceholder.textContent = message;
+  scheduleAutoPreview(message || "设置已更改，正在自动更新预览...");
+}
+
+function scheduleAutoPreview(message, options = {}) {
+  if (state.preview.autoTimer) clearTimeout(state.preview.autoTimer);
+  renderLegendDragHandle();
+  if (!state.records.length) return;
+  setPreviewStatus(message || "设置已更改，正在自动更新预览...", "pending");
+  state.preview.autoTimer = setTimeout(() => {
+    state.preview.autoTimer = null;
+    refreshPreviewAutomatically();
+  }, options.delay ?? AUTO_PREVIEW_DELAY_MS);
+}
+
+async function refreshPreviewAutomatically() {
+  await exportMap(["png"], false, { auto: true });
+}
+
+function setPreviewBusy(active, message = "") {
+  el.previewBtn.disabled = active;
+  el.previewBtn.textContent = active ? "生成中..." : "生成预览";
+  if (active) setPreviewStatus(message || "正在生成预览...", "busy");
+  else if (el.previewStatus.dataset.kind === "busy") hidePreviewStatus();
+}
+
+function setPreviewStatus(message, kind = "info") {
+  if (!message) return hidePreviewStatus();
+  el.previewStatus.textContent = message;
+  el.previewStatus.dataset.kind = kind;
+  el.previewStatus.classList.remove("hidden");
+}
+
+function hidePreviewStatus() {
+  el.previewStatus.textContent = "";
+  el.previewStatus.dataset.kind = "";
+  el.previewStatus.classList.add("hidden");
+}
+
+function imageDimensions(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth || 1, height: image.naturalHeight || 1 });
+    image.onerror = () => reject(new Error("预览图尺寸读取失败"));
+    image.src = url;
+  });
+}
+
+function legendPositionValue() {
+  if (el.legendPositionInput.value !== "custom") {
+    const selected = parseLegendPosition(el.legendPositionInput.value);
+    if (selected) {
+      state.legendPosition.x = selected.x;
+      state.legendPosition.y = selected.y;
+      state.legendPosition.justify = selected.justify;
+    }
+  }
+  const { x, y, justify } = state.legendPosition;
+  return `n${clamp(x, 0.02, 0.98).toFixed(3)}/${clamp(y, 0.02, 0.98).toFixed(3)}+j${justify || "TR"}`;
+}
+
+function parseLegendPosition(value) {
+  const match = /^n([0-9.]+)\/([0-9.]+)\+j([A-Z]{2})$/.exec(String(value || ""));
+  if (!match) return null;
+  return {
+    x: clamp(Number(match[1]), 0.02, 0.98),
+    y: clamp(Number(match[2]), 0.02, 0.98),
+    justify: match[3]
+  };
+}
+
+function handleLegendPointerDown(event) {
+  if (!state.preview.hasImage || !el.showLegendInput.checked || event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  state.legendPosition.dragging = true;
+  el.legendDragHandle.classList.add("dragging");
+  el.legendDragHandle.setPointerCapture(event.pointerId);
+}
+
+function handleLegendPointerMove(event) {
+  if (!state.legendPosition.dragging) return;
+  event.preventDefault();
+  event.stopPropagation();
+  updateLegendPositionFromPreviewPoint(previewPoint(event));
+  el.legendPositionInput.value = "custom";
+  renderLegendDragHandle();
+  setPreviewStatus(`图例位置：X ${state.legendPosition.x.toFixed(2)} / Y ${state.legendPosition.y.toFixed(2)}`, "pending");
+}
+
+function handleLegendPointerUp(event) {
+  if (!state.legendPosition.dragging) return;
+  event.preventDefault();
+  event.stopPropagation();
+  updateLegendPositionFromPreviewPoint(previewPoint(event));
+  cancelLegendDrag();
+  el.legendPositionInput.value = "custom";
+  renderLegendDragHandle();
+  scheduleAutoPreview("图例位置已调整，正在自动更新预览...", { delay: 300 });
+}
+
+function cancelLegendDrag() {
+  state.legendPosition.dragging = false;
+  el.legendDragHandle.classList.remove("dragging");
+}
+
+function updateLegendPositionFromPreviewPoint(point) {
+  const fit = previewImageFitRect();
+  if (!fit.width || !fit.height) return;
+  const baseX = (point.x - state.preview.panX) / state.preview.zoom;
+  const baseY = (point.y - state.preview.panY) / state.preview.zoom;
+  const x = clamp((baseX - fit.left) / fit.width, 0.02, 0.98);
+  const cssY = clamp((baseY - fit.top) / fit.height, 0.02, 0.98);
+  const y = clamp(1 - cssY, 0.02, 0.98);
+  state.legendPosition.x = x;
+  state.legendPosition.y = y;
+  state.legendPosition.justify = `${y >= 0.5 ? "T" : "B"}${x >= 0.5 ? "R" : "L"}`;
+}
+
+function renderLegendDragHandle() {
+  if (!state.preview.hasImage || !el.showLegendInput.checked || state.plotType === "responseCurve") {
+    el.legendDragHandle.classList.add("hidden");
+    el.legendPositionHint.classList.add("hidden");
+    return;
+  }
+  const fit = previewImageFitRect();
+  if (!fit.width || !fit.height) {
+    el.legendDragHandle.classList.add("hidden");
+    el.legendPositionHint.classList.add("hidden");
+    return;
+  }
+  const { x, y, justify } = state.legendPosition;
+  const baseX = fit.left + clamp(x, 0.02, 0.98) * fit.width;
+  const baseY = fit.top + (1 - clamp(y, 0.02, 0.98)) * fit.height;
+  const screenX = state.preview.panX + baseX * state.preview.zoom;
+  const screenY = state.preview.panY + baseY * state.preview.zoom;
+  el.legendDragHandle.style.left = `${screenX.toFixed(1)}px`;
+  el.legendDragHandle.style.top = `${screenY.toFixed(1)}px`;
+  el.legendDragHandle.style.transform = `translate(${justify.includes("R") ? "-100%" : "0"}, ${justify.includes("B") ? "-100%" : "0"})`;
+  el.legendDragHandle.style.color = readColor("legendTextColor");
+  el.legendDragHandle.style.background = readColor("legendBackground");
+  el.legendDragHandle.style.borderColor = readColor("legendBorderColor");
+  el.legendPositionHint.textContent = `X ${x.toFixed(2)} / Y ${y.toFixed(2)}`;
+  el.legendPositionHint.classList.remove("hidden");
+  el.legendDragHandle.classList.remove("hidden");
+}
+
+function previewImageFitRect() {
+  const box = el.previewBox.getBoundingClientRect();
+  const imageWidth = state.preview.imageWidth || box.width;
+  const imageHeight = state.preview.imageHeight || box.height;
+  if (!box.width || !box.height || !imageWidth || !imageHeight) return { left: 0, top: 0, width: 0, height: 0 };
+  const scale = Math.min(box.width / imageWidth, box.height / imageHeight);
+  const width = imageWidth * scale;
+  const height = imageHeight * scale;
+  return {
+    left: (box.width - width) / 2,
+    top: (box.height - height) / 2,
+    width,
+    height
+  };
 }
 
 function resetPreviewView() {
@@ -1067,6 +1316,7 @@ function updatePreviewTransform() {
   el.previewImageLayer.style.transform = `translate(${state.preview.panX.toFixed(2)}px, ${state.preview.panY.toFixed(2)}px) scale(${state.preview.zoom.toFixed(4)})`;
   el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
   el.previewBox.classList.toggle("is-zoomed", state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001);
+  renderLegendDragHandle();
 }
 
 function handlePreviewWheel(event) {
@@ -1080,7 +1330,7 @@ function handlePreviewWheel(event) {
 }
 
 function handlePreviewPointerDown(event) {
-  if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls")) return;
+  if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls") || event.target.closest(".legend-drag-handle")) return;
   event.preventDefault();
   el.previewBox.focus({ preventScroll: true });
   const point = previewPoint(event);

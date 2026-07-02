@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.7.0 - 2026-07-02
+
+- Added editable legend styling for width, title size, label size, text color, background color, background transparency, border color, and border width.
+- Added an in-preview draggable legend handle that writes back to GMT normalized legend coordinates.
+- Added debounced automatic PNG preview regeneration for legend and structural-line overlay changes, with queued refreshes when GMT is already rendering.
+
 ## v0.6.1 - 2026-07-02
 
 - Mark the current preview as stale when overlay or legend settings change, so users know to regenerate the map before expecting the legend to appear.

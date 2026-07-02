@@ -402,6 +402,26 @@ fieldset {
   margin: 4px 0;
 }
 
+.legend-style-details {
+  margin-top: 4px;
+  padding-top: 7px;
+  border-top: 1px solid #edf1f5;
+}
+
+.legend-style-details summary {
+  font-size: 12px;
+  color: #415066;
+}
+
+.legend-style-details label {
+  grid-template-columns: 78px minmax(0, 1fr);
+  margin: 6px 0;
+}
+
+.legend-position-readout.hidden {
+  display: none;
+}
+
 .analysis-only {
   display: none;
 }
@@ -620,6 +640,61 @@ td:nth-child(3) {
   min-height: 24px;
   padding: 2px 7px;
   font-size: 12px;
+}
+
+.preview-status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 4;
+  max-width: calc(100% - 20px);
+  padding: 5px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #334155;
+  font-size: 12px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.preview-status.hidden {
+  display: none;
+}
+
+.preview-status[data-kind="busy"],
+.preview-status[data-kind="pending"] {
+  border-color: rgba(47, 111, 115, 0.35);
+  color: #163d42;
+}
+
+.legend-drag-handle {
+  position: absolute;
+  z-index: 5;
+  min-height: 30px;
+  min-width: 56px;
+  padding: 5px 10px;
+  border: 1px solid #64748b;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  cursor: grab;
+  touch-action: none;
+}
+
+.legend-drag-handle:hover,
+.legend-drag-handle.dragging {
+  outline: 2px solid rgba(47, 111, 115, 0.25);
+}
+
+.legend-drag-handle.dragging {
+  cursor: grabbing;
+}
+
+.legend-drag-handle.hidden {
+  display: none;
 }
 
 #previewPlaceholder {

@@ -122,6 +122,8 @@
             <span id="previewZoomLabel">100%</span>
             <button id="previewFitBtn" type="button">适配</button>
           </div>
+          <button id="legendDragHandle" class="legend-drag-handle hidden" type="button" aria-label="拖动图例位置">图例</button>
+          <span id="previewStatus" class="preview-status hidden" aria-live="polite"></span>
           <span id="previewPlaceholder">导入点位后生成预览</span>
         </div>
         <div class="button-row export-row">
@@ -260,9 +262,37 @@
                 <option value="n0.02/0.98+jTL">左上</option>
                 <option value="n0.98/0.02+jBR">右下</option>
                 <option value="n0.02/0.02+jBL">左下</option>
+                <option value="custom">自定义（拖动）</option>
               </select>
             </label>
             <label class="check"><input id="legendIncludeFaultsInput" type="checkbox" checked />包含构造线</label>
+            <p id="legendPositionHint" class="field-note legend-position-readout hidden"></p>
+            <details class="legend-style-details">
+              <summary>图例样式</summary>
+              <label>宽度 cm<input id="legendWidthInput" type="number" min="2.0" max="8.0" step="0.1" value="4.2" /></label>
+              <label>标题字号<input id="legendTitleSizeInput" type="number" min="6" max="22" step="0.5" value="11" /></label>
+              <label>文字字号<input id="legendLabelSizeInput" type="number" min="5" max="18" step="0.5" value="8.5" /></label>
+              <label>文字色
+                <span class="color-control">
+                  <select id="legendTextColorInput"></select>
+                  <input id="legendTextColorPicker" class="color-picker" type="color" value="#000000" title="自定义图例文字色" />
+                </span>
+              </label>
+              <label>底色
+                <span class="color-control">
+                  <select id="legendBackgroundInput"></select>
+                  <input id="legendBackgroundPicker" class="color-picker" type="color" value="#ffffff" title="自定义图例底色" />
+                </span>
+              </label>
+              <label>底色透明<input id="legendBackgroundAlphaInput" type="number" min="0" max="100" step="5" value="8" /></label>
+              <label>边框色
+                <span class="color-control">
+                  <select id="legendBorderColorInput"></select>
+                  <input id="legendBorderColorPicker" class="color-picker" type="color" value="#666666" title="自定义图例边框色" />
+                </span>
+              </label>
+              <label>边框宽 p<input id="legendBorderWidthInput" type="number" min="0" max="3" step="0.05" value="0.5" /></label>
+            </details>
           </div>
         </details>
 

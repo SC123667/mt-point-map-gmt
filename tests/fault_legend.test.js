@@ -4,7 +4,7 @@ const os = require("os");
 const path = require("path");
 
 const { autodetectAndParse, buildFaultOverlay, recolorPen, summarizeFaultFile } = require("../electron/faults");
-const { buildLegendSpec } = require("../electron/legend");
+const { buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
 const { buildScript } = require("../electron/gmt");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mt-gmt-fault-test-"));
@@ -55,6 +55,22 @@ try {
   ]);
   assert(legend.includes("S 0.14c c 0.22c #d7191c 0.35p,black 0.45c MT station"));
   assert(legend.includes("S 0.14c - 0.42c - 0.9p,#ff0000 0.45c Faults"));
+
+  const styledLegend = normalizeLegendConfig({
+    width: "5.6c",
+    titleFontSize: 13,
+    labelFontSize: 10,
+    textColor: "#222222",
+    backgroundColor: "#f4f1ea",
+    backgroundTransparency: 20,
+    borderColor: "#335577",
+    borderWidth: 0.8,
+    position: "n0.250/0.700+jTL"
+  });
+  assert.strictEqual(styledLegend.titleFont, "13.0p,Helvetica-Bold,#222222");
+  assert.strictEqual(styledLegend.labelFont, "10.0p,Helvetica,#222222");
+  assert.strictEqual(styledLegend.frame, "+p0.80p,#335577+g#f4f1ea@20+r2p");
+  assert(legendCommand("map_legend.txt", "100/101/35/36", "M16c", "sh", styledLegend).includes("-Dn0.250/0.700+jTL+w5.6c -F+p0.80p,#335577+g#f4f1ea@20+r2p+c0.12c"));
 
   const scriptDir = path.join(tmp, "script-output");
   const script = buildScript([
