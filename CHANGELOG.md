@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.2 - 2026-07-03
+
+- Strengthened the Windows installer update path so hidden residual processes are closed by executable name, executable path, and command-line match before installing.
+- Added an early installer cleanup hook to reduce false "please close the app" failures when no app window is visible.
+- Updated the Windows install-repair batch file to use the same broader cleanup before launching the setup program.
+
 ## v0.9.1 - 2026-07-03
 
 - Fixed Windows update installs by adding an installer hook that closes old `MTPointMapGMT.exe` processes before overwriting the app.
