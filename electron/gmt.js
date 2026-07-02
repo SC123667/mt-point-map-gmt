@@ -946,7 +946,7 @@ function terrainKey(outputDirectory, config, region = config.region) {
       String(region || ""),
       String(config.terrainResolution || "06m"),
       String(config.terrainIntensity || "0.65"),
-      String(config.localTerrainGridPath || config.terrainGridPath || "")
+      String(config.localTerrainGridPath || "")
     ].join("|"))
     .digest("hex")
     .slice(0, 12);

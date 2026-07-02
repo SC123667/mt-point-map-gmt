@@ -5,7 +5,7 @@ const path = require("path");
 
 const { autodetectAndParse, buildFaultOverlay, recolorPen, summarizeFaultFile } = require("../electron/faults");
 const { buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
-const { buildScript } = require("../electron/gmt");
+const { buildScript, terrainPaths } = require("../electron/gmt");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mt-gmt-fault-test-"));
 
@@ -186,6 +186,24 @@ try {
   assert(vectorScript.includes("png,pdf,eps E450"));
   assert(vectorScript.includes("gmt set GMT_DATA_SERVER https://mirrors.ustc.edu.cn/gmtdata"));
   assert(vectorScript.includes("-B+"));
+
+  const terrainConfigBase = {
+    region: "100.9/101.3/34.9/35.2",
+    terrainResolution: "06m",
+    terrainIntensity: 0.65,
+    terrainGridPath: path.join(tmp, "preview-temp-grid.nc")
+  };
+  const cacheA = terrainPaths(tmp, terrainConfigBase);
+  const cacheB = terrainPaths(tmp, {
+    ...terrainConfigBase,
+    terrainGridPath: path.join(tmp, "other-temp-grid.nc")
+  });
+  const cacheLocal = terrainPaths(tmp, {
+    ...terrainConfigBase,
+    localTerrainGridPath: path.join(tmp, "local-terrain.grd")
+  });
+  assert.strictEqual(cacheA.key, cacheB.key);
+  assert.notStrictEqual(cacheA.key, cacheLocal.key);
 
   console.log("Fault overlay and legend tests passed");
 } finally {

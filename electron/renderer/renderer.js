@@ -7,6 +7,7 @@ const state = {
   outputDirectory: "",
   terrain: {
     key: "",
+    pendingKey: "",
     gridPath: "",
     shadePath: "",
     region: "",
@@ -56,6 +57,8 @@ const PREVIEW_MIN_ZOOM = 1;
 const PREVIEW_MAX_ZOOM = 16;
 const PREVIEW_WHEEL_SENSITIVITY = 0.00075;
 const AUTO_PREVIEW_DELAY_MS = 700;
+const PREVIEW_PNG_DPI = 120;
+const PREVIEW_TERRAIN_MAX_RESOLUTION = "06m";
 const CUSTOM_COLOR_VALUE = "__custom__";
 const CUSTOM_TERRAIN_SERVER_VALUE = "__custom__";
 const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
@@ -112,6 +115,7 @@ const ids = [
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
+  "pngDpiDialog", "pngDpiDialogInput", "pngDpiCancelBtn", "pngDpiDialogCancelBtn", "pngDpiConfirmBtn",
   "windowControls", "exitFullscreenBtn", "minimizeWindowBtn", "closeWindowBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
@@ -810,6 +814,79 @@ function renderFaultLayers() {
   });
 }
 
+function previewConfig(config) {
+  const next = {
+    ...config,
+    pngDpi: PREVIEW_PNG_DPI
+  };
+  if (next.showTerrain && !next.localTerrainGridPath) {
+    next.terrainResolution = previewTerrainResolution(next.terrainResolution);
+    next.terrainGridPath = "";
+    next.terrainShadePath = "";
+  }
+  return next;
+}
+
+function previewTerrainResolution(resolution) {
+  const current = TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"];
+  const ceiling = TERRAIN_RESOLUTIONS[PREVIEW_TERRAIN_MAX_RESOLUTION];
+  if (!current || !ceiling) return PREVIEW_TERRAIN_MAX_RESOLUTION;
+  return current.seconds < ceiling.seconds ? PREVIEW_TERRAIN_MAX_RESOLUTION : resolution;
+}
+
+function sanitizePngDpi(value) {
+  return clamp(Math.round(Number(value) || 300), 72, 1200);
+}
+
+function requestPngDpi(currentValue) {
+  const current = sanitizePngDpi(currentValue);
+  if (!formatsDialogAvailable()) {
+    const value = prompt("PNG DPI", String(current));
+    if (value === null) return Promise.resolve(null);
+    return Promise.resolve(sanitizePngDpi(value));
+  }
+  return new Promise((resolve) => {
+    const dialog = el.pngDpiDialog;
+    const input = el.pngDpiDialogInput;
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      dialog.removeEventListener("cancel", onCancel);
+      el.pngDpiCancelBtn.removeEventListener("click", onCancel);
+      el.pngDpiDialogCancelBtn.removeEventListener("click", onCancel);
+      el.pngDpiConfirmBtn.removeEventListener("click", onConfirm);
+      input.removeEventListener("keydown", onKeyDown);
+      if (dialog.open) dialog.close();
+      resolve(value);
+    };
+    const onCancel = (event) => {
+      event?.preventDefault?.();
+      done(null);
+    };
+    const onConfirm = () => done(sanitizePngDpi(input.value));
+    const onKeyDown = (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        onConfirm();
+      }
+    };
+    input.value = String(current);
+    dialog.addEventListener("cancel", onCancel);
+    el.pngDpiCancelBtn.addEventListener("click", onCancel);
+    el.pngDpiDialogCancelBtn.addEventListener("click", onCancel);
+    el.pngDpiConfirmBtn.addEventListener("click", onConfirm);
+    input.addEventListener("keydown", onKeyDown);
+    dialog.showModal();
+    input.focus();
+    input.select();
+  });
+}
+
+function formatsDialogAvailable() {
+  return Boolean(el.pngDpiDialog?.showModal && el.pngDpiDialogInput && el.pngDpiConfirmBtn);
+}
+
 async function exportMap(formats, showAlert, options = {}) {
   if (!state.records.length) return notify("请先导入点位数据。");
   if (!options.auto && state.preview.autoTimer) {
@@ -821,12 +898,20 @@ async function exportMap(formats, showAlert, options = {}) {
     return false;
   }
   state.preview.rendering = true;
-  setPreviewBusy(true, options.auto ? "正在自动更新预览..." : "正在生成预览...");
-  const config = readConfig();
+  const isPreviewRender = !showAlert;
+  setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新低清预览..." : "正在生成低清预览..."));
+  const baseConfig = readConfig();
+  const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
   try {
     if (!validatePlotReadiness(config)) return false;
+    if (showAlert && formats.includes("png")) {
+      const dpi = await requestPngDpi(config.pngDpi);
+      if (!dpi) return false;
+      config.pngDpi = dpi;
+      el.pngDpiInput.value = String(dpi);
+    }
     if (config.showTerrain) {
-      const ready = await ensureTerrainReady(config, { auto: Boolean(options.auto) });
+      const ready = await ensureTerrainReady(config, { auto: Boolean(options.auto), preview: isPreviewRender });
       if (!ready) return false;
       if (config.localTerrainGridPath) {
         config.terrainGridPath = config.localTerrainGridPath;
@@ -853,6 +938,9 @@ async function exportMap(formats, showAlert, options = {}) {
     if (formats.includes("png")) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
       if (png) await renderPreview(png);
+      if (isPreviewRender && baseConfig.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
+        setPreviewStatus(`预览使用 ${TERRAIN_RESOLUTIONS[config.terrainResolution]?.label || config.terrainResolution} 快速底图；正式导出仍使用高清设置。`, "pending");
+      }
     }
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
@@ -879,16 +967,22 @@ async function ensureTerrainReady(config, options = {}) {
   if (config.localTerrainGridPath) return true;
   const key = terrainKeyClient(config);
   if (state.terrain.key === key && state.terrain.gridPath && state.terrain.shadePath) return true;
-  if (options.auto) {
+  const cached = await adoptTerrainCache(config, key);
+  if (cached) return true;
+  if (options.auto && !options.preview) {
     setPreviewStatus("地形底图尚未准备，先点“生成预览”或“下载/准备底图”后再自动更新。");
     return false;
   }
   if (!config.terrainAllowDownload) {
+    if (options.auto) {
+      setPreviewStatus("地形底图本地缓存未命中，且已关闭联网下载。");
+      return false;
+    }
     const confirmed = confirm("当前未准备本地地形底图，并且关闭了联网下载。是否仍然尝试只使用 GMT 本地缓存准备底图？");
     if (!confirmed) return false;
   }
   try {
-    await prepareTerrain(true);
+    await prepareTerrain(true, config);
     return Boolean(state.terrain.gridPath && state.terrain.shadePath);
   } catch (error) {
     notify(error.message || String(error));
@@ -896,9 +990,33 @@ async function ensureTerrainReady(config, options = {}) {
   }
 }
 
-async function prepareTerrain(waitForCompletion) {
+async function adoptTerrainCache(config, key = terrainKeyClient(config)) {
+  try {
+    const cache = await window.mtApp.estimateTerrain({ records: state.records, config, outputDirectory: state.outputDirectory });
+    if (!cache?.cacheReady) return false;
+    state.terrain = {
+      ...state.terrain,
+      key,
+      pendingKey: "",
+      gridPath: cache.gridPath,
+      shadePath: cache.shadePath,
+      region: config.region,
+      resolution: config.terrainResolution
+    };
+    el.terrainProgressPanel.classList.remove("hidden");
+    el.terrainProgress.value = 100;
+    el.terrainProgressText.textContent = "已复用缓存地形底图。";
+    el.terrainProgressText.dataset.state = "completed";
+    el.terrainProgressPercent.textContent = "100%";
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function prepareTerrain(waitForCompletion, configOverride = null) {
   if (!state.records.length) return notify("请先导入点位文件。");
-  const config = readConfig();
+  const config = configOverride ? { ...configOverride } : readConfig();
   if (!config.region) config.region = autoRegionClient(state.records);
   const estimate = estimateTerrainClient(config.region, config.terrainResolution);
   if (estimate.blocked) {
@@ -907,6 +1025,7 @@ async function prepareTerrain(waitForCompletion) {
     return false;
   }
   resetTerrainPaths();
+  state.terrain.pendingKey = terrainKeyClient(config);
   el.terrainProgressPanel.classList.remove("hidden");
   const waiting = waitForCompletion ? waitForTerrainCompletion() : null;
   const result = await window.mtApp.prepareTerrain({ records: state.records, config, outputDirectory: state.outputDirectory });
@@ -946,7 +1065,8 @@ function renderTerrainProgress(status) {
   el.prepareTerrainBtn.disabled = ["starting", "running", "paused"].includes(status.state);
   if (status.state === "completed") {
     state.terrain = {
-      key: terrainKeyClient(readConfig()),
+      key: state.terrain.pendingKey || terrainKeyClient(readConfig()),
+      pendingKey: "",
       gridPath: status.gridPath,
       shadePath: status.shadePath,
       region: status.region,
@@ -1067,7 +1187,7 @@ function terrainKeyClient(config) {
 }
 
 function resetTerrainPaths() {
-  state.terrain = { ...state.terrain, key: "", gridPath: "", shadePath: "", region: "", resolution: "" };
+  state.terrain = { ...state.terrain, key: "", pendingKey: "", gridPath: "", shadePath: "", region: "", resolution: "" };
 }
 
 async function deleteLocalTerrain() {

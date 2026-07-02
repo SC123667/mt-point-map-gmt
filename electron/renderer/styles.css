@@ -1130,6 +1130,10 @@ td:nth-child(3) {
   backdrop-filter: blur(22px) saturate(1.28);
 }
 
+.png-dpi-dialog {
+  width: min(420px, calc(100vw - 44px));
+}
+
 .settings-dialog::backdrop,
 .table-help-dialog::backdrop {
   background: rgba(20, 31, 45, 0.22);

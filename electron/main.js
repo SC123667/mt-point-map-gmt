@@ -411,9 +411,11 @@ ipcMain.handle("output:deleteCurrent", (_event, payload) => {
 ipcMain.handle("terrain:estimate", (_event, payload) => {
   const outputDirectory = outputDirectoryFromPayload(payload);
   const config = normalizeTerrainConfig(payload);
+  const paths = terrainPaths(outputDirectory, config);
   return {
     ...terrainEstimate(config.region, config.terrainResolution),
-    ...terrainPaths(outputDirectory, config)
+    ...paths,
+    cacheReady: fs.existsSync(paths.gridPath) && fs.existsSync(paths.shadePath)
   };
 });
 

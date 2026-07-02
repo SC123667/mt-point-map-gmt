@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.5 - 2026-07-03
+
+- Added fast low-resolution PNG previews while keeping high-resolution terrain and DPI settings for formal exports.
+- Reused existing terrain grid and shade cache files before starting another GMT terrain download/preparation task.
+- Added a PNG export DPI dialog so manual PNG exports can set raster resolution before running GMT.
+
 ## v0.9.4 - 2026-07-03
 
 - Added Windows/Linux in-app window controls for minimize, close, and exiting fullscreen when native window chrome is hidden.

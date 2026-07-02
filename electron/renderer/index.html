@@ -377,6 +377,21 @@
       </div>
     </dialog>
 
+    <dialog id="pngDpiDialog" class="settings-dialog png-dpi-dialog">
+      <div class="dialog-head">
+        <h2>PNG 导出设置</h2>
+        <button id="pngDpiCancelBtn" type="button">关闭</button>
+      </div>
+      <div class="settings-dialog-body">
+        <label>PNG DPI<input id="pngDpiDialogInput" type="number" min="72" max="1200" step="10" value="300" /></label>
+        <p class="field-note">预览会自动使用低清快速模式；这里的 DPI 只影响正式导出的 PNG。</p>
+      </div>
+      <div class="settings-dialog-footer">
+        <button id="pngDpiDialogCancelBtn" type="button">取消</button>
+        <button id="pngDpiConfirmBtn" class="primary" type="button">确认导出</button>
+      </div>
+    </dialog>
+
     <dialog id="tableHelpDialog" class="table-help-dialog">
       <div class="dialog-head">
         <h2>MT 表格格式说明</h2>
