@@ -55,16 +55,28 @@
         </div>
       </section>
       <div class="settings-toolbar" aria-label="参数模块">
-        <details class="toolbar-menu">
-          <summary>数据</summary>
+        <details class="toolbar-menu menu-data">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 3.5h10v9H3z" />
+              <path d="M3 6.5h10M6.5 3.5v9" />
+            </svg>
+            <span>数据</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="data" title="数据预览" type="button">数据表格</button>
             <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段识别</button>
             <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
           </div>
         </details>
-        <details class="toolbar-menu">
-          <summary>制图</summary>
+        <details class="toolbar-menu menu-map">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.75 4.5l3-1.25 4.5 1.5 3-1.25v8l-3 1.25-4.5-1.5-3 1.25z" />
+              <path d="M5.75 3.25v8M10.25 4.75v8" />
+            </svg>
+            <span>制图</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
             <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形底图</button>
@@ -72,22 +84,40 @@
             <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">绘图预设</button>
           </div>
         </details>
-        <details class="toolbar-menu">
-          <summary>图层</summary>
+        <details class="toolbar-menu menu-layer">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 2.75l5.25 2.75L8 8.25 2.75 5.5z" />
+              <path d="M3.25 8L8 10.5 12.75 8M3.25 10.5L8 13l4.75-2.5" />
+            </svg>
+            <span>图层</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加与图例</button>
             <button class="settings-tool" data-settings-panel="elements" title="比例尺、指北针和经纬网" type="button">图件元素</button>
           </div>
         </details>
-        <details class="toolbar-menu">
-          <summary>标注</summary>
+        <details class="toolbar-menu menu-label">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 4.5h10M5.5 4.5v7M10.5 4.5v7M4.5 11.5h7" />
+            </svg>
+            <span>标注</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">测点标签</button>
             <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
           </div>
         </details>
-        <details class="toolbar-menu export-tools">
-          <summary>导出</summary>
+        <details class="toolbar-menu menu-export export-tools">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 2.75v7.5" />
+              <path d="M5.25 7.75L8 10.5l2.75-2.75" />
+              <path d="M3.25 12.75h9.5" />
+            </svg>
+            <span>导出</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button id="exportPngBtn" class="settings-tool" title="导出 PNG" type="button">PNG</button>
             <button id="exportPdfBtn" class="settings-tool" title="导出 PDF 矢量图" type="button">PDF</button>
@@ -95,8 +125,14 @@
             <button id="saveScriptBtn" class="settings-tool" title="保存 GMT 脚本" type="button">GMT脚本</button>
           </div>
         </details>
-        <details class="toolbar-menu">
-          <summary>工具</summary>
+        <details class="toolbar-menu menu-tools">
+          <summary>
+            <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M9.5 2.75a3.5 3.5 0 0 0 3.75 3.75l-6.9 6.9a1.75 1.75 0 0 1-2.48-2.48l6.9-6.9" />
+              <path d="M4.75 11.25l1 1" />
+            </svg>
+            <span>工具</span>
+          </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">数据质检</button>
             <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选绘图</button>

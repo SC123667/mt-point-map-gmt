@@ -1,25 +1,32 @@
 :root {
   color-scheme: light;
-  --bg: #eef3f8;
-  --surface: rgba(255, 255, 255, 0.74);
+  --bg: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.88);
   --surface-solid: #ffffff;
-  --surface-soft: rgba(248, 250, 252, 0.84);
-  --surface-strong: rgba(255, 255, 255, 0.9);
-  --line: rgba(138, 153, 173, 0.34);
-  --line-strong: rgba(111, 129, 153, 0.5);
-  --text: #17202a;
+  --surface-soft: #f3f6fa;
+  --surface-strong: #ffffff;
+  --line: #d8e0ea;
+  --line-strong: #bac7d6;
+  --text: #0f172a;
   --muted: #64748b;
-  --accent: #1f6f78;
-  --accent-dark: #17545b;
-  --accent-soft: rgba(31, 111, 120, 0.12);
-  --accent-blue: #315f9f;
+  --primary: #1e3a5f;
+  --primary-soft: rgba(30, 58, 95, 0.1);
+  --accent: #0f766e;
+  --accent-dark: #0b5f59;
+  --accent-soft: rgba(15, 118, 110, 0.1);
+  --accent-blue: #2563eb;
   --accent-warm: #b7791f;
-  --danger: #a63b2d;
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.08);
   --warn: #a15c12;
-  --glass-blur: 18px;
-  --shadow-soft: 0 12px 34px rgba(30, 41, 59, 0.1);
-  --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  --focus-ring: 0 0 0 3px rgba(31, 111, 120, 0.18);
+  --glass-blur: 14px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --shadow-panel: 0 12px 30px rgba(15, 23, 42, 0.12);
+  --shadow-control: 0 1px 1px rgba(15, 23, 42, 0.05);
+  --focus-ring: 0 0 0 3px rgba(15, 118, 110, 0.18);
 }
 
 * {
@@ -1879,6 +1886,283 @@ body[data-platform="win32"] .table-help-dialog {
     right: auto;
     left: 0;
   }
+}
+
+/* v0.9.15 professional visual system: stable scientific-tool chrome. */
+body {
+  background: var(--bg);
+}
+
+.app-header,
+.workspace-toolbar,
+.status-bar {
+  border-color: var(--line);
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: none;
+}
+
+.app-header h1 {
+  color: var(--text);
+}
+
+button {
+  min-height: 32px;
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: var(--text);
+  box-shadow: var(--shadow-control);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+button:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+button.primary {
+  border-color: var(--accent-dark);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(15, 118, 110, 0.18);
+}
+
+button.primary:hover {
+  background: var(--accent-dark);
+  box-shadow: 0 7px 16px rgba(15, 118, 110, 0.2);
+}
+
+button.danger,
+button.subtle-danger,
+.small-danger {
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.22);
+  background: var(--danger-soft);
+}
+
+button.danger:hover,
+button.subtle-danger:hover,
+.small-danger:hover {
+  color: #7f1d1d;
+  border-color: rgba(220, 38, 38, 0.36);
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.plot-group,
+.toolbar-context {
+  border-color: var(--line);
+  background: var(--surface-strong);
+  box-shadow: none;
+}
+
+.tool-tab {
+  color: #475569;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tool-tab:hover {
+  color: var(--primary);
+  border-color: var(--line);
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.tool-tab.active {
+  color: var(--primary);
+  border-color: rgba(15, 118, 110, 0.28);
+  background: #ffffff;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tool-tab.active::after {
+  display: none;
+}
+
+.toolbar-menu summary {
+  min-width: 74px;
+  height: 30px;
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: var(--primary);
+  font-weight: 650;
+  box-shadow: var(--shadow-control);
+}
+
+.toolbar-menu summary:hover,
+.toolbar-menu[open] summary {
+  color: var(--accent-dark);
+  border-color: rgba(15, 118, 110, 0.34);
+  background: #f2fbfa;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.menu-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.menu-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.toolbar-menu-panel {
+  min-width: 172px;
+  padding: 6px;
+  border-color: var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: var(--shadow-panel);
+}
+
+.toolbar-menu-panel .settings-tool {
+  height: 32px;
+  min-height: 32px;
+  min-width: 158px;
+  padding: 0 10px;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  color: #334155;
+  line-height: 30px;
+  box-shadow: none;
+}
+
+.toolbar-menu-panel .settings-tool:hover,
+.toolbar-menu-panel .settings-tool:focus-visible {
+  color: var(--accent-dark);
+  border-color: rgba(15, 118, 110, 0.16);
+  background: var(--accent-soft);
+}
+
+.preview-pane {
+  background: #eef2f7;
+}
+
+.preview-box {
+  border-color: var(--line);
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(rgba(100, 116, 139, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 116, 139, 0.028) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.82),
+    0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.preview-box.has-preview {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(rgba(100, 116, 139, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 116, 139, 0.022) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+}
+
+#previewPlaceholder,
+.preview-zoom-controls,
+.preview-status {
+  border-color: var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.settings-dialog,
+.table-help-dialog {
+  border-color: var(--line);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.2);
+}
+
+.settings-dialog-body {
+  background: #ffffff;
+}
+
+.settings-dialog-footer,
+.dialog-head {
+  border-color: var(--line);
+  background: #f8fafc;
+}
+
+.status-bar {
+  min-height: 28px;
+  grid-template-columns: minmax(120px, 0.55fr) minmax(0, 1.8fr) auto auto;
+  gap: 10px;
+  color: #64748b;
+}
+
+#runtimeStatus,
+#gmtStatusText,
+#versionText {
+  border-color: rgba(216, 224, 234, 0.9);
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+  box-shadow: none;
+}
+
+#runtimeStatus[data-state="busy"],
+#gmtStatusText[data-state="ready"] {
+  color: var(--accent-dark);
+  border-color: rgba(15, 118, 110, 0.18);
+  background: rgba(240, 253, 250, 0.72);
+}
+
+#runtimeStatus[data-state="error"],
+#gmtStatusText[data-state="error"] {
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+  background: rgba(254, 242, 242, 0.72);
+}
+
+body[data-platform="darwin"] .app-header,
+body[data-platform="darwin"] .workspace-toolbar,
+body[data-platform="darwin"] .status-bar,
+body[data-platform="darwin"] .toolbar-menu-panel,
+body[data-platform="darwin"] .preview-zoom-controls,
+body[data-platform="darwin"] .preview-status {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.18);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.18);
+}
+
+body[data-platform="darwin"] .settings-dialog,
+body[data-platform="darwin"] .table-help-dialog {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body[data-platform="win32"] .app-header,
+body[data-platform="win32"] .workspace-toolbar,
+body[data-platform="win32"] .status-bar,
+body[data-platform="win32"] .toolbar-menu-panel,
+body[data-platform="win32"] .preview-zoom-controls,
+body[data-platform="win32"] .preview-status,
+body[data-platform="win32"] .settings-dialog,
+body[data-platform="win32"] .table-help-dialog,
+body[data-platform="win32"] button {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body[data-platform="win32"] .app-header,
+body[data-platform="win32"] .workspace-toolbar,
+body[data-platform="win32"] .status-bar {
+  background: #f8fafc;
 }
 
 @media (prefers-reduced-motion: reduce) {

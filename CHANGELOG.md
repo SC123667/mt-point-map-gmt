@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.15 - 2026-07-03
+
+- Unified the UI visual system around a deeper navy primary color, geologic teal accent, cool gray background, and tokenized borders, radii, shadows, and focus states.
+- Refined buttons into consistent normal, primary, and danger styles, reducing mixed gradients and glass effects across the workspace.
+- Added small line icons to the six overlay toolbar entries and polished menu sizing, selected states, hover states, and menu shadows.
+- Made the preview area more paper-like, reduced grid dominance, and clarified the bottom status bar hierarchy.
+- Tightened macOS and Windows platform styling so glass is limited to lightweight chrome on macOS while Windows uses solid Fluent-style surfaces.
+
 ## v0.9.14 - 2026-07-03
 
 - Reworked the workbench toolbar into overlay command menus so future features can be added under Data, Mapping, Layers, Labels, Export, or Tools without crowding the main interface.
