@@ -57,8 +57,6 @@ const PREVIEW_MIN_ZOOM = 1;
 const PREVIEW_MAX_ZOOM = 16;
 const PREVIEW_WHEEL_SENSITIVITY = 0.00075;
 const AUTO_PREVIEW_DELAY_MS = 700;
-const PREVIEW_PNG_DPI = 120;
-const PREVIEW_TERRAIN_MAX_RESOLUTION = "06m";
 const CUSTOM_COLOR_VALUE = "__custom__";
 const CUSTOM_TERRAIN_SERVER_VALUE = "__custom__";
 const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
@@ -815,23 +813,7 @@ function renderFaultLayers() {
 }
 
 function previewConfig(config) {
-  const next = {
-    ...config,
-    pngDpi: PREVIEW_PNG_DPI
-  };
-  if (next.showTerrain && !next.localTerrainGridPath) {
-    next.terrainResolution = previewTerrainResolution(next.terrainResolution);
-    next.terrainGridPath = "";
-    next.terrainShadePath = "";
-  }
-  return next;
-}
-
-function previewTerrainResolution(resolution) {
-  const current = TERRAIN_RESOLUTIONS[resolution] || TERRAIN_RESOLUTIONS["06m"];
-  const ceiling = TERRAIN_RESOLUTIONS[PREVIEW_TERRAIN_MAX_RESOLUTION];
-  if (!current || !ceiling) return PREVIEW_TERRAIN_MAX_RESOLUTION;
-  return current.seconds < ceiling.seconds ? PREVIEW_TERRAIN_MAX_RESOLUTION : resolution;
+  return { ...config };
 }
 
 function sanitizePngDpi(value) {
@@ -899,7 +881,7 @@ async function exportMap(formats, showAlert, options = {}) {
   }
   state.preview.rendering = true;
   const isPreviewRender = !showAlert;
-  setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新低清预览..." : "正在生成低清预览..."));
+  setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
   try {
@@ -938,9 +920,6 @@ async function exportMap(formats, showAlert, options = {}) {
     if (formats.includes("png")) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
       if (png) await renderPreview(png);
-      if (isPreviewRender && baseConfig.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
-        setPreviewStatus(`预览使用 ${TERRAIN_RESOLUTIONS[config.terrainResolution]?.label || config.terrainResolution} 快速底图；正式导出仍使用高清设置。`, "pending");
-      }
     }
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
@@ -1139,8 +1118,8 @@ function terrainSafetyClient(values, resolution, cells) {
   if (cells > TERRAIN_SAFE_CELL_LIMIT) {
     const advice = recommendedLabel ? `建议改用 ${recommendedLabel}，或先缩小范围后再用高分辨率` : "建议先缩小范围后再使用高分辨率";
     return {
-      blocked: true,
-      warning: `${detail}，超过安全上限 ${formatCount(TERRAIN_SAFE_CELL_LIMIT)}，为避免软件卡死已停止准备。${advice}`,
+      blocked: false,
+      warning: `${detail}，处理会比较慢，占用磁盘和内存也会更高；${advice}`,
       recommendedResolution,
       recommendedLabel
     };

@@ -5,7 +5,7 @@ const path = require("path");
 
 const { autodetectAndParse, buildFaultOverlay, recolorPen, summarizeFaultFile } = require("../electron/faults");
 const { buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
-const { buildScript, terrainPaths } = require("../electron/gmt");
+const { buildScript, terrainEstimate, terrainPaths } = require("../electron/gmt");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mt-gmt-fault-test-"));
 
@@ -204,6 +204,12 @@ try {
   });
   assert.strictEqual(cacheA.key, cacheB.key);
   assert.notStrictEqual(cacheA.key, cacheLocal.key);
+
+  const largeSrtmEstimate = terrainEstimate("112.209316/120.913323/42.650685/46.413555", "03s");
+  assert.strictEqual(largeSrtmEstimate.blocked, false);
+  assert(largeSrtmEstimate.warning.includes("处理会比较慢"));
+  assert(!largeSrtmEstimate.warning.includes("安全上限"));
+  assert(!largeSrtmEstimate.warning.includes("停止准备"));
 
   console.log("Fault overlay and legend tests passed");
 } finally {

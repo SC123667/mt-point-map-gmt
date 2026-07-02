@@ -890,8 +890,8 @@ function terrainSafety(region, resolution, cells) {
   if (cells > TERRAIN_SAFE_CELL_LIMIT) {
     const advice = recommendedLabel ? `建议改用 ${recommendedLabel}，或先缩小范围后再用高分辨率` : "建议先缩小范围后再使用高分辨率";
     return {
-      blocked: true,
-      warning: `${detail}，超过安全上限 ${formatCount(TERRAIN_SAFE_CELL_LIMIT)}，为避免软件卡死已停止准备。${advice}`,
+      blocked: false,
+      warning: `${detail}，处理会比较慢，占用磁盘和内存也会更高；${advice}`,
       recommendedResolution,
       recommendedLabel
     };

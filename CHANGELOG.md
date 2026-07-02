@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.6 - 2026-07-03
+
+- Removed the hard terrain-size safety stop so large SRTM basemap preparation can continue after showing a performance warning.
+- Restored basemap previews to the selected terrain resolution instead of silently downgrading preview terrain.
+- Removed the SRTM XYZ point cap that could stop high-resolution terrain preparation after downloads had started.
+
 ## v0.9.5 - 2026-07-03
 
 - Added fast low-resolution PNG previews while keeping high-resolution terrain and DPI settings for formal exports.

@@ -30,7 +30,6 @@ const {
 } = require("./gmt");
 
 const APP_TITLE = "MT点位图制作工具—GMT";
-const SRTM_XYZ_POINT_LIMIT = 2_500_000;
 let currentInstallerDownload = null;
 let currentTerrainTask = null;
 
@@ -1402,7 +1401,7 @@ class SrtmTerrainPrepareTask {
     this.percent = Math.max(this.percent, 68);
     this.emit();
     try {
-      await writeSrtmXYZ(this.tiles, this.config.region, terrainResolutionSeconds(this.config.terrainResolution), this.xyzPath, this.estimate.cells);
+      await writeSrtmXYZ(this.tiles, this.config.region, terrainResolutionSeconds(this.config.terrainResolution), this.xyzPath);
       this.runXYZToGrid();
     } catch (error) {
       this.fail(error.message || String(error));
@@ -1619,12 +1618,9 @@ function srtmTileName(lat, lon) {
   return `${latPrefix}${String(Math.abs(lat)).padStart(2, "0")}${lonPrefix}${String(Math.abs(lon)).padStart(3, "0")}`;
 }
 
-async function writeSrtmXYZ(tiles, regionText, seconds, outputPath, estimatedCells = 0) {
+async function writeSrtmXYZ(tiles, regionText, seconds, outputPath) {
   const values = String(regionText || "").split("/").map((value) => Number(value));
   if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) throw new Error("地形范围无效，无法裁剪 SRTM。");
-  if (estimatedCells > SRTM_XYZ_POINT_LIMIT) {
-    throw new Error(`当前 SRTM 网格约 ${formatPointCount(estimatedCells)} 个点，超过安全上限 ${formatPointCount(SRTM_XYZ_POINT_LIMIT)}。请降低分辨率或缩小范围。`);
-  }
   const [west, east, south, north] = values;
   const margin = Math.max(seconds / 3600, 1 / 3600);
   const stride = Math.max(1, Math.round(seconds));
@@ -1650,9 +1646,6 @@ async function writeSrtmXYZ(tiles, regionText, seconds, outputPath, estimatedCel
             if (elevation <= -32768) continue;
             stream.write(`${lon.toFixed(8)}\t${lat.toFixed(8)}\t${elevation}\n`);
             points += 1;
-            if (points > SRTM_XYZ_POINT_LIMIT) {
-              throw new Error(`SRTM 裁剪点数超过 ${formatPointCount(SRTM_XYZ_POINT_LIMIT)}，已停止以避免软件卡死。请降低分辨率或缩小范围。`);
-            }
           }
         }
       }
@@ -1663,13 +1656,6 @@ async function writeSrtmXYZ(tiles, regionText, seconds, outputPath, estimatedCel
       reject(error);
     }
   });
-}
-
-function formatPointCount(value) {
-  const count = Math.max(0, Number(value) || 0);
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
-  return String(Math.round(count));
 }
 
 class InstallerDownloadTask {
