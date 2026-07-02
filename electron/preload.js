@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld("mtApp", {
   onMenuDeleteOutputs: (handler) => ipcRenderer.on("menu:deleteOutputs", handler),
   onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),
   onMenuOpenSettingsPanel: (handler) => ipcRenderer.on("menu:openSettingsPanel", (_event, panel) => handler(panel)),
+  onMenuResetLayout: (handler) => ipcRenderer.on("menu:resetLayout", handler),
   onMenuRecheckGMT: (handler) => ipcRenderer.on("menu:recheckGMT", handler),
   onMenuInstallGMT: (handler) => ipcRenderer.on("menu:installGMT", handler),
   getWindowState: () => ipcRenderer.invoke("window:getState"),

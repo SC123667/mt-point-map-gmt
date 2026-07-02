@@ -240,6 +240,11 @@ function configureMenu(win) {
         },
         { type: "separator" },
         {
+          label: "地形缓存管理...",
+          click: () => sendMenuAction(win, "menu:openSettingsPanel", "terrain")
+        },
+        { type: "separator" },
+        {
           label: "GMT 中文手册安装页",
           click: () => shell.openExternal("https://docs.gmt-china.org/latest/install/")
         },
@@ -260,12 +265,15 @@ function configureMenu(win) {
         { role: "zoomOut", label: "缩小" },
         { type: "separator" },
         { label: "切换全屏", accelerator: "F11", click: () => toggleFullScreen(win) },
-        { label: "退出全屏", accelerator: "Esc", click: () => win.setFullScreen(false) }
+        { label: "退出全屏", click: () => win.setFullScreen(false) }
       ]
     },
     {
       label: "窗口",
       submenu: [
+        { label: "退出全屏", accelerator: "Esc", click: () => win.setFullScreen(false) },
+        { label: "重置工作台布局", click: () => sendMenuAction(win, "menu:resetLayout") },
+        { type: "separator" },
         { role: "minimize", label: "最小化" },
         { role: "zoom", label: "缩放" },
         ...(isMac ? [{ type: "separator" }, { role: "front", label: "全部置于前台" }] : [])
@@ -853,6 +861,7 @@ function loadRenderer(win) {
       onMenuDeleteOutputs: (handler) => ipcRenderer.on("menu:deleteOutputs", handler),
       onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),
       onMenuOpenSettingsPanel: (handler) => ipcRenderer.on("menu:openSettingsPanel", (_event, panel) => handler(panel)),
+      onMenuResetLayout: (handler) => ipcRenderer.on("menu:resetLayout", handler),
       onMenuRecheckGMT: (handler) => ipcRenderer.on("menu:recheckGMT", handler),
       onMenuInstallGMT: (handler) => ipcRenderer.on("menu:installGMT", handler),
       getWindowState: () => ipcRenderer.invoke("window:getState"),

@@ -43,34 +43,71 @@
       </div>
     </section>
 
-    <nav class="workspace-toolbar" aria-label="图件类型">
-      <div class="tool-tabs" role="tablist">
-        <button class="tool-tab active" data-plot-type="stationMap" type="button">点位图</button>
-        <button class="tool-tab" data-plot-type="strikeMap" type="button">走向</button>
-        <button class="tool-tab" data-plot-type="phaseTensorMap" type="button">相位张量</button>
-        <button class="tool-tab" data-plot-type="tipperMap" type="button">感应矢量</button>
-        <button class="tool-tab" data-plot-type="responseCurve" type="button">电阻率/相位曲线</button>
+    <nav class="workspace-toolbar" aria-label="MT/GMT 制图工作台">
+      <section class="toolbar-group plot-group" aria-label="MT 图件">
+        <span class="toolbar-group-title">MT图件</span>
+        <div class="tool-tabs" role="tablist">
+          <button class="tool-tab active" data-plot-type="stationMap" type="button">点位图</button>
+          <button class="tool-tab" data-plot-type="strikeMap" type="button">走向</button>
+          <button class="tool-tab" data-plot-type="phaseTensorMap" type="button">相位张量</button>
+          <button class="tool-tab" data-plot-type="tipperMap" type="button">感应矢量</button>
+          <button class="tool-tab" data-plot-type="responseCurve" type="button">曲线</button>
+        </div>
+      </section>
+      <div class="settings-toolbar" aria-label="参数模块">
+        <section class="toolbar-group" aria-label="数据">
+          <span class="toolbar-group-title">数据</span>
+          <div class="toolbar-items">
+            <button class="settings-tool" data-settings-panel="data" title="数据预览" type="button">数据</button>
+            <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段</button>
+            <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
+          </div>
+        </section>
+        <section class="toolbar-group" aria-label="制图">
+          <span class="toolbar-group-title">制图</span>
+          <div class="toolbar-items">
+            <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
+            <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形</button>
+            <button class="settings-tool" data-settings-panel="symbol" title="点位符号" type="button">符号</button>
+            <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">预设</button>
+          </div>
+        </section>
+        <section class="toolbar-group" aria-label="图层">
+          <span class="toolbar-group-title">图层</span>
+          <div class="toolbar-items">
+            <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加</button>
+            <button class="settings-tool" data-settings-panel="elements" title="比例尺、指北针和经纬网" type="button">元素</button>
+          </div>
+        </section>
+        <section class="toolbar-group" aria-label="标注">
+          <span class="toolbar-group-title">标注</span>
+          <div class="toolbar-items">
+            <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">标签</button>
+            <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
+          </div>
+        </section>
+        <section class="toolbar-group export-tools" aria-label="导出">
+          <span class="toolbar-group-title">导出</span>
+          <div class="toolbar-items">
+            <button id="exportPngBtn" class="settings-tool" title="导出 PNG" type="button">PNG</button>
+            <button id="exportPdfBtn" class="settings-tool" title="导出 PDF 矢量图" type="button">PDF</button>
+            <button id="exportAllBtn" class="settings-tool" title="导出 PNG + PDF + EPS" type="button">全部</button>
+            <button id="saveScriptBtn" class="settings-tool" title="保存 GMT 脚本" type="button">脚本</button>
+          </div>
+        </section>
+        <section class="toolbar-group" aria-label="工具">
+          <span class="toolbar-group-title">工具</span>
+          <div class="toolbar-items">
+            <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">质检</button>
+            <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选</button>
+            <button id="tableHelpBtn" class="settings-tool" type="button" title="表格格式说明">格式</button>
+          </div>
+        </section>
       </div>
       <div class="toolbar-context">
         <label>周期
           <select id="mtPeriodInput"></select>
         </label>
-        <button id="tableHelpBtn" type="button">表格格式</button>
-      </div>
-      <div class="settings-toolbar" aria-label="参数模块">
-        <button class="settings-tool" data-settings-panel="data" title="数据" type="button">数据</button>
-        <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">质检</button>
-        <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选</button>
-        <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段</button>
-        <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
-        <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
-        <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形</button>
-        <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加</button>
-        <button class="settings-tool" data-settings-panel="symbol" title="点位符号" type="button">符号</button>
-        <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">标签</button>
-        <button class="settings-tool" data-settings-panel="elements" title="图件元素" type="button">元素</button>
-        <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
-        <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">预设</button>
       </div>
     </nav>
 
@@ -223,14 +260,14 @@
           <p id="localTerrainText" class="field-note">未导入本地 GRD 地形图</p>
           <div class="button-row terrain-actions">
             <button id="chooseLocalTerrainBtn" type="button">导入本地 GRD</button>
-            <button id="clearLocalTerrainBtn" type="button">清除本地 GRD</button>
+            <button id="clearLocalTerrainBtn" class="danger subtle-danger" type="button">清除本地 GRD</button>
           </div>
           <p id="terrainEstimateText" class="field-note">导入点位后显示预计大小</p>
           <div class="button-row terrain-actions">
             <button id="prepareTerrainBtn" type="button">下载/准备底图</button>
             <button id="pauseTerrainBtn" type="button">暂停</button>
             <button id="resumeTerrainBtn" type="button">继续</button>
-            <button id="cancelTerrainBtn" type="button">取消</button>
+            <button id="cancelTerrainBtn" class="danger subtle-danger" type="button">取消</button>
           </div>
           <div id="terrainProgressPanel" class="terrain-progress hidden" aria-live="polite">
             <progress id="terrainProgress" max="100" value="0"></progress>
@@ -240,8 +277,8 @@
             </div>
           </div>
           <div class="button-row terrain-actions">
-            <button id="deleteTerrainBtn" type="button">删除本地底图</button>
-            <button id="clearTerrainCacheBtn" type="button">清理 GMT 地形缓存</button>
+            <button id="deleteTerrainBtn" class="danger subtle-danger" type="button">删除本地底图</button>
+            <button id="clearTerrainCacheBtn" class="danger subtle-danger" type="button">清理 GMT 地形缓存</button>
             <button id="terrainDocsBtn" type="button">地形数据说明</button>
           </div>
           <details class="legend-style-details">
@@ -252,8 +289,8 @@
             </label>
             <div class="button-row terrain-actions">
               <button id="refreshTerrainCacheBtn" type="button">刷新缓存</button>
-              <button id="deleteTerrainCurrentCacheBtn" type="button">删除当前范围</button>
-              <button id="deleteTerrainCacheResolutionBtn" type="button">删除该分辨率</button>
+              <button id="deleteTerrainCurrentCacheBtn" class="danger subtle-danger" type="button">删除当前范围</button>
+              <button id="deleteTerrainCacheResolutionBtn" class="danger subtle-danger" type="button">删除该分辨率</button>
             </div>
           </details>
         </fieldset>
@@ -312,7 +349,7 @@
           <div class="compact-row">
             <label class="color-chip-label">颜色<input id="faultColorInput" type="color" value="#d7191c" /></label>
             <button id="importFaultBtn" type="button">导入构造线</button>
-            <button id="clearFaultsBtn" type="button">清空</button>
+            <button id="clearFaultsBtn" class="danger subtle-danger" type="button">清空</button>
           </div>
           <div id="faultFileList" class="layer-list" aria-live="polite"></div>
           <div class="legend-options">
@@ -449,7 +486,9 @@
     </main>
 
     <footer class="status-bar">
+      <span id="runtimeStatus">就绪</span>
       <span id="outputPath">输出目录将在导出后显示</span>
+      <span id="gmtStatusText">GMT 检测中</span>
       <span id="versionText">v0.9.0</span>
     </footer>
 

@@ -4,6 +4,13 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.13 - 2026-07-03
+
+- Reworked the main UI into a grouped MT/GMT workbench toolbar for Data, Mapping, Layers, Labels, Export, and Tools while keeping the preview as the primary workspace.
+- Added platform-specific UI polish: lighter macOS glass-style chrome and steadier Windows/Fluent-style controls with clearer focus and hover states.
+- Added status-bar runtime feedback for GMT detection, terrain preparation, preview/export progress, cache operations, and output location.
+- Added GMT cache management and workbench layout reset menu entries, plus consistent weak-danger styling for destructive cleanup actions.
+
 ## v0.9.12 - 2026-07-03
 
 - Fixed EDI directory imports that could fail with `import-worker.js 后台任务异常结束：退出码 0` when the worker exited before a large IPC result finished transferring.

@@ -142,7 +142,7 @@ const ids = [
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
-  "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
+  "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
@@ -167,7 +167,7 @@ const ids = [
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
   "legendBorderColorPicker", "legendBorderWidthInput",
-  "deleteOutputBtn", "versionText"
+  "deleteOutputBtn", "runtimeStatus", "gmtStatusText", "versionText"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
@@ -202,12 +202,13 @@ function wireEvents() {
   window.mtApp.onMenuSaveScript?.(saveScript);
   window.mtApp.onMenuDeleteOutputs?.(deleteCurrentOutputs);
   window.mtApp.onMenuOpenSettingsPanel?.((panel) => openSettingsPanel(panel));
+  window.mtApp.onMenuResetLayout?.(resetWorkbenchLayout);
   window.mtApp.onMenuRecheckGMT?.(recheckGMT);
   window.mtApp.onMenuInstallGMT?.(installGMT);
   document.querySelectorAll(".tool-tab").forEach((button) => {
     button.addEventListener("click", () => setPlotType(button.dataset.plotType));
   });
-  document.querySelectorAll(".settings-tool").forEach((button) => {
+  document.querySelectorAll(".settings-tool[data-settings-panel]").forEach((button) => {
     button.addEventListener("click", () => openSettingsPanel(button.dataset.settingsPanel));
   });
   bind(el.tableHelpBtn, "click", showTableHelp);
@@ -234,6 +235,7 @@ function wireEvents() {
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
   bind(el.exportBothBtn, "click", () => exportMap(["png", "pdf"], true));
+  bind(el.exportAllBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
   bind(el.saveScriptBtn, "click", saveScript);
   bind(el.deleteOutputBtn, "click", deleteCurrentOutputs);
   bind(el.chooseOutputBtn, "click", chooseOutputDirectory);
@@ -341,6 +343,14 @@ function renderWindowControls(snapshot = {}) {
   const shouldShowControls = state.window.platform && state.window.platform !== "darwin";
   el.windowControls?.classList.toggle("hidden", !shouldShowControls);
   el.exitFullscreenBtn?.classList.toggle("hidden", !state.window.isFullScreen);
+}
+
+function resetWorkbenchLayout() {
+  closeSettingsDialog();
+  resetPreviewView();
+  hidePreviewStatus();
+  renderDraggableMapElements();
+  setRuntimeStatus("工作台布局已重置");
 }
 
 function wireLegendControls() {
@@ -947,6 +957,10 @@ function renderGMTStatus(available, plan, gmtInfo) {
   el.appStatus.textContent = available
     ? `GMT 已就绪：${gmtInfo.version || "未知版本"}，路径：${gmtInfo.path}`
     : `未检测到 GMT。${plan.message}`;
+  if (el.gmtStatusText) {
+    el.gmtStatusText.textContent = available ? `GMT ${gmtInfo.version || "已就绪"}` : "GMT 未就绪";
+    el.gmtStatusText.dataset.state = available ? "ready" : "error";
+  }
   const downloadText = plan.download ? `将下载：${plan.download.fileName}` : "请参考官方安装文档";
   el.installPlanText.textContent = `${plan.platform}：${downloadText}`;
   el.installBtn.disabled = available || !plan.canAutoInstall;
@@ -985,6 +999,7 @@ function renderDownloadProgress(status) {
   el.cancelDownloadBtn.disabled = !active;
   el.installBtn.disabled = active;
   el.installBtn.textContent = active ? "正在下载 GMT..." : "下载并安装 GMT";
+  setRuntimeStatus(`${status.message || "GMT 下载"} ${status.total ? `${percent.toFixed(percent < 10 ? 1 : 0)}%` : ""}`.trim(), status.state === "failed" ? "error" : "busy");
 }
 
 function loadParsed(parsed, options = {}) {
@@ -1007,6 +1022,7 @@ function loadParsed(parsed, options = {}) {
   renderPlaceholder();
   resetTerrainPaths();
   updateTerrainEstimate();
+  setRuntimeStatus(`已导入 ${state.allRecords.length} 个测点`);
   if (options.autoPreview !== false) scheduleAutoPreview(options.message || "数据已导入，正在自动绘制预览...", { delay: 150 });
 }
 
@@ -1405,6 +1421,7 @@ async function exportMap(formats, showAlert, options = {}) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
       if (png) await renderPreview(png);
     }
+    setRuntimeStatus(showAlert ? `导出完成：${result.files.length} 个文件` : "预览已更新", "ready");
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
   } finally {
@@ -1435,6 +1452,7 @@ async function deleteCurrentOutputs() {
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   });
   renderPlaceholder();
+  setRuntimeStatus(result.message);
   notify(result.message);
 }
 
@@ -1538,6 +1556,7 @@ function renderTerrainProgress(status) {
   el.resumeTerrainBtn.disabled = status.state !== "paused";
   el.cancelTerrainBtn.disabled = !["starting", "running", "paused"].includes(status.state);
   el.prepareTerrainBtn.disabled = ["starting", "running", "paused"].includes(status.state);
+  setRuntimeStatus(`${status.message || readableTerrainState(status.state)} ${percent.toFixed(percent < 10 ? 1 : 0)}%`, ["failed", "cancelled"].includes(status.state) ? "error" : (status.state === "completed" ? "ready" : "busy"));
   if (status.state === "completed") {
     state.terrain = {
       key: state.terrain.pendingKey || terrainKeyClient(readConfig()),
@@ -1669,6 +1688,7 @@ async function deleteLocalTerrain() {
   const result = await window.mtApp.deleteLocalTerrain({ outputDirectory: state.outputDirectory });
   resetTerrainPaths();
   el.terrainProgressPanel.classList.add("hidden");
+  setRuntimeStatus(result.message);
   notify(result.message);
 }
 
@@ -1708,6 +1728,7 @@ function baseName(filePath) {
 async function clearTerrainCache() {
   if (!confirm("这会清理 GMT 下载过的 earth_relief 地形缓存。以后再用地形底图可能需要重新联网下载。确定继续吗？")) return;
   const result = await window.mtApp.clearTerrainCache();
+  setRuntimeStatus(result.message);
   notify(result.message);
   refreshTerrainCacheSummary();
 }
@@ -1737,6 +1758,7 @@ async function deleteTerrainCacheResolution() {
   if (!resolution) return notify("请选择要删除的缓存分辨率。");
   if (!confirm(`确定删除 ${resolution} 分辨率的地形缓存吗？`)) return;
   const result = await window.mtApp.deleteTerrainCacheResolution({ outputDirectory: state.outputDirectory, resolution });
+  setRuntimeStatus(result.message);
   notify(result.message);
   refreshTerrainCacheSummary();
 }
@@ -1753,6 +1775,7 @@ async function deleteCurrentTerrainCache() {
   });
   if (!result) return notify("当前版本没有可用的当前范围缓存删除接口。");
   resetTerrainPaths();
+  setRuntimeStatus(result.message);
   notify(result.message);
   refreshTerrainCacheSummary();
   updateTerrainEstimate();
@@ -2088,12 +2111,19 @@ function setPreviewStatus(message, kind = "info") {
   el.previewStatus.textContent = message;
   el.previewStatus.dataset.kind = kind;
   el.previewStatus.classList.remove("hidden");
+  setRuntimeStatus(message, kind === "error" ? "error" : (kind === "busy" || kind === "pending" ? "busy" : "ready"));
 }
 
 function hidePreviewStatus() {
   el.previewStatus.textContent = "";
   el.previewStatus.dataset.kind = "";
   el.previewStatus.classList.add("hidden");
+}
+
+function setRuntimeStatus(message, kind = "ready") {
+  if (!el.runtimeStatus) return;
+  el.runtimeStatus.textContent = message || "就绪";
+  el.runtimeStatus.dataset.state = kind;
 }
 
 function imageDimensions(url) {
@@ -2559,6 +2589,7 @@ function escapeHTML(value) {
 }
 
 function notify(message) {
+  setRuntimeStatus(String(message || "").split(/\r?\n/)[0] || "就绪");
   alert(message);
 }
 

@@ -1350,6 +1350,299 @@ summary {
   color: var(--warn);
 }
 
+/* Workbench polish: shared logic, platform-specific chrome. */
+.workspace-toolbar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "plots settings context";
+  gap: 10px;
+  padding: 8px 12px;
+  align-items: stretch;
+}
+
+.toolbar-group {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4px;
+  padding: 5px 7px 6px;
+  border-right: 1px solid rgba(132, 148, 170, 0.24);
+}
+
+.toolbar-group:last-child {
+  border-right: 0;
+}
+
+.plot-group {
+  grid-area: plots;
+  min-width: 0;
+  border: 1px solid rgba(139, 154, 174, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.toolbar-group-title {
+  padding: 0 2px;
+  color: #6b788a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.toolbar-items {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.settings-toolbar {
+  grid-area: settings;
+  gap: 0;
+  padding: 0;
+  align-self: stretch;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.tool-tabs {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.tool-tab,
+.settings-tool {
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+.tool-tab {
+  min-width: 62px;
+  padding: 4px 9px;
+}
+
+.settings-tool {
+  min-width: 38px;
+  padding: 4px 8px;
+}
+
+.export-tools .settings-tool {
+  color: #153f46;
+}
+
+.toolbar-context {
+  min-width: 170px;
+  padding: 5px 7px 6px;
+  border: 1px solid rgba(139, 154, 174, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.toolbar-context label {
+  font-size: 12px;
+  color: #506174;
+}
+
+.toolbar-context select {
+  width: 135px;
+}
+
+.status-bar {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1.6fr) auto auto;
+}
+
+#runtimeStatus,
+#gmtStatusText,
+#versionText {
+  padding: 2px 8px;
+  border: 1px solid rgba(139, 154, 174, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.56);
+  font-variant-numeric: tabular-nums;
+}
+
+#runtimeStatus[data-state="busy"],
+#gmtStatusText[data-state="ready"] {
+  color: #173f46;
+  border-color: rgba(31, 111, 120, 0.24);
+  background: rgba(238, 250, 250, 0.72);
+}
+
+#runtimeStatus[data-state="error"],
+#gmtStatusText[data-state="error"] {
+  color: #8a1f17;
+  border-color: rgba(173, 92, 82, 0.32);
+  background: rgba(255, 246, 244, 0.72);
+}
+
+.preview-pane {
+  padding: 10px;
+  border-color: rgba(132, 148, 170, 0.24);
+}
+
+.preview-box {
+  border-color: rgba(120, 138, 161, 0.3);
+  background-size: 32px 32px, 32px 32px, cover;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.36),
+    0 12px 30px rgba(15, 23, 42, 0.07);
+}
+
+.preview-image-layer {
+  padding: 32px;
+}
+
+.preview-zoom-controls,
+.preview-status {
+  border-radius: 8px;
+}
+
+.legend-drag-handle,
+.element-drag-handle {
+  opacity: 0.48;
+  transition: opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.preview-box:hover .legend-drag-handle,
+.preview-box:hover .element-drag-handle,
+.legend-drag-handle.dragging,
+.element-drag-handle.dragging {
+  opacity: 0.94;
+}
+
+.settings-dialog,
+.table-help-dialog {
+  border-radius: 10px;
+}
+
+.settings-dialog-body {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-dialog fieldset,
+.settings-dialog .mt-field-details,
+.settings-dialog .overlay-details,
+.settings-dialog .section-title {
+  margin: 0;
+  border-radius: 8px;
+}
+
+.settings-dialog label {
+  grid-template-columns: minmax(84px, 0.34fr) minmax(0, 1fr);
+}
+
+.settings-dialog-footer {
+  position: sticky;
+  bottom: 0;
+}
+
+button.danger,
+button.subtle-danger,
+.small-danger {
+  color: #8a1f17;
+  border-color: rgba(173, 92, 82, 0.34);
+  background: linear-gradient(180deg, rgba(255, 250, 249, 0.94), rgba(255, 241, 238, 0.78));
+}
+
+button.danger:hover,
+button.subtle-danger:hover,
+.small-danger:hover {
+  color: #751b14;
+  border-color: rgba(166, 59, 45, 0.48);
+  background: linear-gradient(180deg, rgba(255, 248, 247, 0.98), rgba(255, 232, 228, 0.9));
+}
+
+body[data-platform="darwin"] .app-header,
+body[data-platform="darwin"] .workspace-toolbar,
+body[data-platform="darwin"] .status-bar,
+body[data-platform="darwin"] .settings-dialog,
+body[data-platform="darwin"] .preview-zoom-controls,
+body[data-platform="darwin"] .preview-status {
+  -webkit-backdrop-filter: blur(20px) saturate(1.32);
+  backdrop-filter: blur(20px) saturate(1.32);
+}
+
+body[data-platform="darwin"] .app-header {
+  min-height: 48px;
+  padding: 8px 18px;
+}
+
+body[data-platform="darwin"] .workspace-toolbar {
+  background: rgba(248, 251, 253, 0.58);
+}
+
+body[data-platform="darwin"] .settings-dialog {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+body[data-platform="win32"] {
+  --surface: #ffffff;
+  --surface-soft: #f7f9fc;
+  --surface-strong: #ffffff;
+  --line: rgba(98, 114, 137, 0.42);
+  --glass-blur: 0px;
+  background: #eef3f8;
+}
+
+body[data-platform="win32"] .app-header,
+body[data-platform="win32"] .workspace-toolbar,
+body[data-platform="win32"] .status-bar,
+body[data-platform="win32"] .settings-dialog,
+body[data-platform="win32"] .preview-zoom-controls,
+body[data-platform="win32"] .preview-status,
+body[data-platform="win32"] button {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body[data-platform="win32"] .workspace-toolbar {
+  background: #f8fbfd;
+  border-bottom-color: rgba(98, 114, 137, 0.42);
+}
+
+body[data-platform="win32"] .toolbar-group,
+body[data-platform="win32"] .plot-group,
+body[data-platform="win32"] .toolbar-context {
+  border-color: rgba(98, 114, 137, 0.34);
+  background: #ffffff;
+}
+
+body[data-platform="win32"] .settings-tool:hover,
+body[data-platform="win32"] .tool-tab:hover,
+body[data-platform="win32"] button:hover {
+  border-color: rgba(49, 95, 159, 0.54);
+  box-shadow: 0 0 0 1px rgba(49, 95, 159, 0.12), 0 3px 10px rgba(15, 23, 42, 0.08);
+}
+
+body[data-platform="win32"] .settings-dialog,
+body[data-platform="win32"] .table-help-dialog {
+  background: #ffffff;
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.2);
+}
+
+@media (max-width: 1120px) {
+  .workspace-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "plots context"
+      "settings settings";
+  }
+
+  .settings-toolbar {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
