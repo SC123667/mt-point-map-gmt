@@ -773,6 +773,10 @@ select:hover {
   display: none;
 }
 
+.terrain-custom-row.hidden {
+  display: none;
+}
+
 table {
   width: 100%;
   border-collapse: separate;

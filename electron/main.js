@@ -21,6 +21,7 @@ const {
   runGMT,
   saveScript,
   terrainEstimate,
+  terrainDataServer,
   terrainIntensity,
   terrainPaths,
   terrainRemoteName,
@@ -101,9 +102,17 @@ function configureMenu(win) {
               click: () => sendMenuAction(win, "menu:exportPdf")
             },
             {
+              label: "导出 EPS 矢量图...",
+              click: () => sendMenuAction(win, "menu:exportEps")
+            },
+            {
               label: "导出 PNG + PDF...",
               accelerator: "CmdOrCtrl+Shift+E",
               click: () => sendMenuAction(win, "menu:exportBoth")
+            },
+            {
+              label: "导出 PNG + PDF + EPS...",
+              click: () => sendMenuAction(win, "menu:exportAll")
             },
             {
               label: "保存 GMT 脚本...",
@@ -272,7 +281,7 @@ ipcMain.handle("data:applyMapping", (_event, payload) => {
 });
 
 ipcMain.handle("gmt:buildScript", (_event, payload) => {
-  return buildScript(payload.records, payload.config, outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf"]);
+  return buildScript(payload.records, payload.config, outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
 });
 
 ipcMain.handle("gmt:saveScript", async (_event, payload) => {
@@ -285,7 +294,7 @@ ipcMain.handle("gmt:saveScript", async (_event, payload) => {
     ]
   });
   if (result.canceled || !result.filePath) return null;
-  const script = buildScript(payload.records, payload.config, path.dirname(result.filePath), ["png", "pdf"]);
+  const script = buildScript(payload.records, payload.config, path.dirname(result.filePath), payload.formats || ["png", "pdf", "eps"]);
   fs.writeFileSync(result.filePath, script, "utf8");
   if (process.platform !== "win32") fs.chmodSync(result.filePath, 0o755);
   return result.filePath;
@@ -295,11 +304,16 @@ ipcMain.handle("gmt:export", async (_event, payload) => {
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
   const formats = payload.formats || ["png"];
-  const needsTitleOverlay = shouldOverlayTitle(payload.config);
+  const includesVector = formats.some(isVectorFormat);
+  const needsTitleOverlay = !includesVector && formats.includes("png") && shouldOverlayTitle(payload.config);
   const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
   const outputName = payload.config.outputName || "mt_point_map";
   const gmtWorkspace = createGMTWorkspace(outputDirectory, payload.config, outputName);
-  const script = buildScript(payload.records, gmtWorkspace.config, gmtWorkspace.directory, gmtFormats);
+  const config = {
+    ...gmtWorkspace.config,
+    forceGMTTitle: includesVector && shouldOverlayTitle(payload.config)
+  };
+  const script = buildScript(payload.records, config, gmtWorkspace.directory, gmtFormats);
   const result = runGMT(script, gmtWorkspace.directory, outputName, gmtFormats);
   if (result.ok && needsTitleOverlay) {
     await overlayNativeTitle(result, payload.config, outputName, formats);
@@ -626,6 +640,10 @@ function shouldOverlayTitle(config) {
   return title && needsNativeTextRendering(title);
 }
 
+function isVectorFormat(format) {
+  return ["pdf", "eps", "ps"].includes(String(format || "").toLowerCase());
+}
+
 async function overlayNativeTitle(result, config, outputName, requestedFormats) {
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文标题叠加失败：未找到 PNG 底图 ${pngPath}`);
@@ -783,6 +801,8 @@ function loadRenderer(win) {
       onMenuExportPng: (handler) => ipcRenderer.on("menu:exportPng", handler),
       onMenuExportPdf: (handler) => ipcRenderer.on("menu:exportPdf", handler),
       onMenuExportBoth: (handler) => ipcRenderer.on("menu:exportBoth", handler),
+      onMenuExportEps: (handler) => ipcRenderer.on("menu:exportEps", handler),
+      onMenuExportAll: (handler) => ipcRenderer.on("menu:exportAll", handler),
       onMenuSaveScript: (handler) => ipcRenderer.on("menu:saveScript", handler),
       onMenuDeleteOutputs: (handler) => ipcRenderer.on("menu:deleteOutputs", handler),
       onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),
@@ -811,11 +831,12 @@ function normalizeTerrainConfig(payload) {
   }
   config.terrainResolution = config.terrainResolution || "06m";
   config.terrainIntensity = terrainIntensity(config.terrainIntensity);
+  config.terrainDataServer = terrainDataServer(config.terrainDataServer);
   return config;
 }
 
 function deleteCurrentOutputs(outputDirectory, outputName) {
-  const extensions = process.platform === "win32" ? ["png", "pdf", "bat"] : ["png", "pdf", "gmt"];
+  const extensions = process.platform === "win32" ? ["png", "pdf", "eps", "bat"] : ["png", "pdf", "eps", "gmt"];
   const candidates = [
     ...extensions.map((extension) => path.join(outputDirectory, `${outputName}.${extension}`)),
     path.join(outputDirectory, "stations_points.tsv"),
@@ -879,11 +900,11 @@ function clearTerrainCache() {
   return { ok: true, message: result.stderr || result.stdout || "已清理 GMT 地形数据缓存。" };
 }
 
-function gmtChildEnv(gmtInfo) {
+function gmtChildEnv(gmtInfo, config = {}) {
   const env = {
     ...process.env,
     PATH: `${gmtInfo.binDir}${path.delimiter}${process.env.PATH || ""}`,
-    GMT_DATA_SERVER: process.env.GMT_DATA_SERVER || "oceania"
+    GMT_DATA_SERVER: terrainDataServer(config.terrainDataServer || process.env.GMT_DATA_SERVER)
   };
   if (gmtInfo.gsLib) env.GS_LIB = gmtInfo.gsLib;
   return env;
@@ -994,7 +1015,7 @@ class TerrainPrepareTask {
     this.child = spawn(this.gmtInfo.path, args, {
       cwd: this.outputDirectory,
       encoding: "utf8",
-      env: gmtChildEnv(this.gmtInfo)
+      env: gmtChildEnv(this.gmtInfo, this.config)
     });
     const onData = (chunk) => {
       this.lastOutput = String(chunk).trim() || this.lastOutput;
@@ -1351,7 +1372,7 @@ class SrtmTerrainPrepareTask {
     this.child = spawn(this.gmtInfo.path, args, {
       cwd: this.outputDirectory,
       encoding: "utf8",
-      env: gmtChildEnv(this.gmtInfo)
+      env: gmtChildEnv(this.gmtInfo, this.config)
     });
     const onData = (chunk) => {
       this.lastOutput = String(chunk).trim() || this.lastOutput;

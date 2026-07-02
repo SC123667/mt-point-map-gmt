@@ -102,6 +102,9 @@ try {
   }, scriptDir, ["png"]);
 
   assert(script.includes("Structural line overlays"));
+  assert(script.includes("export GMT_DATA_SERVER=https://mirrors.ustc.edu.cn/gmtdata"));
+  assert(script.includes("gmt begin"));
+  assert(script.includes("png E300"));
   assert(script.includes("gmt plot"));
   assert(script.includes("gmt legend"));
   assert(!script.includes("...(config"));
@@ -144,6 +147,45 @@ try {
   assert(strikeScript.includes("-W1.60p,#984ea3"));
   assert(strikeLegend.includes("S 0.14c s 0.24c #2b83ba 0.50p,#333333 0.45c Site"));
   assert(strikeLegend.includes("S 0.14c - 0.42c - 1.60p,#984ea3 0.45c Impedance strike"));
+
+  const vectorScriptDir = path.join(tmp, "vector-script-output");
+  const vectorScript = buildScript([
+    { name: "V01", lon: 101.0, lat: 35.0 },
+    { name: "V02", lon: 101.2, lat: 35.1 }
+  ], {
+    title: "矢量图测试",
+    forceGMTTitle: true,
+    plotType: "stationMap",
+    region: "100.9/101.3/34.9/35.2",
+    projection: "M16c",
+    frame: "af",
+    showGrid: true,
+    showLabels: false,
+    showScale: false,
+    showNorthArrow: false,
+    pointSymbol: "c",
+    pointSize: 0.22,
+    pointFill: "#d7191c",
+    pointPenWidth: 0.35,
+    pointPenColor: "black",
+    labelFontSize: 8,
+    labelColor: "black",
+    labelDX: 0.08,
+    labelDY: 0.08,
+    showTerrain: true,
+    terrainResolution: "06m",
+    terrainIntensity: 0.65,
+    terrainAllowDownload: true,
+    terrainDataServer: "https://mirrors.ustc.edu.cn/gmtdata",
+    outputName: "mt_vector_map",
+    pngDpi: 450,
+    faultLayers: [],
+    legend: { show: false }
+  }, vectorScriptDir, ["png", "pdf", "eps"]);
+  assert(vectorScript.includes("gmt begin"));
+  assert(vectorScript.includes("png,pdf,eps E450"));
+  assert(vectorScript.includes("gmt set GMT_DATA_SERVER https://mirrors.ustc.edu.cn/gmtdata"));
+  assert(vectorScript.includes("-B+"));
 
   console.log("Fault overlay and legend tests passed");
 } finally {

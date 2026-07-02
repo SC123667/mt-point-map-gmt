@@ -177,6 +177,14 @@
           </label>
           <label>阴影强度<input id="terrainIntensityInput" type="number" min="0.1" max="1.5" step="0.05" value="0.65" /></label>
           <label class="check"><input id="terrainAllowDownloadInput" type="checkbox" checked />允许联网下载缺失地形数据</label>
+          <label>下载源
+            <select id="terrainDataServerInput">
+              <option value="https://mirrors.ustc.edu.cn/gmtdata" selected>中国镜像 USTC</option>
+              <option value="oceania">官方 Oceania</option>
+              <option value="__custom__">自定义地址</option>
+            </select>
+          </label>
+          <label id="terrainDataServerCustomRow" class="terrain-custom-row hidden">自定义<input id="terrainDataServerCustomInput" placeholder="https://..." /></label>
           <p id="localTerrainText" class="field-note">未导入本地 GRD 地形图</p>
           <div class="button-row terrain-actions">
             <button id="chooseLocalTerrainBtn" type="button">导入本地 GRD</button>
@@ -341,6 +349,7 @@
           <label class="check"><input id="showGridInput" type="checkbox" checked />经纬网</label>
           <label class="check"><input id="showScaleInput" type="checkbox" checked />比例尺</label>
           <label class="check"><input id="showNorthInput" type="checkbox" checked />指北针</label>
+          <label>PNG DPI<input id="pngDpiInput" type="number" min="72" max="1200" step="10" value="300" /></label>
           <label>输出名<input id="outputNameInput" value="mt_point_map" /></label>
         </fieldset>
       </section>
@@ -348,7 +357,7 @@
 
     <footer class="status-bar">
       <span id="outputPath">输出目录将在导出后显示</span>
-      <span id="versionText">v0.8.1</span>
+      <span id="versionText">v0.9.0</span>
     </footer>
 
     <dialog id="settingsDialog" class="settings-dialog">

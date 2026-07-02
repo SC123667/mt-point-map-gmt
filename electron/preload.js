@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("mtApp", {
   onMenuExportPng: (handler) => ipcRenderer.on("menu:exportPng", handler),
   onMenuExportPdf: (handler) => ipcRenderer.on("menu:exportPdf", handler),
   onMenuExportBoth: (handler) => ipcRenderer.on("menu:exportBoth", handler),
+  onMenuExportEps: (handler) => ipcRenderer.on("menu:exportEps", handler),
+  onMenuExportAll: (handler) => ipcRenderer.on("menu:exportAll", handler),
   onMenuSaveScript: (handler) => ipcRenderer.on("menu:saveScript", handler),
   onMenuDeleteOutputs: (handler) => ipcRenderer.on("menu:deleteOutputs", handler),
   onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),

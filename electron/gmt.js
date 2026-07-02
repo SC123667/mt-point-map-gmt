@@ -9,6 +9,11 @@ const { DEFAULT_LEGEND_FILE, buildLegendEntries, legendCommand, writeLegendFile 
 
 const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
+const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
+const OFFICIAL_TERRAIN_DATA_SERVER = "oceania";
+const DEFAULT_PNG_DPI = 300;
+const MIN_PNG_DPI = 72;
+const MAX_PNG_DPI = 1200;
 const TERRAIN_RESOLUTIONS = {
   "20m": { seconds: 1200, remote: "@earth_relief_20m", label: "20 分，约 37 km", source: "gmt" },
   "10m": { seconds: 600, remote: "@earth_relief_10m", label: "10 分，约 18 km", source: "gmt" },
@@ -308,7 +313,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const gridPrefix = config.showGrid ? "g" : "";
   const frameOption = `-B${gridPrefix}${config.frame}`;
   const title = (config.title || "").trim();
-  const titleOption = title && !needsNativeTextRendering(title) ? ` -B+t${quote(title)}` : "";
+  const titleOption = title && (!needsNativeTextRendering(title) || config.forceGMTTitle) ? ` -B+t${quote(title)}` : "";
   const outputPrefix = shell === "bat" ? config.outputName || "mt_point_map" : path.join(outputDirectory, config.outputName || "mt_point_map");
   const pointsPathForScript = shell === "bat" ? "stations_points.tsv" : pointsPath;
   const labelsPathForScript = shell === "bat" ? "stations_labels.tsv" : labelsPath;
@@ -316,7 +321,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
   const scale = scaleForRegion(regionValues);
   const gmt = resolveGMT();
-  const environmentLines = gmtEnvironmentLines(gmt, shell);
+  const environmentLines = gmtEnvironmentLines(gmt, shell, config);
   const terrain = terrainScriptParts(config, region, outputDirectory, shell);
   const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
@@ -327,7 +332,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       "setlocal enabledelayedexpansion",
       "cd /d \"%~dp0\"",
       ...environmentLines,
-      `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
+      gmtBeginCommand(outputPrefix, formats, config),
       "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
       ...terrain.preCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
@@ -348,7 +353,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     "set -euo pipefail",
     ...environmentLines,
     "",
-    `gmt begin ${quote(outputPrefix)} ${quote(formats.join(","))}`,
+    `  ${gmtBeginCommand(outputPrefix, formats, config)}`,
     "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
     ...terrain.preCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
@@ -528,7 +533,7 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const shell = process.platform === "win32" ? "bat" : "sh";
   const outputPrefix = shell === "bat" ? config.outputName || "mt_response_curve" : path.join(outputDirectory, config.outputName || "mt_response_curve");
   const gmt = resolveGMT();
-  const environmentLines = gmtEnvironmentLines(gmt, shell);
+  const environmentLines = gmtEnvironmentLines(gmt, shell, config);
   const curve = buildCurveFiles(station, outputDirectory);
   const q = (value) => quote(value);
   const f = (name) => shell === "bat" ? name : path.join(outputDirectory, name);
@@ -555,13 +560,13 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   ].filter(Boolean);
   if (shell === "bat") {
     return ["@echo off", "setlocal enabledelayedexpansion", "cd /d \"%~dp0\"", ...environmentLines,
-      `gmt begin ${q(config.outputName || "mt_response_curve")} ${q(formats.join(","))}`,
+      gmtBeginCommand(config.outputName || "mt_response_curve", formats, config),
       "gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
       ...commands,
       "gmt end", ""].filter((line) => line !== "-").join("\r\n");
   }
   return ["#!/usr/bin/env bash", "set -euo pipefail", ...environmentLines, "",
-    `gmt begin ${q(outputPrefix)} ${q(formats.join(","))}`,
+    gmtBeginCommand(outputPrefix, formats, config),
     "  gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
     ...commands,
     "gmt end", ""].join("\n");
@@ -680,7 +685,7 @@ function terrainScriptParts(config, region, outputDirectory, shell) {
   const cpt = terrainCpt(config.terrainCpt);
   const prefix = shell === "bat" ? "" : "  ";
   const preCommands = [];
-  preCommands.push(`${prefix}gmt set GMT_DATA_SERVER oceania`);
+  preCommands.push(`${prefix}gmt set GMT_DATA_SERVER ${quote(terrainDataServer(config.terrainDataServer))}`);
   preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
   if (localGrid) {
     if (!fs.existsSync(shade)) preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
@@ -739,8 +744,46 @@ function quote(value) {
   return `'${text.replace(/'/g, "'\"'\"'")}'`;
 }
 
+function gmtBeginCommand(outputPrefix, formats, config = {}) {
+  const formatText = normalizeFormats(formats).join(",");
+  const options = psconvertOptionsForFormats(formats, config);
+  return `gmt begin ${quote(outputPrefix)} ${quote(formatText)}${options ? ` ${options}` : ""}`;
+}
+
+function normalizeFormats(formats) {
+  const values = Array.isArray(formats) && formats.length ? formats : ["png"];
+  const allowed = new Set(["bmp", "eps", "jpg", "pdf", "png", "PNG", "ppm", "ps", "tif"]);
+  const cleaned = values
+    .map((format) => String(format || "").trim())
+    .filter((format) => allowed.has(format.split("+")[0]));
+  return cleaned.length ? [...new Set(cleaned)] : ["png"];
+}
+
+function psconvertOptionsForFormats(formats, config = {}) {
+  const hasRaster = normalizeFormats(formats).some((format) => {
+    const base = format.split("+")[0];
+    return ["bmp", "jpg", "png", "PNG", "ppm", "tif"].includes(base);
+  });
+  return hasRaster ? `E${pngDpi(config.pngDpi)}` : "";
+}
+
+function pngDpi(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_PNG_DPI;
+  return Math.max(MIN_PNG_DPI, Math.min(MAX_PNG_DPI, Math.round(numeric)));
+}
+
 function needsNativeTextRendering(value) {
   return /[^\x00-\x7F]/.test(String(value || ""));
+}
+
+function terrainDataServer(value) {
+  const text = String(value || "").trim();
+  if (!text) return DEFAULT_TERRAIN_DATA_SERVER;
+  if (text === "official" || text === OFFICIAL_TERRAIN_DATA_SERVER) return OFFICIAL_TERRAIN_DATA_SERVER;
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(text)) return text;
+  if (/^[A-Za-z0-9_.:-]+$/.test(text)) return text;
+  return DEFAULT_TERRAIN_DATA_SERVER;
 }
 
 function parseRegion(region) {
@@ -965,16 +1008,19 @@ function ghostscriptLibraryPath(binDir) {
   return parts.join(path.delimiter);
 }
 
-function gmtEnvironmentLines(gmt, shell) {
+function gmtEnvironmentLines(gmt, shell, config = {}) {
+  const dataServer = terrainDataServer(config.terrainDataServer || process.env.GMT_DATA_SERVER);
   if (!gmt.available || !gmt.binDir) return [];
   if (shell === "bat") {
     return [
       `set "PATH=${gmt.binDir};%PATH%"`,
+      `set "GMT_DATA_SERVER=${dataServer}"`,
       gmt.gsLib ? `set "GS_LIB=${gmt.gsLib}"` : ""
     ].filter(Boolean);
   }
   return [
     `export PATH=${quote(gmt.binDir)}:"$PATH"`,
+    `export GMT_DATA_SERVER=${quote(dataServer)}`,
     gmt.gsLib ? `export GS_LIB=${gmt.gsLib.split(path.delimiter).map(quote).join(":")}` : ""
   ].filter(Boolean);
 }
@@ -999,6 +1045,9 @@ module.exports = {
   terrainResolutionSeconds,
   terrainSource,
   terrainIntensity,
+  terrainDataServer,
+  pngDpi,
+  normalizeFormats,
   DEFAULT_OVERLAY_FILE,
   DEFAULT_LEGEND_FILE,
   needsNativeTextRendering

@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.0 - 2026-07-03
+
+- Added a terrain download-source selector with the USTC China GMT mirror as the default, plus official and custom server options.
+- Added EPS vector export and an all-formats export path for PNG, vector PDF, and EPS.
+- Kept PDF/EPS export on the GMT vector pipeline instead of rasterizing the rendered PNG into vector files.
+- Added configurable PNG DPI for GMT raster export.
+- Updated saved GMT scripts so they can generate PNG, PDF, and EPS outputs with the selected PNG DPI and terrain data server.
+
 ## v0.8.1 - 2026-07-03
 
 - Refined the preview-first workspace with macOS-style translucent glass panels, softer depth, and a more polished toolbar.

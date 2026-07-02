@@ -53,6 +53,8 @@ const PREVIEW_MAX_ZOOM = 16;
 const PREVIEW_WHEEL_SENSITIVITY = 0.00075;
 const AUTO_PREVIEW_DELAY_MS = 700;
 const CUSTOM_COLOR_VALUE = "__custom__";
+const CUSTOM_TERRAIN_SERVER_VALUE = "__custom__";
+const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
 const COLOR_OPTIONS = [
   ["#d7191c", "红色 #d7191c"],
   ["#2b83ba", "蓝色 #2b83ba"],
@@ -107,16 +109,17 @@ const ids = [
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
-  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
-  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
-  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
-  "terrainAllowDownloadInput", "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
-  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
-  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "chooseLocalTerrainBtn", "clearLocalTerrainBtn", "localTerrainText",
+	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
+	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
+	  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
+	  "terrainAllowDownloadInput", "terrainDataServerInput", "terrainDataServerCustomRow", "terrainDataServerCustomInput",
+    "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
+	  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
+	  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "chooseLocalTerrainBtn", "clearLocalTerrainBtn", "localTerrainText",
   "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
   "labelDXInput", "labelDYInput",
-  "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput",
+	  "showGridInput", "showScaleInput", "showNorthInput", "pngDpiInput", "outputNameInput",
   "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
   "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput", "legendPositionHint",
   "legendStationLabelInput", "legendOverlayLabelInput",
@@ -131,6 +134,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   populateColorControls();
   wireEvents();
   renderLocalTerrainGrid();
+  renderTerrainDataServerCustom();
   renderFaultLayers();
   setPlotType("stationMap");
   await refreshStatus();
@@ -149,6 +153,8 @@ function wireEvents() {
   window.mtApp.onMenuExportPng?.(() => exportMap(["png"], true));
   window.mtApp.onMenuExportPdf?.(() => exportMap(["pdf"], true));
   window.mtApp.onMenuExportBoth?.(() => exportMap(["png", "pdf"], true));
+  window.mtApp.onMenuExportEps?.(() => exportMap(["eps"], true));
+  window.mtApp.onMenuExportAll?.(() => exportMap(["png", "pdf", "eps"], true));
   window.mtApp.onMenuSaveScript?.(saveScript);
   window.mtApp.onMenuDeleteOutputs?.(deleteCurrentOutputs);
   window.mtApp.onMenuOpenSettingsPanel?.((panel) => openSettingsPanel(panel));
@@ -205,10 +211,11 @@ function wireEvents() {
   bind(el.chooseLocalTerrainBtn, "click", chooseLocalTerrainGrid);
   bind(el.clearLocalTerrainBtn, "click", clearLocalTerrainGrid);
   bind(el.terrainDocsBtn, "click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
-  [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput].forEach((control) => {
+  [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput, el.terrainDataServerInput, el.terrainDataServerCustomInput].forEach((control) => {
     bind(control, "input", updateTerrainEstimate);
     bind(control, "change", updateTerrainEstimate);
   });
+  bind(el.terrainDataServerInput, "change", renderTerrainDataServerCustom);
   bind(el.recheckBtn, "click", recheckGMT);
   bind(el.installBtn, "click", installGMT);
   bind(el.pauseDownloadBtn, "click", () => window.mtApp.pauseGMTDownload());
@@ -652,6 +659,7 @@ function readConfig() {
     terrainCpt: el.terrainCptInput.value,
     terrainIntensity: Number(el.terrainIntensityInput.value),
     terrainAllowDownload: el.terrainAllowDownloadInput.checked,
+    terrainDataServer: readTerrainDataServer(),
     localTerrainGridPath: state.terrain.localGridPath,
     terrainGridPath: state.terrain.localGridPath || state.terrain.gridPath,
     terrainShadePath: state.terrain.shadePath,
@@ -676,7 +684,8 @@ function readConfig() {
       borderColor: readColor("legendBorderColor"),
       borderWidth: Number(el.legendBorderWidthInput.value)
     },
-    outputName: el.outputNameInput.value.trim() || "mt_point_map"
+    outputName: el.outputNameInput.value.trim() || "mt_point_map",
+    pngDpi: clamp(Math.round(Number(el.pngDpiInput.value) || 300), 72, 1200)
   };
   if (state.plotType === "responseCurve") config.showTerrain = false;
   return config;
@@ -1067,6 +1076,18 @@ async function clearTerrainCache() {
   notify(result.message);
 }
 
+function readTerrainDataServer() {
+  if (el.terrainDataServerInput.value === CUSTOM_TERRAIN_SERVER_VALUE) {
+    return el.terrainDataServerCustomInput.value.trim() || DEFAULT_TERRAIN_DATA_SERVER;
+  }
+  return el.terrainDataServerInput.value || DEFAULT_TERRAIN_DATA_SERVER;
+}
+
+function renderTerrainDataServerCustom() {
+  const isCustom = el.terrainDataServerInput.value === CUSTOM_TERRAIN_SERVER_VALUE;
+  el.terrainDataServerCustomRow.classList.toggle("hidden", !isCustom);
+}
+
 async function saveScript() {
   if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
@@ -1084,7 +1105,7 @@ async function saveScript() {
   }
   let saved;
   try {
-    saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory });
+    saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory, formats: ["png", "pdf", "eps"] });
   } catch (error) {
     notify(error.message || String(error));
     return;
