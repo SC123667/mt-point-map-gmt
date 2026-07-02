@@ -23,6 +23,42 @@
   ${endif}
 !macroend
 
+!macro cwnPrepareLegacyInstallRoot ROOT_KEY
+  DetailPrint "Preparing previous MT Point Map GMT installation under ${ROOT_KEY}..."
+
+  !insertmacro cwnCloseMtProcesses
+  Sleep 800
+
+  ClearErrors
+  !insertmacro readReg $R8 "${ROOT_KEY}" "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${if} $R8 == ""
+    StrCpy $R8 "$INSTDIR"
+  ${endif}
+
+  ${if} $R8 != ""
+  ${andIf} ${FileExists} "$R8\*.*"
+    SetOutPath "$TEMP"
+    RMDir /r "$PLUGINSDIR\legacy-install"
+    ClearErrors
+    Rename "$R8" "$PLUGINSDIR\legacy-install"
+    ${if} ${errors}
+      ClearErrors
+      RMDir /r "$R8"
+      ClearErrors
+    ${endif}
+  ${endif}
+
+  DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY}"
+  !ifdef UNINSTALL_REGISTRY_KEY_2
+    DeleteRegKey ${ROOT_KEY} "${UNINSTALL_REGISTRY_KEY_2}"
+  !endif
+  DeleteRegKey ${ROOT_KEY} "${INSTALL_REGISTRY_KEY}"
+
+  CreateDirectory "$INSTDIR"
+  StrCpy $R0 0
+  ClearErrors
+!macroend
+
 !macro customInit
   !insertmacro cwnCloseMtProcesses
   Sleep 800

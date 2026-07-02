@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.3 - 2026-07-03
+
+- Replaced the Windows setup install section with a safe legacy-cleanup path that does not call the old installed uninstaller during updates.
+- Added installer-side removal of stale per-user install directories and uninstall registry entries before extracting the new app.
+- Strengthened the Windows install-repair batch file so it can remove stale install folders and matching uninstall entries before launching setup.
+
 ## v0.9.2 - 2026-07-03
 
 - Strengthened the Windows installer update path so hidden residual processes are closed by executable name, executable path, and command-line match before installing.

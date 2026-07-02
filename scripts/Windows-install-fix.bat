@@ -9,6 +9,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Pr
 
 timeout /t 2 /nobreak >nul
 
+echo Cleaning stale install folder and uninstall records...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$paths = @((Join-Path $env:LOCALAPPDATA 'Programs\mt-point-map-gmt'), (Join-Path $env:LOCALAPPDATA 'Programs\MT点位图制作工具—GMT')); foreach ($path in $paths) { if (Test-Path $path) { Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue } }; $roots = @('HKCU:\Software', 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'); foreach ($root in $roots) { Get-ChildItem $root -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue; if (($p.DisplayName -like '*MT点位图制作工具*GMT*') -or ($p.DisplayName -like '*MT Point Map GMT*') -or ($p.InstallLocation -like '*mt-point-map-gmt*') -or ($p.UninstallString -like '*mt-point-map-gmt*')) { Remove-Item $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue } } }"
+
 set "SETUP="
 for %%F in ("%~dp0*win-x64-setup.exe") do set "SETUP=%%~fF"
 
