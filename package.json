@@ -1,6 +1,6 @@
 {
   "name": "mt-point-map-gmt",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "MT点位图制作工具-GMT / Cross-platform GMT desktop tool for magnetotelluric station maps, EDI parsing, phase tensor, tipper, and MT sounding curves.",
   "main": "electron/main.js",
   "author": "CWN",
@@ -72,6 +72,7 @@
     },
     "nsis": {
       "artifactName": "${productName}-${version}-win-${arch}-setup.${ext}",
+      "include": "build/installer.nsh",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

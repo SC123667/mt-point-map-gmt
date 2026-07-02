@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.1 - 2026-07-03
+
+- Fixed Windows update installs by adding an installer hook that closes old `MTPointMapGMT.exe` processes before overwriting the app.
+- Added compatibility handling for older Windows builds that may still use the Chinese executable name during updates.
+
 ## v0.9.0 - 2026-07-03
 
 - Added a terrain download-source selector with the USTC China GMT mirror as the default, plus official and custom server options.
