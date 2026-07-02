@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.9 - 2026-07-03
+
+- Added `.mtgmt` project save/open support for restoring imported data, filters, terrain settings, structural overlays, legend settings, and plotting parameters.
+- Added a data quality panel with counts for duplicate station names, duplicate coordinates, invalid coordinates, missing MT responses, out-of-frame stations, and exportable skipped-EDI lists.
+- Added large-dataset plotting filters by survey line, station-name prefix, current map region, and MT-response availability while preserving the full imported dataset.
+- Added cancellable GMT preview/export rendering with stage progress messages surfaced in the preview area.
+- Added terrain cache management by cached resolution, plus first-pass plotting presets for paper, field, terrain, structural-line, and phase-tensor workflows.
+- Added finer label and map-element controls, including MT-only/prefix/every-N station labels and selectable scale-bar/north-arrow corners.
+
 ## v0.9.8 - 2026-07-03
 
 - Moved large point/Excel/EDI imports, field remapping, and structural-line summaries into an isolated import worker so thousand-file datasets do not block the Electron main process.

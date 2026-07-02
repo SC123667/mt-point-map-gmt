@@ -84,8 +84,12 @@ try {
     frame: "af",
     showGrid: true,
     showLabels: true,
+    labelMode: "everyN",
+    labelEvery: 2,
     showScale: true,
+    scalePosition: "BL",
     showNorthArrow: true,
+    northPosition: "TL",
     pointSymbol: "c",
     pointSize: 0.22,
     pointFill: "#d7191c",
@@ -106,8 +110,11 @@ try {
   assert(script.includes("gmt begin"));
   assert(script.includes("png E300"));
   assert(script.includes("gmt plot"));
+  assert(script.includes("-LjBL"));
+  assert(script.includes("-TdjTL"));
   assert(script.includes("gmt legend"));
   assert(!script.includes("...(config"));
+  assert.strictEqual(fs.readFileSync(path.join(scriptDir, "stations_labels.tsv"), "utf8").trim().split(/\n/).length, 1);
   assert(fs.existsSync(path.join(scriptDir, "fault_overlays.tsv")));
   assert(fs.existsSync(path.join(scriptDir, "map_legend.txt")));
   assert(fs.readFileSync(path.join(scriptDir, "map_legend.txt"), "utf8").includes("0.45c Site"));

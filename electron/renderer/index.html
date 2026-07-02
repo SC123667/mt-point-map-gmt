@@ -59,6 +59,8 @@
       </div>
       <div class="settings-toolbar" aria-label="参数模块">
         <button class="settings-tool" data-settings-panel="data" title="数据" type="button">数据</button>
+        <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">质检</button>
+        <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选</button>
         <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段</button>
         <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
         <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
@@ -68,6 +70,7 @@
         <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">标签</button>
         <button class="settings-tool" data-settings-panel="elements" title="图件元素" type="button">元素</button>
         <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
+        <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">预设</button>
       </div>
     </nav>
 
@@ -119,6 +122,30 @@
           </thead>
           <tbody id="stationRows"></tbody>
         </table>
+
+        <fieldset data-settings-panel="quality">
+          <legend>数据质检</legend>
+          <div id="qualitySummary" class="quality-summary"></div>
+          <div id="qualityIssueList" class="quality-issues"></div>
+          <div class="button-row">
+            <button id="exportSkippedEdiBtn" type="button">导出跳过 EDI</button>
+          </div>
+        </fieldset>
+
+        <fieldset data-settings-panel="filters">
+          <legend>筛选/分组绘图</legend>
+          <label>测线
+            <select id="filterLineInput"></select>
+          </label>
+          <label>测点名前缀<input id="filterPrefixInput" placeholder="例如 L11 或 A0" /></label>
+          <label class="check"><input id="filterRegionOnlyInput" type="checkbox" />仅绘制当前图幅范围内测点</label>
+          <label class="check"><input id="filterMtOnlyInput" type="checkbox" />仅绘制包含 MT 响应的测点</label>
+          <p id="filterSummary" class="field-note">未启用筛选</p>
+          <div class="button-row">
+            <button id="applyFilterBtn" type="button">应用筛选</button>
+            <button id="clearFilterBtn" type="button">清除筛选</button>
+          </div>
+        </fieldset>
       </section>
 
       <section class="pane preview-pane">
@@ -131,6 +158,7 @@
           </div>
           <button id="legendDragHandle" class="legend-drag-handle hidden" type="button" aria-label="拖动图例位置"></button>
           <span id="previewStatus" class="preview-status hidden" aria-live="polite"></span>
+          <button id="cancelRenderBtn" class="render-cancel hidden" type="button">取消绘图</button>
           <span id="previewPlaceholder">导入点位后生成预览</span>
         </div>
         <details>
@@ -214,6 +242,29 @@
             <button id="clearTerrainCacheBtn" type="button">清理 GMT 地形缓存</button>
             <button id="terrainDocsBtn" type="button">地形数据说明</button>
           </div>
+          <details class="legend-style-details">
+            <summary>缓存管理</summary>
+            <p id="terrainCacheSummaryText" class="field-note">尚未扫描地形缓存</p>
+            <label>分辨率
+              <select id="terrainCacheResolutionInput"></select>
+            </label>
+            <div class="button-row terrain-actions">
+              <button id="refreshTerrainCacheBtn" type="button">刷新缓存</button>
+              <button id="deleteTerrainCacheResolutionBtn" type="button">删除该分辨率</button>
+            </div>
+          </details>
+        </fieldset>
+
+        <fieldset class="map-settings" data-settings-panel="presets">
+          <legend>绘图模板/预设</legend>
+          <div class="preset-grid">
+            <button class="preset-button" data-preset="paperMono" type="button">论文黑白图</button>
+            <button class="preset-button" data-preset="fieldQuick" type="button">野外快速图</button>
+            <button class="preset-button" data-preset="terrainColor" type="button">带地形彩色图</button>
+            <button class="preset-button" data-preset="faultMap" type="button">构造线图</button>
+            <button class="preset-button" data-preset="phaseTensor" type="button">相位张量图</button>
+          </div>
+          <p class="field-note">预设会修改当前绘图参数并自动更新预览，不会删除已导入数据。</p>
         </fieldset>
 
         <fieldset class="analysis-settings" data-settings-panel="mtParams">
@@ -338,6 +389,16 @@
         <fieldset class="map-settings" data-settings-panel="labels">
           <legend>测点标签</legend>
           <label class="check"><input id="showLabelsInput" type="checkbox" checked />显示测点名</label>
+          <label>标签范围
+            <select id="labelModeInput">
+              <option value="all" selected>全部测点</option>
+              <option value="mtOnly">仅有 MT 响应</option>
+              <option value="prefix">按测点名前缀</option>
+              <option value="everyN">每 N 个测点</option>
+            </select>
+          </label>
+          <label>标签前缀<input id="labelPrefixInput" placeholder="例如 L11" /></label>
+          <label>每 N 个<input id="labelEveryInput" type="number" min="1" max="1000" step="1" value="5" /></label>
           <label>字号 pt<input id="labelSizeInput" type="number" min="5" max="18" step="0.5" value="8" /></label>
           <label>文字色
             <span class="color-control">
@@ -353,7 +414,23 @@
           <legend>图件元素</legend>
           <label class="check"><input id="showGridInput" type="checkbox" checked />经纬网</label>
           <label class="check"><input id="showScaleInput" type="checkbox" checked />比例尺</label>
+          <label>比例尺位置
+            <select id="scalePositionInput">
+              <option value="BR" selected>右下</option>
+              <option value="BL">左下</option>
+              <option value="TR">右上</option>
+              <option value="TL">左上</option>
+            </select>
+          </label>
           <label class="check"><input id="showNorthInput" type="checkbox" checked />指北针</label>
+          <label>指北针位置
+            <select id="northPositionInput">
+              <option value="TR" selected>右上</option>
+              <option value="TL">左上</option>
+              <option value="BR">右下</option>
+              <option value="BL">左下</option>
+            </select>
+          </label>
           <label>PNG DPI<input id="pngDpiInput" type="number" min="72" max="1200" step="10" value="300" /></label>
           <label>输出名<input id="outputNameInput" value="mt_point_map" /></label>
         </fieldset>

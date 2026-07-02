@@ -1,10 +1,18 @@
 const state = {
   parsed: null,
+  allRecords: [],
   records: [],
   columns: [],
   mapping: null,
   plotType: "stationMap",
   outputDirectory: "",
+  projectPath: "",
+  filters: {
+    line: "",
+    prefix: "",
+    regionOnly: false,
+    mtOnly: false
+  },
   terrain: {
     key: "",
     pendingKey: "",
@@ -90,6 +98,8 @@ const TERRAIN_RESOLUTIONS = {
 const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
 const SETTINGS_PANELS = {
   data: "数据",
+  quality: "数据质检",
+  filters: "筛选/分组绘图",
   fields: "字段识别",
   mtFields: "MT 响应字段",
   frame: "图幅",
@@ -98,14 +108,17 @@ const SETTINGS_PANELS = {
   symbol: "点位符号",
   labels: "测点标签",
   elements: "图件元素",
-  mtParams: "MT 图件参数"
+  mtParams: "MT 图件参数",
+  presets: "绘图模板/预设"
 };
 
 const ids = [
-  "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
+  "appStatus", "dataSummary", "qualitySummary", "qualityIssueList", "exportSkippedEdiBtn",
+  "filterLineInput", "filterPrefixInput", "filterRegionOnlyInput", "filterMtOnlyInput", "filterSummary", "applyFilterBtn", "clearFilterBtn",
+  "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "previewImageLayer", "previewSelection", "previewZoomControls", "previewZoomLabel", "previewFitBtn", "previewPlaceholder",
-  "previewStatus", "legendDragHandle",
+  "previewStatus", "cancelRenderBtn", "legendDragHandle",
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
@@ -123,10 +136,11 @@ const ids = [
     "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
 	  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
 	  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "chooseLocalTerrainBtn", "clearLocalTerrainBtn", "localTerrainText",
+    "terrainCacheSummaryText", "terrainCacheResolutionInput", "refreshTerrainCacheBtn", "deleteTerrainCacheResolutionBtn",
   "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
-  "labelDXInput", "labelDYInput",
-	  "showGridInput", "showScaleInput", "showNorthInput", "pngDpiInput", "outputNameInput",
+  "labelModeInput", "labelPrefixInput", "labelEveryInput", "labelDXInput", "labelDYInput",
+	  "showGridInput", "showScaleInput", "scalePositionInput", "showNorthInput", "northPositionInput", "pngDpiInput", "outputNameInput",
   "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
   "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput", "legendPositionHint",
   "legendStationLabelInput", "legendOverlayLabelInput",
@@ -155,6 +169,8 @@ function wireEvents() {
   initWindowControls();
   window.mtApp.onMenuOpenFile(openPointFile);
   window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
+  window.mtApp.onMenuOpenProject?.(openProjectFile);
+  window.mtApp.onMenuSaveProject?.(saveProjectFile);
   window.mtApp.onMenuLoadSample(loadSampleData);
   window.mtApp.onMenuChooseOutputDirectory(chooseOutputDirectory);
   window.mtApp.onMenuShowTableHelp?.(showTableHelp);
@@ -178,6 +194,9 @@ function wireEvents() {
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
   bind(el.closeTableHelpBtn, "click", () => el.tableHelpDialog.close());
   bind(el.applyMappingBtn, "click", () => applyMapping({ autoPreview: true }));
+  bind(el.exportSkippedEdiBtn, "click", exportSkippedEdiList);
+  bind(el.applyFilterBtn, "click", () => applyFiltersFromUI({ autoPreview: true }));
+  bind(el.clearFilterBtn, "click", () => clearFilters({ autoPreview: true }));
   bind(el.settingsCloseBtn, "click", closeSettingsDialog);
   bind(el.settingsCancelBtn, "click", closeSettingsDialog);
   bind(el.settingsConfirmBtn, "click", confirmSettingsDialog);
@@ -191,6 +210,7 @@ function wireEvents() {
     scheduleAutoPreview("图幅范围已更新，正在自动绘制预览...", { delay: 100 });
   });
   bind(el.previewBtn, "click", () => exportMap(["png"], false));
+  bind(el.cancelRenderBtn, "click", cancelCurrentRender);
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
   bind(el.exportBothBtn, "click", () => exportMap(["png", "pdf"], true));
@@ -216,6 +236,8 @@ function wireEvents() {
   bind(el.cancelTerrainBtn, "click", () => window.mtApp.cancelTerrain());
   bind(el.deleteTerrainBtn, "click", deleteLocalTerrain);
   bind(el.clearTerrainCacheBtn, "click", clearTerrainCache);
+  bind(el.refreshTerrainCacheBtn, "click", refreshTerrainCacheSummary);
+  bind(el.deleteTerrainCacheResolutionBtn, "click", deleteTerrainCacheResolution);
   bind(el.chooseLocalTerrainBtn, "click", chooseLocalTerrainGrid);
   bind(el.clearLocalTerrainBtn, "click", clearLocalTerrainGrid);
   bind(el.terrainDocsBtn, "click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
@@ -231,6 +253,10 @@ function wireEvents() {
   bind(el.cancelDownloadBtn, "click", () => window.mtApp.cancelGMTDownload());
   window.mtApp.onGMTDownloadProgress(renderDownloadProgress);
   window.mtApp.onTerrainProgress(renderTerrainProgress);
+  window.mtApp.onGMTRenderProgress?.(renderGMTRenderProgress);
+  document.querySelectorAll(".preset-button").forEach((button) => {
+    button.addEventListener("click", () => applyPlotPreset(button.dataset.preset));
+  });
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
@@ -434,6 +460,340 @@ async function loadSampleData() {
   }
 }
 
+async function saveProjectFile() {
+  if (!state.parsed || !state.allRecords.length) return notify("请先导入数据后再保存工程。");
+  const project = createProjectSnapshot();
+  try {
+    const saved = await window.mtApp.saveProject({
+      suggestedName: project.config?.outputName || "mt_gmt_project",
+      project
+    });
+    if (!saved) return;
+    state.projectPath = saved;
+    notify(`工程已保存：${saved}`);
+  } catch (error) {
+    notify(error.message || String(error));
+  }
+}
+
+async function openProjectFile() {
+  try {
+    const opened = await window.mtApp.openProject();
+    if (!opened?.project) return;
+    restoreProjectSnapshot(opened.project, opened.filePath);
+    notify(`工程已打开：${opened.filePath}`);
+  } catch (error) {
+    notify(`工程打开失败：${error.message || String(error)}`);
+  }
+}
+
+function createProjectSnapshot() {
+  const parsed = state.parsed ? { ...state.parsed, records: state.allRecords } : null;
+  return {
+    schema: "mt-point-map-gmt-project",
+    schemaVersion: 1,
+    appVersion: el.versionText?.textContent?.replace(/^v/, "") || "",
+    savedAt: new Date().toISOString(),
+    parsed,
+    allRecords: state.allRecords,
+    filters: { ...state.filters },
+    plotType: state.plotType,
+    outputDirectory: state.outputDirectory,
+    terrain: { ...state.terrain },
+    faultLayers: state.faultLayers.map((layer) => ({ ...layer })),
+    legendPosition: { ...state.legendPosition, dragging: false },
+    legendLabels: { ...state.legendLabels },
+    config: readConfig()
+  };
+}
+
+function restoreProjectSnapshot(project, filePath = "") {
+  if (project?.schema !== "mt-point-map-gmt-project") throw new Error("这不是有效的 MT-GMT 工程文件。");
+  state.projectPath = filePath;
+  state.filters = { ...(project.filters || state.filters) };
+  state.outputDirectory = project.outputDirectory || state.outputDirectory;
+  renderOutputDirectory();
+  const parsed = project.parsed || {};
+  parsed.records = project.allRecords || parsed.records || [];
+  if (!parsed.columns) parsed.columns = project.columns || [];
+  if (!parsed.mapping) parsed.mapping = project.mapping || { coordinateType: "geographic" };
+  if (!parsed.region && project.config?.region) parsed.region = project.config.region;
+  loadParsed(parsed, { autoPreview: false, keepFilters: true, keepRegion: true });
+  applyConfigToUI(project.config || {});
+  state.faultLayers = (project.faultLayers || []).map((layer) => ({ ...layer }));
+  state.terrain = { ...state.terrain, ...(project.terrain || {}) };
+  state.legendPosition = { ...state.legendPosition, ...(project.legendPosition || {}), dragging: false };
+  state.legendLabels = { ...state.legendLabels, ...(project.legendLabels || {}) };
+  populateFilterControls();
+  applyRecordFilters({ updateOnly: true });
+  renderDataSummary();
+  renderStationRows();
+  populateMTControls();
+  renderQualityPanel();
+  renderFaultLayers();
+  renderLocalTerrainGrid();
+  renderLegendDragHandle();
+  updateTerrainEstimate();
+  scheduleAutoPreview("工程已打开，正在自动绘制预览...", { delay: 200 });
+}
+
+function applyConfigToUI(config) {
+  if (!config) return;
+  if (config.plotType) setPlotType(config.plotType);
+  setInputValue(el.titleInput, config.title);
+  setInputValue(el.regionInput, config.region);
+  setInputValue(el.projectionInput, config.projection);
+  setInputValue(el.frameInput, config.frame);
+  setChecked(el.showGridInput, config.showGrid);
+  setChecked(el.showLabelsInput, config.showLabels);
+  setInputValue(el.labelModeInput, config.labelMode);
+  setInputValue(el.labelPrefixInput, config.labelPrefix);
+  setInputValue(el.labelEveryInput, config.labelEvery);
+  setChecked(el.showScaleInput, config.showScale);
+  setInputValue(el.scalePositionInput, config.scalePosition);
+  setChecked(el.showNorthInput, config.showNorthArrow);
+  setInputValue(el.northPositionInput, config.northPosition);
+  setInputValue(el.symbolInput, config.pointSymbol);
+  setInputValue(el.pointSizeInput, config.pointSize);
+  setColorControlValue("pointFill", config.pointFill || "#d7191c");
+  setInputValue(el.penWidthInput, config.pointPenWidth);
+  setColorControlValue("penColor", config.pointPenColor || "black");
+  setInputValue(el.labelSizeInput, config.labelFontSize);
+  setColorControlValue("labelColor", config.labelColor || "black");
+  setInputValue(el.labelDXInput, config.labelDX);
+  setInputValue(el.labelDYInput, config.labelDY);
+  setChecked(el.showTerrainInput, config.showTerrain);
+  setInputValue(el.terrainResolutionInput, config.terrainResolution);
+  setInputValue(el.terrainCptInput, config.terrainCpt);
+  setInputValue(el.terrainIntensityInput, config.terrainIntensity);
+  setChecked(el.terrainAllowDownloadInput, config.terrainAllowDownload);
+  setTerrainDataServerValue(config.terrainDataServer);
+  setInputValue(el.outputNameInput, config.outputName);
+  setInputValue(el.pngDpiInput, config.pngDpi);
+  setInputValue(el.mtPeriodInput, config.mtPeriod);
+  setInputValue(el.curveStationInput, config.curveStation);
+  setInputValue(el.strikeLengthInput, config.strikeLength);
+  setInputValue(el.strikeColorInput, config.strikeColor);
+  setInputValue(el.tensorScaleInput, config.tensorScale);
+  setInputValue(el.tensorPenColorInput, config.tensorPenColor);
+  setInputValue(el.tipperComponentInput, config.tipperComponent);
+  setInputValue(el.tipperConventionInput, config.tipperConvention);
+  setInputValue(el.tipperScaleInput, config.tipperScale);
+  if (config.legend) {
+    setChecked(el.showLegendInput, config.legend.show);
+    setInputValue(el.legendTitleInput, config.legend.title);
+    setInputValue(el.legendStationLabelInput, config.legend.stationLabel);
+    setInputValue(el.legendOverlayLabelInput, config.legend.overlayLabel);
+    if (config.legend.position) {
+      const preset = Array.from(el.legendPositionInput.options).some((option) => option.value === config.legend.position);
+      el.legendPositionInput.value = preset ? config.legend.position : "custom";
+      const parsed = parseLegendPosition(config.legend.position);
+      if (parsed) state.legendPosition = { ...state.legendPosition, ...parsed };
+    }
+    setChecked(el.legendIncludeFaultsInput, config.legend.includeFaults);
+    setInputValue(el.legendWidthInput, parseFloat(config.legend.width) || config.legend.width);
+    setInputValue(el.legendTitleSizeInput, config.legend.titleFontSize);
+    setInputValue(el.legendLabelSizeInput, config.legend.labelFontSize);
+    setColorControlValue("legendTextColor", config.legend.textColor || "black");
+    setColorControlValue("legendBackground", config.legend.backgroundColor || "white");
+    setInputValue(el.legendBackgroundAlphaInput, config.legend.backgroundTransparency);
+    setColorControlValue("legendBorderColor", config.legend.borderColor || "gray50");
+    setInputValue(el.legendBorderWidthInput, config.legend.borderWidth);
+  }
+}
+
+function setInputValue(input, value) {
+  if (!input || value === undefined || value === null || value === "") return;
+  input.value = String(value);
+}
+
+function setChecked(input, value) {
+  if (!input || value === undefined || value === null) return;
+  input.checked = Boolean(value);
+}
+
+function setTerrainDataServerValue(value) {
+  if (!value) return;
+  const known = Array.from(el.terrainDataServerInput.options).some((option) => option.value === value);
+  if (known) {
+    el.terrainDataServerInput.value = value;
+  } else {
+    el.terrainDataServerInput.value = CUSTOM_TERRAIN_SERVER_VALUE;
+    el.terrainDataServerCustomInput.value = value;
+  }
+  renderTerrainDataServerCustom();
+}
+
+function resetFilterState() {
+  state.filters = { line: "", prefix: "", regionOnly: false, mtOnly: false };
+  if (el.filterLineInput) el.filterLineInput.value = "";
+  if (el.filterPrefixInput) el.filterPrefixInput.value = "";
+  if (el.filterRegionOnlyInput) el.filterRegionOnlyInput.checked = false;
+  if (el.filterMtOnlyInput) el.filterMtOnlyInput.checked = false;
+}
+
+function populateFilterControls() {
+  el.filterLineInput.innerHTML = "";
+  el.filterLineInput.append(new Option("全部测线", ""));
+  const lines = Array.from(new Set(state.allRecords.map((record) => String(record.line || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+  for (const line of lines) el.filterLineInput.append(new Option(line, line));
+  el.filterLineInput.value = state.filters.line || "";
+  el.filterPrefixInput.value = state.filters.prefix || "";
+  el.filterRegionOnlyInput.checked = Boolean(state.filters.regionOnly);
+  el.filterMtOnlyInput.checked = Boolean(state.filters.mtOnly);
+  renderFilterSummary();
+}
+
+function applyFiltersFromUI(options = {}) {
+  state.filters = {
+    line: el.filterLineInput.value || "",
+    prefix: el.filterPrefixInput.value.trim(),
+    regionOnly: el.filterRegionOnlyInput.checked,
+    mtOnly: el.filterMtOnlyInput.checked
+  };
+  applyRecordFilters();
+  renderFilterSummary();
+  renderDataSummary();
+  renderStationRows();
+  populateMTControls();
+  renderQualityPanel();
+  resetTerrainPaths();
+  updateTerrainEstimate();
+  if (options.autoPreview) scheduleAutoPreview("筛选已应用，正在自动绘制预览...", { delay: 160 });
+}
+
+function clearFilters(options = {}) {
+  resetFilterState();
+  applyFiltersFromUI(options);
+}
+
+function applyRecordFilters(options = {}) {
+  let records = [...state.allRecords];
+  const filters = state.filters || {};
+  if (filters.line) records = records.filter((record) => String(record.line || "") === filters.line);
+  if (filters.prefix) records = records.filter((record) => String(record.name || "").startsWith(filters.prefix));
+  if (filters.mtOnly) records = records.filter((record) => record.mtResponses?.length);
+  if (filters.regionOnly) {
+    const region = parseRegionClient(el.regionInput?.value || "");
+    if (region) records = records.filter((record) => record.lon >= region.west && record.lon <= region.east && record.lat >= region.south && record.lat <= region.north);
+  }
+  state.records = records;
+  if (!options.updateOnly && !records.length && state.allRecords.length) {
+    setPreviewStatus("当前筛选没有匹配测点。", "pending");
+  }
+  return records;
+}
+
+function renderFilterSummary() {
+  if (!state.allRecords.length) {
+    el.filterSummary.textContent = "未导入数据";
+    return;
+  }
+  const active = [];
+  if (state.filters.line) active.push(`测线 ${state.filters.line}`);
+  if (state.filters.prefix) active.push(`前缀 ${state.filters.prefix}`);
+  if (state.filters.regionOnly) active.push("当前图幅范围");
+  if (state.filters.mtOnly) active.push("有 MT 响应");
+  const prefix = active.length ? active.join(" / ") : "未启用筛选";
+  el.filterSummary.textContent = `${prefix}；当前绘图 ${state.records.length} / ${state.allRecords.length} 个测点`;
+}
+
+function renderDataSummary() {
+  if (!state.parsed) {
+    el.dataSummary.textContent = "未导入点位文件";
+    return;
+  }
+  const parsed = state.parsed;
+  const coordinateText = parsed.mapping.coordinateType === "projected" ? "高斯投影坐标点位，已自动转经纬度" : "点位";
+  const filterText = state.records.length === state.allRecords.length ? "" : `；当前筛选绘制 ${state.records.length} 个`;
+  if (parsed.sourceType === "ediDirectory") {
+    const skipped = parsed.skippedEdiFiles?.length || 0;
+    const total = parsed.totalEdiFiles || state.allRecords.length + skipped;
+    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n扫描 ${total} 个 EDI，已读取 ${state.allRecords.length} 个坐标${skipped ? `，跳过 ${skipped} 个无效坐标` : ""}${filterText}`;
+  } else {
+    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${state.allRecords.length} 个${coordinateText}${filterText}`;
+  }
+}
+
+function renderQualityPanel() {
+  if (!state.allRecords.length) {
+    el.qualitySummary.innerHTML = '<p class="field-note">导入数据后显示质检结果。</p>';
+    el.qualityIssueList.innerHTML = "";
+    el.exportSkippedEdiBtn.disabled = true;
+    return;
+  }
+  const report = buildQualityReport();
+  el.qualitySummary.innerHTML = [
+    qualityMetric("总测点", report.total),
+    qualityMetric("当前绘图", report.drawn),
+    qualityMetric("重复测点名", report.duplicateNameCount),
+    qualityMetric("重复坐标", report.duplicateCoordinateCount),
+    qualityMetric("缺少 MT 响应", report.missingMTCount),
+    qualityMetric("坐标异常", report.invalidCoordinateCount),
+    qualityMetric("跳过 EDI", report.skippedCount)
+  ].join("");
+  const issues = [];
+  if (report.duplicateNames.length) issues.push(`重复测点名：${report.duplicateNames.slice(0, 8).join("、")}${report.duplicateNames.length > 8 ? "..." : ""}`);
+  if (report.duplicateCoordinates.length) issues.push(`重复坐标：${report.duplicateCoordinates.slice(0, 5).join("、")}${report.duplicateCoordinates.length > 5 ? "..." : ""}`);
+  if (report.outOfRegionCount) issues.push(`当前图幅外测点：${report.outOfRegionCount} 个`);
+  if (report.skippedCount) issues.push(`被跳过 EDI：${report.skippedCount} 个，可导出列表检查原因。`);
+  if (!issues.length) issues.push("未发现明显坐标、重复或 EDI 跳过问题。");
+  el.qualityIssueList.innerHTML = issues.map((item) => `<p class="field-note">${escapeHTML(item)}</p>`).join("");
+  el.exportSkippedEdiBtn.disabled = !report.skippedCount;
+}
+
+function qualityMetric(label, value) {
+  return `<span class="quality-metric"><strong>${escapeHTML(value)}</strong><em>${escapeHTML(label)}</em></span>`;
+}
+
+function buildQualityReport() {
+  const nameMap = new Map();
+  const coordMap = new Map();
+  let invalidCoordinateCount = 0;
+  let missingMTCount = 0;
+  let outOfRegionCount = 0;
+  const region = parseRegionClient(el.regionInput?.value || "");
+  for (const record of state.allRecords) {
+    const name = String(record.name || "").trim();
+    if (name) nameMap.set(name, (nameMap.get(name) || 0) + 1);
+    const coordKey = `${Number(record.lon).toFixed(6)},${Number(record.lat).toFixed(6)}`;
+    coordMap.set(coordKey, (coordMap.get(coordKey) || 0) + 1);
+    if (!Number.isFinite(record.lon) || !Number.isFinite(record.lat) || Math.abs(record.lon) > 180 || Math.abs(record.lat) > 90) invalidCoordinateCount += 1;
+    if (!record.mtResponses?.length) missingMTCount += 1;
+    if (region && (record.lon < region.west || record.lon > region.east || record.lat < region.south || record.lat > region.north)) outOfRegionCount += 1;
+  }
+  const duplicateNames = Array.from(nameMap.entries()).filter(([, count]) => count > 1).map(([name]) => name);
+  const duplicateCoordinates = Array.from(coordMap.entries()).filter(([, count]) => count > 1).map(([coord]) => coord);
+  return {
+    total: state.allRecords.length,
+    drawn: state.records.length,
+    duplicateNames,
+    duplicateNameCount: duplicateNames.length,
+    duplicateCoordinates,
+    duplicateCoordinateCount: duplicateCoordinates.length,
+    invalidCoordinateCount,
+    missingMTCount,
+    outOfRegionCount,
+    skippedCount: state.parsed?.skippedEdiFiles?.length || 0
+  };
+}
+
+async function exportSkippedEdiList() {
+  const skipped = state.parsed?.skippedEdiFiles || [];
+  if (!skipped.length) return notify("当前没有被跳过的 EDI。");
+  const content = ["filePath\treason", ...skipped.map((item) => `${item.filePath || ""}\t${String(item.reason || "").replace(/\s+/g, " ")}`)].join("\n") + "\n";
+  const saved = await window.mtApp.saveTextFile({
+    title: "导出被跳过的 EDI 列表",
+    defaultPath: "skipped_edi.tsv",
+    content,
+    filters: [
+      { name: "TSV", extensions: ["tsv"] },
+      { name: "所有文件", extensions: ["*"] }
+    ]
+  });
+  if (saved) notify(`已导出：${saved}`);
+}
+
 async function refreshStatus() {
   const status = await window.mtApp.status();
   state.outputDirectory = status.outputDirectory;
@@ -513,30 +873,27 @@ function renderDownloadProgress(status) {
   el.installBtn.textContent = active ? "正在下载 GMT..." : "下载并安装 GMT";
 }
 
-function loadParsed(parsed) {
+function loadParsed(parsed, options = {}) {
   state.parsed = parsed;
-  state.records = parsed.records;
+  state.allRecords = parsed.records || [];
   state.columns = parsed.columns;
   state.mapping = parsed.mapping;
-  el.regionInput.value = parsed.region;
-  const coordinateText = parsed.mapping.coordinateType === "projected" ? "高斯投影坐标点位，已自动转经纬度" : "点位";
-  if (parsed.sourceType === "ediDirectory") {
-    const skipped = parsed.skippedEdiFiles?.length || 0;
-    const total = parsed.totalEdiFiles || parsed.records.length + skipped;
-    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n扫描 ${total} 个 EDI，已读取 ${parsed.records.length} 个坐标${skipped ? `，跳过 ${skipped} 个无效坐标` : ""}`;
-  } else {
-    el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${parsed.records.length} 个${coordinateText}`;
-  }
+  if (!options.keepRegion) el.regionInput.value = parsed.region;
+  if (!options.keepFilters) resetFilterState();
+  applyRecordFilters({ updateOnly: true });
+  renderDataSummary();
   if (parsed.mapping.coordinateType === "projected" && parsed.records.length > 50) {
     el.showLabelsInput.checked = false;
   }
   populateColumnSelects();
+  populateFilterControls();
   populateMTControls();
   renderStationRows();
+  renderQualityPanel();
   renderPlaceholder();
   resetTerrainPaths();
   updateTerrainEstimate();
-  scheduleAutoPreview("数据已导入，正在自动绘制预览...", { delay: 150 });
+  if (options.autoPreview !== false) scheduleAutoPreview(options.message || "数据已导入，正在自动绘制预览...", { delay: 150 });
 }
 
 function populateColumnSelects() {
@@ -604,10 +961,16 @@ async function applyMapping(options = {}) {
   try {
     const result = await window.mtApp.applyMapping({ rows: state.parsed.rows, mapping });
     state.mapping = mapping;
-    state.records = result.records;
+    state.allRecords = result.records;
+    state.parsed.records = result.records;
+    state.parsed.region = result.region;
+    applyRecordFilters({ updateOnly: true });
     el.regionInput.value = result.region;
+    populateFilterControls();
+    renderDataSummary();
     renderStationRows();
     populateMTControls();
+    renderQualityPanel();
     resetTerrainPaths();
     updateTerrainEstimate();
     if (!options.silent) notify("字段映射已更新。");
@@ -685,8 +1048,13 @@ function readConfig() {
     frame: el.frameInput.value,
     showGrid: el.showGridInput.checked,
     showLabels: el.showLabelsInput.checked,
+    labelMode: el.labelModeInput.value,
+    labelPrefix: el.labelPrefixInput.value.trim(),
+    labelEvery: Number(el.labelEveryInput.value),
     showScale: el.showScaleInput.checked,
+    scalePosition: el.scalePositionInput.value,
     showNorthArrow: el.showNorthInput.checked,
+    northPosition: el.northPositionInput.value,
     pointSymbol: el.symbolInput.value,
     pointSize: Number(el.pointSizeInput.value),
     pointFill: readColor("pointFill"),
@@ -880,6 +1248,7 @@ async function exportMap(formats, showAlert, options = {}) {
     return false;
   }
   state.preview.rendering = true;
+  el.cancelRenderBtn.classList.remove("hidden");
   const isPreviewRender = !showAlert;
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
@@ -925,12 +1294,24 @@ async function exportMap(formats, showAlert, options = {}) {
     return true;
   } finally {
     state.preview.rendering = false;
+    el.cancelRenderBtn.classList.add("hidden");
     setPreviewBusy(false);
     if (state.preview.queuedAuto) {
       state.preview.queuedAuto = false;
       scheduleAutoPreview("设置继续变化，正在自动更新预览...");
     }
   }
+}
+
+async function cancelCurrentRender() {
+  const result = await window.mtApp.cancelGMTRender?.();
+  setPreviewStatus(result?.message || "已请求取消绘图。", "pending");
+}
+
+function renderGMTRenderProgress(status) {
+  if (!status) return;
+  const percent = Number.isFinite(status.percent) ? ` ${Math.round(status.percent)}%` : "";
+  setPreviewStatus(`${status.message || "GMT 正在绘图..."}${percent}`, status.step === "failed" ? "error" : "busy");
 }
 
 async function deleteCurrentOutputs() {
@@ -1213,6 +1594,93 @@ async function clearTerrainCache() {
   if (!confirm("这会清理 GMT 下载过的 earth_relief 地形缓存。以后再用地形底图可能需要重新联网下载。确定继续吗？")) return;
   const result = await window.mtApp.clearTerrainCache();
   notify(result.message);
+  refreshTerrainCacheSummary();
+}
+
+async function refreshTerrainCacheSummary() {
+  try {
+    const summary = await window.mtApp.terrainCacheSummary({ outputDirectory: state.outputDirectory });
+    el.terrainCacheResolutionInput.innerHTML = "";
+    if (!summary.totalFiles) {
+      el.terrainCacheSummaryText.textContent = "当前输出目录没有地形缓存文件。";
+      el.deleteTerrainCacheResolutionBtn.disabled = true;
+      return;
+    }
+    el.terrainCacheSummaryText.textContent = `缓存目录：${summary.directory}；共 ${summary.totalFiles} 个文件，${formatBytes(summary.totalBytes)}`;
+    for (const group of summary.groups) {
+      el.terrainCacheResolutionInput.append(new Option(`${group.resolution} · ${group.files} 文件 · ${formatBytes(group.bytes)}`, group.resolution));
+    }
+    el.deleteTerrainCacheResolutionBtn.disabled = !summary.groups.length;
+  } catch (error) {
+    el.terrainCacheSummaryText.textContent = `缓存扫描失败：${error.message || String(error)}`;
+    el.deleteTerrainCacheResolutionBtn.disabled = true;
+  }
+}
+
+async function deleteTerrainCacheResolution() {
+  const resolution = el.terrainCacheResolutionInput.value;
+  if (!resolution) return notify("请选择要删除的缓存分辨率。");
+  if (!confirm(`确定删除 ${resolution} 分辨率的地形缓存吗？`)) return;
+  const result = await window.mtApp.deleteTerrainCacheResolution({ outputDirectory: state.outputDirectory, resolution });
+  notify(result.message);
+  refreshTerrainCacheSummary();
+}
+
+function applyPlotPreset(preset) {
+  const presets = {
+    paperMono: () => {
+      setChecked(el.showTerrainInput, false);
+      setColorControlValue("pointFill", "white");
+      setColorControlValue("penColor", "black");
+      setInputValue(el.penWidthInput, 0.55);
+      setColorControlValue("labelColor", "black");
+      setChecked(el.showGridInput, true);
+      setChecked(el.showScaleInput, true);
+      setChecked(el.showNorthInput, true);
+      setChecked(el.showLegendInput, true);
+      setColorControlValue("legendBackground", "white");
+      setInputValue(el.legendBackgroundAlphaInput, 0);
+    },
+    fieldQuick: () => {
+      setChecked(el.showTerrainInput, false);
+      setChecked(el.showLabelsInput, false);
+      setInputValue(el.pointSizeInput, 0.28);
+      setColorControlValue("pointFill", "#d7191c");
+      setChecked(el.showLegendInput, false);
+      setInputValue(el.pngDpiInput, 220);
+    },
+    terrainColor: () => {
+      setChecked(el.showTerrainInput, true);
+      setInputValue(el.terrainResolutionInput, "06m");
+      setInputValue(el.terrainCptInput, "geo");
+      setInputValue(el.terrainIntensityInput, 0.65);
+      setColorControlValue("pointFill", "#d7191c");
+      setColorControlValue("penColor", "black");
+      setChecked(el.showLegendInput, true);
+    },
+    faultMap: () => {
+      setChecked(el.showTerrainInput, true);
+      setInputValue(el.terrainCptInput, "dem2");
+      setChecked(el.showLegendInput, true);
+      setChecked(el.legendIncludeFaultsInput, true);
+      setInputValue(el.legendOverlayLabelInput, "Fault / structure");
+      setColorControlValue("pointFill", "#2b83ba");
+    },
+    phaseTensor: () => {
+      setPlotType("phaseTensorMap");
+      setInputValue(el.tensorScaleInput, 0.03);
+      setColorControlValue("pointFill", "white");
+      setChecked(el.showLegendInput, true);
+      setInputValue(el.legendOverlayLabelInput, "Phase tensor");
+    }
+  };
+  const apply = presets[preset];
+  if (!apply) return;
+  apply();
+  renderLocalTerrainGrid();
+  renderLegendDragHandle();
+  updateTerrainEstimate();
+  scheduleAutoPreview("绘图预设已应用，正在自动更新预览...", { delay: 120 });
 }
 
 function readTerrainDataServer() {
@@ -1790,6 +2258,12 @@ function autoRegionClient(records) {
   const lonPad = Math.max((east - west) * 0.12, 0.001);
   const latPad = Math.max((north - south) * 0.12, 0.001);
   return `${(west - lonPad).toFixed(6)}/${(east + lonPad).toFixed(6)}/${(south - latPad).toFixed(6)}/${(north + latPad).toFixed(6)}`;
+}
+
+function parseRegionClient(regionText) {
+  const values = String(regionText || "").split("/").map((value) => Number(value));
+  if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) return null;
+  return { west: values[0], east: values[1], south: values[2], north: values[3] };
 }
 
 function fileName(filePath) {

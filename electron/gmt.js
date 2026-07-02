@@ -304,8 +304,10 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const pointsPath = path.join(outputDirectory, "stations_points.tsv");
   const labelsPath = path.join(outputDirectory, "stations_labels.tsv");
   const pointLines = records.map((record) => `${record.lon.toFixed(8)}\t${record.lat.toFixed(8)}\t${record.name}`).join("\n") + "\n";
+  const labelRecords = recordsForLabels(records, config);
+  const labelLines = labelRecords.map((record) => `${record.lon.toFixed(8)}\t${record.lat.toFixed(8)}\t${record.name}`).join("\n") + (labelRecords.length ? "\n" : "");
   fs.writeFileSync(pointsPath, pointLines, "utf8");
-  fs.writeFileSync(labelsPath, pointLines, "utf8");
+  fs.writeFileSync(labelsPath, labelLines, "utf8");
 
   const region = (config.region || "").trim() || autoRegion(records);
   const regionValues = parseRegion(region);
@@ -340,9 +342,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       ...faultOverlay.commands,
       `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
       ...mtOverlay.commands,
-      config.showLabels ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-      config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
+      config.showLabels && labelRecords.length ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+      config.showScale ? `gmt basemap -R${region} -J${config.projection} -Lj${mapCorner(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -Tdj${mapCorner(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
       legend.command,
       "gmt end",
       ""
@@ -361,13 +363,33 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     ...faultOverlay.commands,
     `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
     ...mtOverlay.commands,
-    config.showLabels ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
+    config.showLabels && labelRecords.length ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
+    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -Lj${mapCorner(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -Tdj${mapCorner(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
     legend.command,
     "gmt end",
     ""
   ].filter(Boolean).join("\n");
+}
+
+function recordsForLabels(records, config = {}) {
+  const mode = String(config.labelMode || "all");
+  if (mode === "mtOnly") return records.filter((record) => record.mtResponses?.length);
+  if (mode === "prefix") {
+    const prefix = String(config.labelPrefix || "").trim();
+    if (!prefix) return records;
+    return records.filter((record) => String(record.name || "").startsWith(prefix));
+  }
+  if (mode === "everyN") {
+    const step = Math.max(1, Math.round(Number(config.labelEvery) || 1));
+    return records.filter((_record, index) => index % step === 0);
+  }
+  return records;
+}
+
+function mapCorner(value, fallback) {
+  const corner = String(value || fallback || "").toUpperCase();
+  return ["TL", "TR", "BL", "BR"].includes(corner) ? corner : fallback;
 }
 
 function faultOverlayScriptParts(config, outputDirectory, region, shell) {

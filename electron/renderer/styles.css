@@ -287,6 +287,8 @@ body[data-platform="darwin"] .window-controls {
 }
 
 .settings-tool[data-settings-panel="data"],
+.settings-tool[data-settings-panel="quality"],
+.settings-tool[data-settings-panel="filters"],
 .settings-tool[data-settings-panel="fields"],
 .settings-tool[data-settings-panel="mtFields"] {
   --module-accent: var(--accent-blue);
@@ -301,7 +303,8 @@ body[data-platform="darwin"] .window-controls {
 .settings-tool[data-settings-panel="terrain"],
 .settings-tool[data-settings-panel="overlay"],
 .settings-tool[data-settings-panel="elements"],
-.settings-tool[data-settings-panel="mtParams"] {
+.settings-tool[data-settings-panel="mtParams"],
+.settings-tool[data-settings-panel="presets"] {
   --module-accent: var(--accent-warm);
 }
 
@@ -820,6 +823,57 @@ select:hover {
   overflow-wrap: anywhere;
 }
 
+.quality-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.quality-metric {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid rgba(139, 154, 174, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.quality-metric strong {
+  color: #173f46;
+  font-size: 18px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.quality-metric em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.quality-issues {
+  margin-top: 8px;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.preset-button {
+  min-height: 38px;
+  justify-content: center;
+  border-color: rgba(31, 111, 120, 0.24);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(239, 248, 249, 0.78));
+  color: #173f46;
+  font-weight: 650;
+}
+
 .terrain-actions {
   flex-wrap: wrap;
   margin-top: 8px;
@@ -1039,6 +1093,27 @@ td:nth-child(3) {
 .preview-status[data-kind="pending"] {
   border-color: rgba(47, 111, 115, 0.35);
   color: #163d42;
+}
+
+.preview-status[data-kind="error"] {
+  border-color: rgba(166, 59, 45, 0.4);
+  color: #7f241b;
+}
+
+.render-cancel {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  min-height: 28px;
+  padding: 4px 9px;
+  color: #8a1f17;
+  border-color: rgba(173, 92, 82, 0.4);
+  background: rgba(255, 248, 247, 0.86);
+}
+
+.render-cancel.hidden {
+  display: none;
 }
 
 .legend-drag-handle {
