@@ -157,6 +157,8 @@
             <button id="previewFitBtn" type="button">适配</button>
           </div>
           <button id="legendDragHandle" class="legend-drag-handle hidden" type="button" aria-label="拖动图例位置"></button>
+          <button id="scaleDragHandle" class="element-drag-handle scale hidden" type="button" aria-label="拖动比例尺位置">比例</button>
+          <button id="northDragHandle" class="element-drag-handle north hidden" type="button" aria-label="拖动指北针位置">N</button>
           <span id="previewStatus" class="preview-status hidden" aria-live="polite"></span>
           <button id="cancelRenderBtn" class="render-cancel hidden" type="button">取消绘图</button>
           <span id="previewPlaceholder">导入点位后生成预览</span>
@@ -250,6 +252,7 @@
             </label>
             <div class="button-row terrain-actions">
               <button id="refreshTerrainCacheBtn" type="button">刷新缓存</button>
+              <button id="deleteTerrainCurrentCacheBtn" type="button">删除当前范围</button>
               <button id="deleteTerrainCacheResolutionBtn" type="button">删除该分辨率</button>
             </div>
           </details>
@@ -426,6 +429,7 @@
               <option value="BL">左下</option>
               <option value="TR">右上</option>
               <option value="TL">左上</option>
+              <option value="custom">自定义（拖动）</option>
             </select>
           </label>
           <label class="check"><input id="showNorthInput" type="checkbox" checked />指北针</label>
@@ -435,6 +439,7 @@
               <option value="TL">左上</option>
               <option value="BR">右下</option>
               <option value="BL">左下</option>
+              <option value="custom">自定义（拖动）</option>
             </select>
           </label>
           <label>PNG DPI<input id="pngDpiInput" type="number" min="72" max="1200" step="10" value="300" /></label>

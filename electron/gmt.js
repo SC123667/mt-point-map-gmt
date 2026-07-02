@@ -343,8 +343,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
       ...mtOverlay.commands,
       config.showLabels && labelRecords.length ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-      config.showScale ? `gmt basemap -R${region} -J${config.projection} -Lj${mapCorner(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -Tdj${mapCorner(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+      config.showScale ? `gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
       legend.command,
       "gmt end",
       ""
@@ -364,8 +364,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
     ...mtOverlay.commands,
     config.showLabels && labelRecords.length ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -Lj${mapCorner(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -Tdj${mapCorner(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
     legend.command,
     "gmt end",
     ""
@@ -387,8 +387,16 @@ function recordsForLabels(records, config = {}) {
   return records;
 }
 
+function mapRefpoint(value, fallback) {
+  const text = String(value || "").trim();
+  if (/^n[0-9.]+\/[0-9.]+(?:\+j(?:TL|TR|BL|BR))?$/i.test(text)) return text;
+  return `j${mapCorner(text, fallback)}`;
+}
+
 function mapCorner(value, fallback) {
   const corner = String(value || fallback || "").toUpperCase();
+  const withoutPrefix = corner.replace(/^J/, "");
+  if (["TL", "TR", "BL", "BR"].includes(withoutPrefix)) return withoutPrefix;
   return ["TL", "TR", "BL", "BR"].includes(corner) ? corner : fallback;
 }
 

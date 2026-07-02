@@ -51,6 +51,20 @@ const state = {
     justify: "TR",
     dragging: false
   },
+  elementPositions: {
+    scale: {
+      x: 0.92,
+      y: 0.08,
+      justify: "BR",
+      dragging: false
+    },
+    north: {
+      x: 0.92,
+      y: 0.92,
+      justify: "TR",
+      dragging: false
+    }
+  },
   legendLabels: {
     stationTouched: false,
     overlayTouched: false
@@ -68,6 +82,12 @@ const AUTO_PREVIEW_DELAY_MS = 700;
 const CUSTOM_COLOR_VALUE = "__custom__";
 const CUSTOM_TERRAIN_SERVER_VALUE = "__custom__";
 const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
+const ELEMENT_POSITION_DEFAULTS = {
+  TL: { x: 0.08, y: 0.92, justify: "TL" },
+  TR: { x: 0.92, y: 0.92, justify: "TR" },
+  BL: { x: 0.08, y: 0.08, justify: "BL" },
+  BR: { x: 0.92, y: 0.08, justify: "BR" }
+};
 const COLOR_OPTIONS = [
   ["#d7191c", "红色 #d7191c"],
   ["#2b83ba", "蓝色 #2b83ba"],
@@ -118,7 +138,7 @@ const ids = [
   "nameColumn", "lonColumn", "latColumn",
   "lineColumn", "elevationColumn", "applyMappingBtn", "stationRows", "previewBtn", "previewBox",
   "previewImageLayer", "previewSelection", "previewZoomControls", "previewZoomLabel", "previewFitBtn", "previewPlaceholder",
-  "previewStatus", "cancelRenderBtn", "legendDragHandle",
+  "previewStatus", "cancelRenderBtn", "legendDragHandle", "scaleDragHandle", "northDragHandle",
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
@@ -136,7 +156,7 @@ const ids = [
     "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
 	  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
 	  "deleteTerrainBtn", "clearTerrainCacheBtn", "terrainDocsBtn", "chooseLocalTerrainBtn", "clearLocalTerrainBtn", "localTerrainText",
-    "terrainCacheSummaryText", "terrainCacheResolutionInput", "refreshTerrainCacheBtn", "deleteTerrainCacheResolutionBtn",
+    "terrainCacheSummaryText", "terrainCacheResolutionInput", "refreshTerrainCacheBtn", "deleteTerrainCurrentCacheBtn", "deleteTerrainCacheResolutionBtn",
   "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
   "labelModeInput", "labelPrefixInput", "labelEveryInput", "labelDXInput", "labelDYInput",
@@ -230,6 +250,14 @@ function wireEvents() {
   bind(el.legendDragHandle, "pointermove", handleLegendPointerMove);
   bind(el.legendDragHandle, "pointerup", handleLegendPointerUp);
   bind(el.legendDragHandle, "pointercancel", cancelLegendDrag);
+  bind(el.scaleDragHandle, "pointerdown", (event) => handleElementPointerDown(event, "scale"));
+  bind(el.scaleDragHandle, "pointermove", (event) => handleElementPointerMove(event, "scale"));
+  bind(el.scaleDragHandle, "pointerup", (event) => handleElementPointerUp(event, "scale"));
+  bind(el.scaleDragHandle, "pointercancel", () => cancelElementDrag("scale"));
+  bind(el.northDragHandle, "pointerdown", (event) => handleElementPointerDown(event, "north"));
+  bind(el.northDragHandle, "pointermove", (event) => handleElementPointerMove(event, "north"));
+  bind(el.northDragHandle, "pointerup", (event) => handleElementPointerUp(event, "north"));
+  bind(el.northDragHandle, "pointercancel", () => cancelElementDrag("north"));
   bind(el.prepareTerrainBtn, "click", () => prepareTerrain(false));
   bind(el.pauseTerrainBtn, "click", () => window.mtApp.pauseTerrain());
   bind(el.resumeTerrainBtn, "click", () => window.mtApp.resumeTerrain());
@@ -237,6 +265,7 @@ function wireEvents() {
   bind(el.deleteTerrainBtn, "click", deleteLocalTerrain);
   bind(el.clearTerrainCacheBtn, "click", clearTerrainCache);
   bind(el.refreshTerrainCacheBtn, "click", refreshTerrainCacheSummary);
+  bind(el.deleteTerrainCurrentCacheBtn, "click", deleteCurrentTerrainCache);
   bind(el.deleteTerrainCacheResolutionBtn, "click", deleteTerrainCacheResolution);
   bind(el.chooseLocalTerrainBtn, "click", chooseLocalTerrainGrid);
   bind(el.clearLocalTerrainBtn, "click", clearLocalTerrainGrid);
@@ -246,6 +275,24 @@ function wireEvents() {
     bind(control, "change", updateTerrainEstimate);
   });
   bind(el.terrainDataServerInput, "change", renderTerrainDataServerCustom);
+  bind(el.showScaleInput, "change", () => {
+    renderDraggableMapElements();
+    scheduleAutoPreview("比例尺显示状态已更改，正在自动更新预览...");
+  });
+  bind(el.scalePositionInput, "change", () => {
+    syncElementPositionFromSelect("scale");
+    renderDraggableMapElements();
+    scheduleAutoPreview("比例尺位置已更改，正在自动更新预览...");
+  });
+  bind(el.showNorthInput, "change", () => {
+    renderDraggableMapElements();
+    scheduleAutoPreview("指北针显示状态已更改，正在自动更新预览...");
+  });
+  bind(el.northPositionInput, "change", () => {
+    syncElementPositionFromSelect("north");
+    renderDraggableMapElements();
+    scheduleAutoPreview("指北针位置已更改，正在自动更新预览...");
+  });
   bind(el.recheckBtn, "click", recheckGMT);
   bind(el.installBtn, "click", installGMT);
   bind(el.pauseDownloadBtn, "click", () => window.mtApp.pauseGMTDownload());
@@ -503,6 +550,10 @@ function createProjectSnapshot() {
     terrain: { ...state.terrain },
     faultLayers: state.faultLayers.map((layer) => ({ ...layer })),
     legendPosition: { ...state.legendPosition, dragging: false },
+    elementPositions: {
+      scale: { ...state.elementPositions.scale, dragging: false },
+      north: { ...state.elementPositions.north, dragging: false }
+    },
     legendLabels: { ...state.legendLabels },
     config: readConfig()
   };
@@ -524,6 +575,10 @@ function restoreProjectSnapshot(project, filePath = "") {
   state.faultLayers = (project.faultLayers || []).map((layer) => ({ ...layer }));
   state.terrain = { ...state.terrain, ...(project.terrain || {}) };
   state.legendPosition = { ...state.legendPosition, ...(project.legendPosition || {}), dragging: false };
+  state.elementPositions = {
+    scale: { ...state.elementPositions.scale, ...(project.elementPositions?.scale || {}), dragging: false },
+    north: { ...state.elementPositions.north, ...(project.elementPositions?.north || {}), dragging: false }
+  };
   state.legendLabels = { ...state.legendLabels, ...(project.legendLabels || {}) };
   populateFilterControls();
   applyRecordFilters({ updateOnly: true });
@@ -534,6 +589,7 @@ function restoreProjectSnapshot(project, filePath = "") {
   renderFaultLayers();
   renderLocalTerrainGrid();
   renderLegendDragHandle();
+  renderDraggableMapElements();
   updateTerrainEstimate();
   scheduleAutoPreview("工程已打开，正在自动绘制预览...", { delay: 200 });
 }
@@ -551,9 +607,9 @@ function applyConfigToUI(config) {
   setInputValue(el.labelPrefixInput, config.labelPrefix);
   setInputValue(el.labelEveryInput, config.labelEvery);
   setChecked(el.showScaleInput, config.showScale);
-  setInputValue(el.scalePositionInput, config.scalePosition);
+  setElementPositionFromConfig("scale", config.scalePosition);
   setChecked(el.showNorthInput, config.showNorthArrow);
-  setInputValue(el.northPositionInput, config.northPosition);
+  setElementPositionFromConfig("north", config.northPosition);
   setInputValue(el.symbolInput, config.pointSymbol);
   setInputValue(el.pointSizeInput, config.pointSize);
   setColorControlValue("pointFill", config.pointFill || "#d7191c");
@@ -737,6 +793,7 @@ function renderQualityPanel() {
   const issues = [];
   if (report.duplicateNames.length) issues.push(`重复测点名：${report.duplicateNames.slice(0, 8).join("、")}${report.duplicateNames.length > 8 ? "..." : ""}`);
   if (report.duplicateCoordinates.length) issues.push(`重复坐标：${report.duplicateCoordinates.slice(0, 5).join("、")}${report.duplicateCoordinates.length > 5 ? "..." : ""}`);
+  if (report.sourceInvalidCoordinateCount) issues.push(`原始数据无效坐标行：${report.sourceInvalidCoordinateCount} 行${report.sourceInvalidCoordinateSamples.length ? `，例如 ${report.sourceInvalidCoordinateSamples.join("、")}` : ""}`);
   if (report.outOfRegionCount) issues.push(`当前图幅外测点：${report.outOfRegionCount} 个`);
   if (report.skippedCount) issues.push(`被跳过 EDI：${report.skippedCount} 个，可导出列表检查原因。`);
   if (!issues.length) issues.push("未发现明显坐标、重复或 EDI 跳过问题。");
@@ -755,6 +812,7 @@ function buildQualityReport() {
   let missingMTCount = 0;
   let outOfRegionCount = 0;
   const region = parseRegionClient(el.regionInput?.value || "");
+  const sourceCoordinateReport = buildSourceCoordinateReport();
   for (const record of state.allRecords) {
     const name = String(record.name || "").trim();
     if (name) nameMap.set(name, (nameMap.get(name) || 0) + 1);
@@ -764,6 +822,7 @@ function buildQualityReport() {
     if (!record.mtResponses?.length) missingMTCount += 1;
     if (region && (record.lon < region.west || record.lon > region.east || record.lat < region.south || record.lat > region.north)) outOfRegionCount += 1;
   }
+  invalidCoordinateCount += sourceCoordinateReport.invalidRows;
   const duplicateNames = Array.from(nameMap.entries()).filter(([, count]) => count > 1).map(([name]) => name);
   const duplicateCoordinates = Array.from(coordMap.entries()).filter(([, count]) => count > 1).map(([coord]) => coord);
   return {
@@ -774,10 +833,63 @@ function buildQualityReport() {
     duplicateCoordinates,
     duplicateCoordinateCount: duplicateCoordinates.length,
     invalidCoordinateCount,
+    sourceInvalidCoordinateCount: sourceCoordinateReport.invalidRows,
+    sourceInvalidCoordinateSamples: sourceCoordinateReport.samples,
     missingMTCount,
     outOfRegionCount,
     skippedCount: state.parsed?.skippedEdiFiles?.length || 0
   };
+}
+
+function buildSourceCoordinateReport() {
+  if (state.parsed?.sourceType === "ediDirectory") return { invalidRows: 0, samples: [] };
+  const rows = state.parsed?.rows || [];
+  const mapping = state.mapping || state.parsed?.mapping || {};
+  if (!rows.length || !mapping.coordinateType) return { invalidRows: 0, samples: [] };
+  const invalid = [];
+  rows.forEach((row, index) => {
+    const result = validateSourceCoordinateRow(row, mapping);
+    if (!result.valid) {
+      const name = mapping.name ? String(row[mapping.name] || "").trim() : "";
+      invalid.push(`${name || `第${index + 1}行`}(${result.reason})`);
+    }
+  });
+  return {
+    invalidRows: invalid.length,
+    samples: invalid.slice(0, 5)
+  };
+}
+
+function validateSourceCoordinateRow(row, mapping) {
+  if (mapping.coordinateType === "projected") {
+    const easting = parseCoordinateText(row[mapping.easting]);
+    const northing = parseCoordinateText(row[mapping.northing]);
+    if (!Number.isFinite(easting) || !Number.isFinite(northing)) return { valid: false, reason: "投影坐标无效" };
+    return { valid: true, reason: "" };
+  }
+  const lon = parseCoordinateText(row[mapping.lon]);
+  const lat = parseCoordinateText(row[mapping.lat]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return { valid: false, reason: "经纬度无效" };
+  if (Math.abs(lon) < 1e-12 && Math.abs(lat) < 1e-12) return { valid: false, reason: "0/0占位" };
+  if (lon < -180 || lon > 180 || lat < -90 || lat > 90) return { valid: false, reason: "超出范围" };
+  return { valid: true, reason: "" };
+}
+
+function parseCoordinateText(value) {
+  const text = String(value ?? "").trim().replace(/^["']|["']$/g, "");
+  if (!text) return NaN;
+  const suffix = text.match(/[NSEW]$/i)?.[0].toUpperCase() || "";
+  const cleaned = text.replace(/[NSEW]$/i, "").replace(/[°'"]/g, ":").trim();
+  let sign = cleaned.startsWith("-") ? -1 : 1;
+  if (suffix === "S" || suffix === "W") sign = -1;
+  const unsigned = cleaned.replace(/^[+-]/, "");
+  if (unsigned.includes(":")) {
+    const parts = unsigned.split(":").filter(Boolean).map(Number);
+    if (!parts.length || parts.some((part) => !Number.isFinite(part))) return NaN;
+    return sign * ((parts[0] || 0) + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600);
+  }
+  const decimal = Number(unsigned);
+  return Number.isFinite(decimal) ? sign * decimal : NaN;
 }
 
 async function exportSkippedEdiList() {
@@ -1054,9 +1166,9 @@ function readConfig() {
     labelPrefix: el.labelPrefixInput.value.trim(),
     labelEvery: Number(el.labelEveryInput.value),
     showScale: el.showScaleInput.checked,
-    scalePosition: el.scalePositionInput.value,
+    scalePosition: elementPositionValue("scale"),
     showNorthArrow: el.showNorthInput.checked,
-    northPosition: el.northPositionInput.value,
+    northPosition: elementPositionValue("north"),
     pointSymbol: el.symbolInput.value,
     pointSize: Number(el.pointSizeInput.value),
     pointFill: readColor("pointFill"),
@@ -1629,6 +1741,23 @@ async function deleteTerrainCacheResolution() {
   refreshTerrainCacheSummary();
 }
 
+async function deleteCurrentTerrainCache() {
+  if (!state.records.length) return notify("请先导入点位数据。");
+  const config = readConfig();
+  if (!config.region) config.region = autoRegionClient(state.records);
+  if (!confirm(`确定删除当前范围 ${config.region} / ${config.terrainResolution} 的本地地形缓存吗？`)) return;
+  const result = await window.mtApp.deleteCurrentTerrainCache?.({
+    records: state.records,
+    config,
+    outputDirectory: state.outputDirectory
+  });
+  if (!result) return notify("当前版本没有可用的当前范围缓存删除接口。");
+  resetTerrainPaths();
+  notify(result.message);
+  refreshTerrainCacheSummary();
+  updateTerrainEstimate();
+}
+
 function applyPlotPreset(preset) {
   const presets = {
     paperMono: () => {
@@ -1682,6 +1811,7 @@ function applyPlotPreset(preset) {
   apply();
   renderLocalTerrainGrid();
   renderLegendDragHandle();
+  renderDraggableMapElements();
   updateTerrainEstimate();
   scheduleAutoPreview("绘图预设已应用，正在自动更新预览...", { delay: 120 });
 }
@@ -1894,6 +2024,8 @@ function clearPreviewImage() {
   el.previewSelection.classList.remove("active");
   el.previewSelection.style.cssText = "";
   el.legendDragHandle.classList.add("hidden");
+  el.scaleDragHandle.classList.add("hidden");
+  el.northDragHandle.classList.add("hidden");
   hidePreviewStatus();
   el.previewZoomControls.classList.add("hidden");
   el.previewZoomLabel.textContent = "100%";
@@ -1973,6 +2105,66 @@ function imageDimensions(url) {
   });
 }
 
+function elementPositionControls(type) {
+  if (type === "scale") {
+    return {
+      input: el.scalePositionInput,
+      show: el.showScaleInput,
+      handle: el.scaleDragHandle,
+      label: "比例尺",
+      fallback: "BR"
+    };
+  }
+  return {
+    input: el.northPositionInput,
+    show: el.showNorthInput,
+    handle: el.northDragHandle,
+    label: "指北针",
+    fallback: "TR"
+  };
+}
+
+function elementPositionValue(type) {
+  const controls = elementPositionControls(type);
+  if (controls.input?.value !== "custom") {
+    syncElementPositionFromSelect(type);
+    return controls.input?.value || controls.fallback;
+  }
+  const position = state.elementPositions[type] || ELEMENT_POSITION_DEFAULTS[controls.fallback];
+  return `n${clamp(position.x, 0.02, 0.98).toFixed(3)}/${clamp(position.y, 0.02, 0.98).toFixed(3)}+j${position.justify || controls.fallback}`;
+}
+
+function syncElementPositionFromSelect(type) {
+  const controls = elementPositionControls(type);
+  if (!controls.input || controls.input.value === "custom") return;
+  const parsed = parseElementPosition(controls.input.value, controls.fallback);
+  if (parsed) state.elementPositions[type] = { ...state.elementPositions[type], ...parsed, dragging: false };
+}
+
+function setElementPositionFromConfig(type, value) {
+  const controls = elementPositionControls(type);
+  if (!controls.input || value === undefined || value === null || value === "") return;
+  const preset = Array.from(controls.input.options).some((option) => option.value === value && value !== "custom");
+  controls.input.value = preset ? value : "custom";
+  const parsed = parseElementPosition(value, controls.fallback);
+  if (parsed) state.elementPositions[type] = { ...state.elementPositions[type], ...parsed, dragging: false };
+}
+
+function parseElementPosition(value, fallback = "BR") {
+  const text = String(value || fallback || "").trim();
+  const normalized = text.toUpperCase();
+  const corner = normalized.replace(/^J/, "");
+  if (ELEMENT_POSITION_DEFAULTS[corner]) return { ...ELEMENT_POSITION_DEFAULTS[corner] };
+  const match = /^N([0-9.]+)\/([0-9.]+)(?:\+J([A-Z]{2}))?$/i.exec(text);
+  if (!match) return { ...ELEMENT_POSITION_DEFAULTS[fallback] };
+  const justify = (match[3] || fallback || "BR").toUpperCase();
+  return {
+    x: clamp(Number(match[1]), 0.02, 0.98),
+    y: clamp(Number(match[2]), 0.02, 0.98),
+    justify: ELEMENT_POSITION_DEFAULTS[justify] ? justify : fallback
+  };
+}
+
 function legendPositionValue() {
   if (el.legendPositionInput.value !== "custom") {
     const selected = parseLegendPosition(el.legendPositionInput.value);
@@ -2031,6 +2223,61 @@ function cancelLegendDrag() {
   el.legendDragHandle.classList.remove("dragging");
 }
 
+function handleElementPointerDown(event, type) {
+  const controls = elementPositionControls(type);
+  if (!state.preview.hasImage || !controls.show?.checked || state.plotType === "responseCurve" || event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  state.elementPositions[type].dragging = true;
+  controls.handle.classList.add("dragging");
+  controls.handle.setPointerCapture(event.pointerId);
+}
+
+function handleElementPointerMove(event, type) {
+  if (!state.elementPositions[type]?.dragging) return;
+  const controls = elementPositionControls(type);
+  event.preventDefault();
+  event.stopPropagation();
+  updateElementPositionFromPreviewPoint(type, previewPoint(event));
+  controls.input.value = "custom";
+  renderElementDragHandle(type);
+  setPreviewStatus(`${controls.label}位置：X ${state.elementPositions[type].x.toFixed(2)} / Y ${state.elementPositions[type].y.toFixed(2)}`, "pending");
+}
+
+function handleElementPointerUp(event, type) {
+  if (!state.elementPositions[type]?.dragging) return;
+  const controls = elementPositionControls(type);
+  event.preventDefault();
+  event.stopPropagation();
+  updateElementPositionFromPreviewPoint(type, previewPoint(event));
+  cancelElementDrag(type);
+  controls.input.value = "custom";
+  renderElementDragHandle(type);
+  scheduleAutoPreview(`${controls.label}位置已调整，正在自动更新预览...`, { delay: 300 });
+}
+
+function cancelElementDrag(type) {
+  const controls = elementPositionControls(type);
+  if (state.elementPositions[type]) state.elementPositions[type].dragging = false;
+  controls.handle?.classList.remove("dragging");
+}
+
+function updateElementPositionFromPreviewPoint(type, point) {
+  const fit = previewImageFitRect();
+  if (!fit.width || !fit.height) return;
+  const baseX = (point.x - state.preview.panX) / state.preview.zoom;
+  const baseY = (point.y - state.preview.panY) / state.preview.zoom;
+  const x = clamp((baseX - fit.left) / fit.width, 0.02, 0.98);
+  const cssY = clamp((baseY - fit.top) / fit.height, 0.02, 0.98);
+  const y = clamp(1 - cssY, 0.02, 0.98);
+  state.elementPositions[type] = {
+    ...state.elementPositions[type],
+    x,
+    y,
+    justify: `${y >= 0.5 ? "T" : "B"}${x >= 0.5 ? "R" : "L"}`
+  };
+}
+
 function updateLegendPositionFromPreviewPoint(point) {
   const fit = previewImageFitRect();
   if (!fit.width || !fit.height) return;
@@ -2069,6 +2316,33 @@ function renderLegendDragHandle() {
   el.legendDragHandle.classList.remove("hidden");
 }
 
+function renderDraggableMapElements() {
+  renderElementDragHandle("scale");
+  renderElementDragHandle("north");
+}
+
+function renderElementDragHandle(type) {
+  const controls = elementPositionControls(type);
+  if (!state.preview.hasImage || !controls.show?.checked || state.plotType === "responseCurve") {
+    controls.handle?.classList.add("hidden");
+    return;
+  }
+  const fit = previewImageFitRect();
+  if (!fit.width || !fit.height) {
+    controls.handle?.classList.add("hidden");
+    return;
+  }
+  const position = state.elementPositions[type] || ELEMENT_POSITION_DEFAULTS[controls.fallback];
+  const baseX = fit.left + clamp(position.x, 0.02, 0.98) * fit.width;
+  const baseY = fit.top + (1 - clamp(position.y, 0.02, 0.98)) * fit.height;
+  const screenX = state.preview.panX + baseX * state.preview.zoom;
+  const screenY = state.preview.panY + baseY * state.preview.zoom;
+  controls.handle.style.left = `${screenX.toFixed(1)}px`;
+  controls.handle.style.top = `${screenY.toFixed(1)}px`;
+  controls.handle.style.transform = `translate(-50%, -50%)${position.dragging ? " scale(1.08)" : ""}`;
+  controls.handle.classList.remove("hidden");
+}
+
 function previewImageFitRect() {
   const box = el.previewBox.getBoundingClientRect();
   const layerStyle = getComputedStyle(el.previewImageLayer);
@@ -2104,6 +2378,7 @@ function updatePreviewTransform() {
   el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
   el.previewBox.classList.toggle("is-zoomed", state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001);
   renderLegendDragHandle();
+  renderDraggableMapElements();
 }
 
 function handlePreviewWheel(event) {
@@ -2117,7 +2392,7 @@ function handlePreviewWheel(event) {
 }
 
 function handlePreviewPointerDown(event) {
-  if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls") || event.target.closest(".legend-drag-handle")) return;
+  if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls") || event.target.closest(".legend-drag-handle, .element-drag-handle")) return;
   event.preventDefault();
   el.previewBox.focus({ preventScroll: true });
   const point = previewPoint(event);

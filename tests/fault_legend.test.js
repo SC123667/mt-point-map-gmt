@@ -129,6 +129,32 @@ try {
   assert(fs.existsSync(path.join(scriptDir, "map_legend.txt")));
   assert(fs.readFileSync(path.join(scriptDir, "map_legend.txt"), "utf8").includes("0.45c Site"));
 
+  const customElementScript = buildScript([
+    { name: "A01", lon: 101.0, lat: 35.0 }
+  ], {
+    title: "Custom Elements",
+    plotType: "stationMap",
+    region: "100.9/101.3/34.9/35.2",
+    projection: "M16c",
+    frame: "af",
+    showGrid: true,
+    showLabels: false,
+    showScale: true,
+    scalePosition: "n0.250/0.180+jBL",
+    showNorthArrow: true,
+    northPosition: "n0.880/0.850+jTR",
+    pointSymbol: "c",
+    pointSize: 0.22,
+    pointFill: "#d7191c",
+    pointPenWidth: 0.35,
+    pointPenColor: "black",
+    showTerrain: false,
+    outputName: "custom_elements",
+    legend: { show: false }
+  }, path.join(tmp, "custom-elements"), ["png"]);
+  assert(customElementScript.includes("-Ln0.250/0.180+jBL"));
+  assert(customElementScript.includes("-Tdn0.880/0.850+jTR"));
+
   const strikeScriptDir = path.join(tmp, "strike-script-output");
   const strikeScript = buildScript([
     { name: "S01", lon: 101.0, lat: 35.0, mtResponses: [{ period: 1, z: { xy: { re: 1, im: 2 }, yx: { re: -2, im: -1 } }, provided: { strike: 35 } }] },

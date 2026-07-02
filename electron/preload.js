@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("mtApp", {
   deleteLocalTerrain: (payload) => ipcRenderer.invoke("terrain:deleteLocal", payload),
   clearTerrainCache: () => ipcRenderer.invoke("terrain:clearCache"),
   terrainCacheSummary: (payload) => ipcRenderer.invoke("terrain:cacheSummary", payload),
+  deleteCurrentTerrainCache: (payload) => ipcRenderer.invoke("terrain:deleteCurrentCache", payload),
   deleteTerrainCacheResolution: (payload) => ipcRenderer.invoke("terrain:deleteCacheResolution", payload),
   onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
   openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),

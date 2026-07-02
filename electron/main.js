@@ -528,6 +528,7 @@ ipcMain.handle("terrain:deleteLocal", (_event, payload) => {
 });
 ipcMain.handle("terrain:clearCache", () => clearTerrainCache());
 ipcMain.handle("terrain:cacheSummary", (_event, payload) => terrainCacheSummary(outputDirectoryFromPayload(payload)));
+ipcMain.handle("terrain:deleteCurrentCache", (_event, payload) => deleteCurrentTerrainCache(outputDirectoryFromPayload(payload), payload));
 ipcMain.handle("terrain:deleteCacheResolution", (_event, payload) => deleteTerrainCacheResolution(outputDirectoryFromPayload(payload), payload?.resolution));
 
 ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
@@ -826,6 +827,7 @@ function loadRenderer(win) {
       deleteLocalTerrain: (payload) => ipcRenderer.invoke("terrain:deleteLocal", payload),
       clearTerrainCache: () => ipcRenderer.invoke("terrain:clearCache"),
       terrainCacheSummary: (payload) => ipcRenderer.invoke("terrain:cacheSummary", payload),
+      deleteCurrentTerrainCache: (payload) => ipcRenderer.invoke("terrain:deleteCurrentCache", payload),
       deleteTerrainCacheResolution: (payload) => ipcRenderer.invoke("terrain:deleteCacheResolution", payload),
       onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
       openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),
@@ -929,6 +931,33 @@ function terrainCacheSummary(outputDirectory) {
     totalBytes,
     totalFiles: files.length,
     groups: Array.from(groups.values()).sort((a, b) => a.resolution.localeCompare(b.resolution))
+  };
+}
+
+function deleteCurrentTerrainCache(outputDirectory, payload) {
+  const config = normalizeTerrainConfig(payload);
+  const paths = terrainPaths(outputDirectory, config);
+  const targets = [paths.gridPath, paths.shadePath];
+  let bytes = 0;
+  const deleted = [];
+  for (const filePath of targets) {
+    if (!fs.existsSync(filePath)) continue;
+    try {
+      bytes += fs.statSync(filePath).size;
+    } catch {
+      // The file may disappear between existence and stat checks.
+    }
+    fs.rmSync(filePath, { force: true });
+    deleted.push(filePath);
+  }
+  removeEmptyDirectories(paths.directory);
+  return {
+    ok: true,
+    deleted,
+    bytes,
+    message: deleted.length
+      ? `已删除当前范围 ${config.terrainResolution} 地形缓存 ${deleted.length} 个文件，释放 ${formatBytesLocal(bytes)}。`
+      : `当前范围 ${config.terrainResolution} 没有可删除的本地地形缓存。`
   };
 }
 

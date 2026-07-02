@@ -4,6 +4,13 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.11 - 2026-07-03
+
+- Added original table-row coordinate validation so the quality panel can count mapped source rows with invalid, placeholder, or out-of-range coordinates.
+- Added terrain cache deletion for the current map range and resolution while keeping the existing resolution-wide cache cleanup.
+- Added draggable preview handles for the scale bar and north arrow, with custom positions written into GMT scripts and project files.
+- Added regression coverage for custom scale-bar and north-arrow GMT positions.
+
 ## v0.9.10 - 2026-07-03
 
 - Added a legend item order control so station symbols can appear before or after MT/structural overlay entries.
