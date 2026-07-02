@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.4 - 2026-07-03
+
+- Added Windows/Linux in-app window controls for minimize, close, and exiting fullscreen when native window chrome is hidden.
+- Added fullscreen-safe shortcuts: `F11` toggles fullscreen, `Esc` exits fullscreen, and `Ctrl+W` closes the window on Windows.
+- Synced renderer window-control visibility with Electron fullscreen state so the escape control appears only when needed.
+
 ## v0.9.3 - 2026-07-03
 
 - Replaced the Windows setup install section with a safe legacy-cleanup path that does not call the old installed uninstaller during updates.

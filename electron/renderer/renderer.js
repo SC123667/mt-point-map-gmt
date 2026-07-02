@@ -32,6 +32,10 @@ const state = {
   },
   terrainWaiter: null,
   faultLayers: [],
+  window: {
+    platform: "",
+    isFullScreen: false
+  },
   legendPosition: {
     x: 0.98,
     y: 0.98,
@@ -108,6 +112,7 @@ const ids = [
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
+  "windowControls", "exitFullscreenBtn", "minimizeWindowBtn", "closeWindowBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
@@ -145,6 +150,7 @@ function bind(control, eventName, handler, options) {
 }
 
 function wireEvents() {
+  initWindowControls();
   window.mtApp.onMenuOpenFile(openPointFile);
   window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
   window.mtApp.onMenuLoadSample(loadSampleData);
@@ -226,6 +232,40 @@ function wireEvents() {
   document.querySelectorAll("[data-link]").forEach((button) => {
     button.addEventListener("click", () => window.mtApp.openExternal(button.dataset.link));
   });
+}
+
+async function initWindowControls() {
+  bind(el.exitFullscreenBtn, "click", () => window.mtApp.exitWindowFullscreen?.());
+  bind(el.minimizeWindowBtn, "click", () => window.mtApp.minimizeWindow?.());
+  bind(el.closeWindowBtn, "click", () => window.mtApp.closeWindow?.());
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.window.isFullScreen) {
+      event.preventDefault();
+      window.mtApp.exitWindowFullscreen?.();
+    } else if (event.key === "F11") {
+      event.preventDefault();
+      window.mtApp.toggleWindowFullscreen?.();
+    }
+  });
+  window.mtApp.onWindowState?.(renderWindowControls);
+  try {
+    const snapshot = await window.mtApp.getWindowState?.();
+    renderWindowControls(snapshot || {});
+  } catch (_error) {
+    renderWindowControls({ platform: "" });
+  }
+}
+
+function renderWindowControls(snapshot = {}) {
+  state.window = {
+    platform: snapshot.platform || state.window.platform || "",
+    isFullScreen: Boolean(snapshot.isFullScreen)
+  };
+  document.body.dataset.platform = state.window.platform;
+  document.body.classList.toggle("is-fullscreen", state.window.isFullScreen);
+  const shouldShowControls = state.window.platform && state.window.platform !== "darwin";
+  el.windowControls?.classList.toggle("hidden", !shouldShowControls);
+  el.exitFullscreenBtn?.classList.toggle("hidden", !state.window.isFullScreen);
 }
 
 function wireLegendControls() {

@@ -47,8 +47,55 @@ function createWindow() {
       sandbox: false
     }
   });
+  wireWindowControls(win);
   configureMenu(win);
   loadRenderer(win);
+}
+
+function wireWindowControls(win) {
+  const publishState = () => sendWindowState(win);
+  win.on("enter-full-screen", publishState);
+  win.on("leave-full-screen", publishState);
+  win.on("maximize", publishState);
+  win.on("unmaximize", publishState);
+  win.on("restore", publishState);
+  win.webContents.once("did-finish-load", publishState);
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    if (input.key === "F11") {
+      toggleFullScreen(win);
+      event.preventDefault();
+      return;
+    }
+    if (input.key === "Escape" && win.isFullScreen()) {
+      win.setFullScreen(false);
+      event.preventDefault();
+      return;
+    }
+    if ((input.control || input.meta) && input.key.toLowerCase() === "w") {
+      win.close();
+      event.preventDefault();
+    }
+  });
+}
+
+function currentWindow(event) {
+  return BrowserWindow.fromWebContents(event.sender);
+}
+
+function windowState(win) {
+  return {
+    isFullScreen: Boolean(win?.isFullScreen()),
+    platform: process.platform
+  };
+}
+
+function sendWindowState(win) {
+  if (win && !win.isDestroyed()) win.webContents.send("window:state", windowState(win));
+}
+
+function toggleFullScreen(win) {
+  if (win && !win.isDestroyed()) win.setFullScreen(!win.isFullScreen());
 }
 
 function configureMenu(win) {
@@ -130,7 +177,10 @@ function configureMenu(win) {
           ]
         },
         { type: "separator" },
-        isMac ? { role: "close", label: "关闭窗口" } : { role: "quit", label: "退出" }
+        isMac
+          ? { role: "close", label: "关闭窗口" }
+          : { label: "关闭窗口", accelerator: "Ctrl+W", click: () => win.close() },
+        ...(!isMac ? [{ role: "quit", label: "退出" }] : [])
       ]
     },
     {
@@ -193,7 +243,8 @@ function configureMenu(win) {
         { role: "zoomIn", label: "放大" },
         { role: "zoomOut", label: "缩小" },
         { type: "separator" },
-        { role: "togglefullscreen", label: "进入全屏" }
+        { label: "切换全屏", accelerator: "F11", click: () => toggleFullScreen(win) },
+        { label: "退出全屏", accelerator: "Esc", click: () => win.setFullScreen(false) }
       ]
     },
     {
@@ -240,6 +291,20 @@ ipcMain.handle("app:status", () => ({
   outputDirectory: savedOutputDirectory(),
   version: app.getVersion()
 }));
+
+ipcMain.handle("window:getState", (event) => windowState(currentWindow(event)));
+ipcMain.handle("window:minimize", (event) => {
+  currentWindow(event)?.minimize();
+});
+ipcMain.handle("window:close", (event) => {
+  currentWindow(event)?.close();
+});
+ipcMain.handle("window:toggleFullscreen", (event) => {
+  toggleFullScreen(currentWindow(event));
+});
+ipcMain.handle("window:exitFullscreen", (event) => {
+  currentWindow(event)?.setFullScreen(false);
+});
 
 ipcMain.handle("file:open", async () => {
   const result = await dialog.showOpenDialog({

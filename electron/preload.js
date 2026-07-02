@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld("mtApp", {
   onMenuOpenSettingsPanel: (handler) => ipcRenderer.on("menu:openSettingsPanel", (_event, panel) => handler(panel)),
   onMenuRecheckGMT: (handler) => ipcRenderer.on("menu:recheckGMT", handler),
   onMenuInstallGMT: (handler) => ipcRenderer.on("menu:installGMT", handler),
+  getWindowState: () => ipcRenderer.invoke("window:getState"),
+  minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
+  closeWindow: () => ipcRenderer.invoke("window:close"),
+  toggleWindowFullscreen: () => ipcRenderer.invoke("window:toggleFullscreen"),
+  exitWindowFullscreen: () => ipcRenderer.invoke("window:exitFullscreen"),
+  onWindowState: (handler) => ipcRenderer.on("window:state", (_event, payload) => handler(payload)),
   recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
   openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
   openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)

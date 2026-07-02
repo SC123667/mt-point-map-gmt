@@ -8,13 +8,18 @@
   </head>
   <body>
     <header class="app-header">
-      <div>
+      <div class="app-title-block">
         <h1>MT点位图制作工具—GMT</h1>
         <p id="appStatus" class="gmt-status-cache">正在检测 GMT...</p>
       </div>
       <div class="header-actions gmt-header-actions">
         <button id="recheckBtn">重新检测 GMT</button>
         <button id="installBtn" class="primary">安装 GMT</button>
+      </div>
+      <div id="windowControls" class="window-controls hidden" aria-label="窗口控制">
+        <button id="exitFullscreenBtn" class="window-control exit-fullscreen hidden" type="button" title="退出全屏">退出全屏</button>
+        <button id="minimizeWindowBtn" class="window-control" type="button" title="最小化">_</button>
+        <button id="closeWindowBtn" class="window-control close" type="button" title="关闭">X</button>
       </div>
     </header>
 
