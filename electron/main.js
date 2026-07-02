@@ -1,11 +1,9 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
-const { fork, spawn, spawnSync } = require("child_process");
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
-const XLSX = require("xlsx");
-const { parseStationText, parseEdiStationText, buildEdiParsedResult, buildRecords } = require("./parser");
-const { summarizeFaultFile } = require("./faults");
+const { fork, spawn } = require("child_process");
+const { pathToFileURL } = require("url");
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require("electron");
 const {
   DEFAULT_LEGEND_FILE,
   DEFAULT_OVERLAY_FILE,
@@ -17,8 +15,6 @@ const {
   needsNativeTextRendering,
   openDownloadedInstaller,
   resolveGMT,
-  runGMT,
-  saveScript,
   terrainEstimate,
   terrainDataServer,
   terrainIntensity,
@@ -30,6 +26,17 @@ const {
 const APP_TITLE = "MT点位图制作工具—GMT";
 let currentInstallerDownload = null;
 let currentTerrainTask = null;
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "mt-preview",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true
+    }
+  }
+]);
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -270,6 +277,7 @@ function sendMenuAction(win, action, payload) {
 }
 
 app.whenReady().then(() => {
+  registerPreviewProtocol();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -303,7 +311,7 @@ ipcMain.handle("window:exitFullscreen", (event) => {
   currentWindow(event)?.setFullScreen(false);
 });
 
-ipcMain.handle("file:open", async () => {
+ipcMain.handle("file:open", async (event) => {
   const result = await dialog.showOpenDialog({
     title: "选择点位或 MT 响应表格",
     properties: ["openFile"],
@@ -313,19 +321,19 @@ ipcMain.handle("file:open", async () => {
     ]
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  return loadStationFile(result.filePaths[0]);
+  return runImportWorker(event.sender, { mode: "stationFile", filePath: result.filePaths[0] });
 });
 
-ipcMain.handle("edi:openDirectory", async () => {
+ipcMain.handle("edi:openDirectory", async (event) => {
   const result = await dialog.showOpenDialog({
     title: "选择 EDI 文件夹",
     properties: ["openDirectory"]
   });
   if (result.canceled || !result.filePaths[0]) return null;
-  return loadEdiDirectory(result.filePaths[0]);
+  return runImportWorker(event.sender, { mode: "ediDirectory", directory: result.filePaths[0] });
 });
 
-ipcMain.handle("file:sample", () => {
+ipcMain.handle("file:sample", async (event) => {
   const candidates = [
     path.join(process.resourcesPath || "", "sample_points.csv"),
     path.join(app.getAppPath(), "sample_points.csv"),
@@ -333,20 +341,18 @@ ipcMain.handle("file:sample", () => {
   ];
   const samplePath = candidates.find((candidate) => candidate && fs.existsSync(candidate));
   if (!samplePath) throw new Error("未找到示例数据 sample_points.csv。");
-  return loadStationFile(samplePath);
+  return runImportWorker(event.sender, { mode: "stationFile", filePath: samplePath });
 });
 
-ipcMain.handle("data:applyMapping", (_event, payload) => {
-  const records = buildRecords(payload.rows, payload.mapping);
-  if (!records.length) throw new Error("当前字段映射没有解析出有效点位。");
-  return { records, region: autoRegion(records) };
+ipcMain.handle("data:applyMapping", (event, payload) => {
+  return runImportWorker(event.sender, { mode: "applyMapping", rows: payload.rows, mapping: payload.mapping });
 });
 
 ipcMain.handle("gmt:buildScript", (_event, payload) => {
   return buildScript(payload.records, payload.config, outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
 });
 
-ipcMain.handle("gmt:saveScript", async (_event, payload) => {
+ipcMain.handle("gmt:saveScript", async (event, payload) => {
   const result = await dialog.showSaveDialog({
     title: "保存 GMT 脚本",
     defaultPath: path.join(outputDirectoryFromPayload(payload), `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`),
@@ -356,34 +362,31 @@ ipcMain.handle("gmt:saveScript", async (_event, payload) => {
     ]
   });
   if (result.canceled || !result.filePath) return null;
-  const script = buildScript(payload.records, payload.config, path.dirname(result.filePath), payload.formats || ["png", "pdf", "eps"]);
-  fs.writeFileSync(result.filePath, script, "utf8");
-  if (process.platform !== "win32") fs.chmodSync(result.filePath, 0o755);
+  await runGMTWorker(event.sender, {
+    mode: "saveScript",
+    records: payload.records,
+    config: payload.config,
+    outputDirectory: path.dirname(result.filePath),
+    formats: payload.formats || ["png", "pdf", "eps"],
+    scriptPath: result.filePath
+  });
   return result.filePath;
 });
 
-ipcMain.handle("gmt:export", async (_event, payload) => {
+ipcMain.handle("gmt:export", async (event, payload) => {
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
   const formats = payload.formats || ["png"];
-  const includesVector = formats.some(isVectorFormat);
-  const needsTitleOverlay = !includesVector && formats.includes("png") && shouldOverlayTitle(payload.config);
-  const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
-  const outputName = payload.config.outputName || "mt_point_map";
-  const gmtWorkspace = createGMTWorkspace(outputDirectory, payload.config, outputName);
-  const config = {
-    ...gmtWorkspace.config,
-    forceGMTTitle: includesVector && shouldOverlayTitle(payload.config)
-  };
-  const script = buildScript(payload.records, config, gmtWorkspace.directory, gmtFormats);
-  const result = runGMT(script, gmtWorkspace.directory, outputName, gmtFormats);
-  if (result.ok && needsTitleOverlay) {
+  const outputName = payload.config?.outputName || "mt_point_map";
+  const result = await runGMTWorker(event.sender, {
+    mode: "export",
+    records: payload.records,
+    config: payload.config,
+    formats,
+    outputDirectory
+  });
+  if (result.ok && result.needsTitleOverlay) {
     await overlayNativeTitle(result, payload.config, outputName, formats);
-  }
-  finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, formats);
-  if (result.ok) {
-    result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
-    result.outputDirectory = outputDirectory;
   }
   return result;
 });
@@ -429,7 +432,7 @@ ipcMain.handle("terrain:chooseLocalGrid", async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle("fault:openFiles", async (_event, payload) => {
+ipcMain.handle("fault:openFiles", async (event, payload) => {
   const result = await dialog.showOpenDialog({
     title: "选择构造线或断层线文件",
     properties: ["openFile", "multiSelections"],
@@ -440,20 +443,7 @@ ipcMain.handle("fault:openFiles", async (_event, payload) => {
   });
   if (result.canceled || !result.filePaths.length) return null;
   const color = String(payload?.color || "#d7191c");
-  return {
-    files: result.filePaths.map((filePath) => {
-      try {
-        return summarizeFaultFile(filePath, color);
-      } catch (error) {
-        return {
-          path: filePath,
-          name: path.basename(filePath),
-          color,
-          error: error.message || String(error)
-        };
-      }
-    })
-  };
+  return runImportWorker(event.sender, { mode: "faultFiles", filePaths: result.filePaths, color });
 });
 
 ipcMain.handle("terrain:prepare", (event, payload) => startTerrainTask(event.sender, payload));
@@ -482,10 +472,7 @@ ipcMain.handle("terrain:clearCache", () => clearTerrainCache());
 
 ipcMain.handle("preview:imageDataUrl", (_event, filePath) => {
   if (!filePath || !fs.existsSync(filePath)) throw new Error(`预览图片不存在：${filePath || ""}`);
-  const extension = path.extname(filePath).toLowerCase();
-  const mime = extension === ".jpg" || extension === ".jpeg" ? "image/jpeg" : "image/png";
-  const data = fs.readFileSync(filePath).toString("base64");
-  return `data:${mime};base64,${data}`;
+  return previewUrlForFile(filePath);
 });
 
 ipcMain.handle("gmt:install", (event) => startInstallerDownload(event.sender));
@@ -512,68 +499,85 @@ ipcMain.handle("gmt:recheck", () => ({
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));
 
-function loadStationFile(filePath) {
-  const text = spreadsheetText(filePath);
-  const parsed = parseStationText(text, filePath);
-  return { ...parsed, region: autoRegion(parsed.records) };
+function runImportWorker(webContents, payload) {
+  return runForkWorker("import-worker.js", payload, webContents, "import");
 }
 
-function spreadsheetText(filePath) {
-  if (/\.(xlsx|xls)$/i.test(filePath)) {
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw new Error("Excel 文件中没有可读取的工作表。");
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, defval: "" });
-    return rows.map((row) => row.map((cell) => String(cell ?? "").replace(/\t/g, " ")).join("\t")).join("\n");
-  }
-  const buffer = fs.readFileSync(filePath);
-  return decodeText(buffer);
+function runGMTWorker(webContents, payload) {
+  return runForkWorker("gmt-worker.js", payload, webContents, "gmt");
 }
 
-function loadEdiDirectory(directory) {
-  const ediFiles = findEdiFiles(directory);
-  if (!ediFiles.length) throw new Error("该目录及子文件夹中没有找到 .edi 文件。");
-  const records = [];
-  const skipped = [];
-  for (const filePath of ediFiles) {
-    try {
-      const text = decodeText(fs.readFileSync(filePath));
-      records.push(parseEdiStationText(text, filePath));
-    } catch (error) {
-      skipped.push({
-        filePath,
-        reason: error.message || String(error)
-      });
-    }
-  }
-  if (!records.length) {
-    const sample = skipped.slice(0, 5).map((item) => `${path.basename(item.filePath)}：${item.reason}`).join("\n");
-    throw new Error(`扫描到 ${ediFiles.length} 个 EDI，但没有解析出有效坐标。\n${sample}`);
-  }
-  const parsed = buildEdiParsedResult(records, skipped, directory);
-  return { ...parsed, region: autoRegion(records), totalEdiFiles: ediFiles.length };
-}
-
-function findEdiFiles(directory) {
-  const files = [];
-  const visit = (current) => {
-    let entries = [];
-    try {
-      entries = fs.readdirSync(current, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const fullPath = path.join(current, entry.name);
-      if (entry.isDirectory()) {
-        visit(fullPath);
-      } else if (entry.isFile() && /\.edi$/i.test(entry.name)) {
-        files.push(fullPath);
+function runForkWorker(scriptName, payload, webContents, progressChannel) {
+  return new Promise((resolve, reject) => {
+    const child = fork(path.join(__dirname, scriptName), [], {
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
+      serialization: "advanced"
+    });
+    let settled = false;
+    let stderr = "";
+    let stdout = "";
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      callback(value);
+    };
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("message", (message) => {
+      if (!message || typeof message !== "object") return;
+      if (message.type === "progress" && progressChannel && webContents && !webContents.isDestroyed()) {
+        webContents.send(`${progressChannel}:progress`, message.progress);
+        return;
       }
+      if (message.type === "result") {
+        settle(resolve, message.result);
+        return;
+      }
+      if (message.type === "error") {
+        const error = new Error(message.message || `${scriptName} 执行失败。`);
+        error.stack = message.stack || error.stack;
+        settle(reject, error);
+      }
+    });
+    child.on("error", (error) => settle(reject, error));
+    child.on("exit", (code) => {
+      if (settled) return;
+      const details = stderr || stdout || `退出码 ${code}`;
+      settle(reject, new Error(`${scriptName} 后台任务异常结束：${details}`));
+    });
+    child.send({ type: "start", payload });
+  });
+}
+
+function registerPreviewProtocol() {
+  protocol.handle("mt-preview", async (request) => {
+    const targetPath = previewPathFromUrl(request.url);
+    if (!targetPath || !fs.existsSync(targetPath)) {
+      return new Response("Preview image not found", { status: 404 });
     }
-  };
-  visit(directory);
-  return files.sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+    return net.fetch(pathToFileURL(targetPath).toString());
+  });
+}
+
+function previewUrlForFile(filePath) {
+  const resolved = path.resolve(filePath);
+  const stat = fs.statSync(resolved);
+  const token = Buffer.from(resolved, "utf8").toString("base64url");
+  return `mt-preview://image/${token}?v=${Math.round(stat.mtimeMs)}-${stat.size}`;
+}
+
+function previewPathFromUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    const token = parsed.pathname.replace(/^\/+/, "");
+    return Buffer.from(token, "base64url").toString("utf8");
+  } catch {
+    return "";
+  }
 }
 
 function outputDirectoryFromPayload(payload) {
@@ -616,98 +620,6 @@ function writeSettings(settings) {
   }
 }
 
-function createGMTWorkspace(outputDirectory, config, outputName) {
-  if (process.platform !== "win32") {
-    return { temporary: false, directory: outputDirectory, config };
-  }
-  const directory = createAsciiTempDirectory();
-  return {
-    temporary: true,
-    directory,
-    config: copyTerrainInputsToWorkspace(config, directory),
-    finalOutputDirectory: outputDirectory,
-    outputName
-  };
-}
-
-function createAsciiTempDirectory() {
-  const roots = [
-    process.env.PUBLIC ? path.join(process.env.PUBLIC, "MTPointMapGMT") : "",
-    process.env.ProgramData ? path.join(process.env.ProgramData, "MTPointMapGMT") : "",
-    path.join(app.getPath("temp"), "MTPointMapGMT")
-  ].filter(Boolean);
-  for (const root of roots) {
-    if (!isAsciiPath(root)) continue;
-    try {
-      fs.mkdirSync(root, { recursive: true });
-      return fs.mkdtempSync(path.join(root, "run-"));
-    } catch {
-      // Try the next writable ASCII path.
-    }
-  }
-  const fallbackRoot = path.join(app.getPath("temp"), "MTPointMapGMT");
-  fs.mkdirSync(fallbackRoot, { recursive: true });
-  return fs.mkdtempSync(path.join(fallbackRoot, "run-"));
-}
-
-function isAsciiPath(targetPath) {
-  return /^[\x00-\x7F]+$/.test(String(targetPath || ""));
-}
-
-function copyTerrainInputsToWorkspace(config, workspaceDirectory) {
-  const nextConfig = { ...(config || {}) };
-  if (!nextConfig.showTerrain) return nextConfig;
-  if (nextConfig.terrainGridPath && fs.existsSync(nextConfig.terrainGridPath)) {
-    const extension = path.extname(nextConfig.terrainGridPath) || ".grd";
-    const target = path.join(workspaceDirectory, `terrain_grid${extension}`);
-    fs.copyFileSync(nextConfig.terrainGridPath, target);
-    nextConfig.terrainGridPath = target;
-    if (nextConfig.localTerrainGridPath) nextConfig.localTerrainGridPath = target;
-  }
-  if (nextConfig.terrainShadePath && fs.existsSync(nextConfig.terrainShadePath)) {
-    const target = path.join(workspaceDirectory, "terrain_shade.nc");
-    fs.copyFileSync(nextConfig.terrainShadePath, target);
-    nextConfig.terrainShadePath = target;
-  }
-  return nextConfig;
-}
-
-function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, formats) {
-  if (!workspace.temporary) return;
-  fs.mkdirSync(outputDirectory, { recursive: true });
-  const scriptExtension = process.platform === "win32" ? "bat" : "gmt";
-  const finalScriptPath = path.join(outputDirectory, `${outputName}.${scriptExtension}`);
-  copyIfExists(result.scriptPath, finalScriptPath);
-  result.scriptPath = finalScriptPath;
-
-  if (result.ok) {
-    for (const format of formats) {
-      copyIfExists(path.join(workspace.directory, `${outputName}.${format}`), path.join(outputDirectory, `${outputName}.${format}`));
-    }
-    copyIfExists(path.join(workspace.directory, "stations_points.tsv"), path.join(outputDirectory, "stations_points.tsv"));
-    copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
-    copyIfExists(path.join(workspace.directory, DEFAULT_OVERLAY_FILE), path.join(outputDirectory, DEFAULT_OVERLAY_FILE));
-    copyIfExists(path.join(workspace.directory, DEFAULT_LEGEND_FILE), path.join(outputDirectory, DEFAULT_LEGEND_FILE));
-    fs.rmSync(workspace.directory, { recursive: true, force: true });
-  }
-}
-
-function copyIfExists(source, target) {
-  if (!source || !target || !fs.existsSync(source)) return;
-  if (path.resolve(source) === path.resolve(target)) return;
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.copyFileSync(source, target);
-}
-
-function shouldOverlayTitle(config) {
-  const title = String(config?.title || "").trim();
-  return title && needsNativeTextRendering(title);
-}
-
-function isVectorFormat(format) {
-  return ["pdf", "eps", "ps"].includes(String(format || "").toLowerCase());
-}
-
 async function overlayNativeTitle(result, config, outputName, requestedFormats) {
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文标题叠加失败：未找到 PNG 底图 ${pngPath}`);
@@ -732,7 +644,7 @@ async function renderTitledMap(pngPath, title) {
   const titleHeight = Math.max(72, Math.round(size.height * 0.085));
   const titleSize = Math.max(26, Math.min(54, Math.round(size.width * 0.032)));
   const totalHeight = size.height + titleHeight;
-  const imageData = fs.readFileSync(pngPath).toString("base64");
+  const imageUrl = pathToFileURL(pngPath).toString();
   const html = `<!doctype html>
 <html>
 <head>
@@ -768,7 +680,7 @@ async function renderTitledMap(pngPath, title) {
 </head>
 <body>
   <div class="title">${escapeHTML(title)}</div>
-  <img src="data:image/png;base64,${imageData}" />
+  <img src="${escapeHTML(imageUrl)}" />
 </body>
 </html>`;
   const win = new BrowserWindow({
@@ -808,20 +720,6 @@ function escapeHTML(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function decodeText(buffer) {
-  const utf8 = buffer.toString("utf8");
-  if (!utf8.includes("\uFFFD")) return utf8;
-  for (const encoding of ["gb18030", "gbk"]) {
-    try {
-      const decoded = new TextDecoder(encoding).decode(buffer);
-      if (decoded && !decoded.includes("\uFFFD")) return decoded;
-    } catch {
-      // Fall through to latin1 as a last resort.
-    }
-  }
-  return buffer.toString("latin1");
 }
 
 function loadRenderer(win) {
@@ -873,6 +771,14 @@ function loadRenderer(win) {
       onMenuOpenSettingsPanel: (handler) => ipcRenderer.on("menu:openSettingsPanel", (_event, panel) => handler(panel)),
       onMenuRecheckGMT: (handler) => ipcRenderer.on("menu:recheckGMT", handler),
       onMenuInstallGMT: (handler) => ipcRenderer.on("menu:installGMT", handler),
+      getWindowState: () => ipcRenderer.invoke("window:getState"),
+      minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
+      closeWindow: () => ipcRenderer.invoke("window:close"),
+      toggleWindowFullscreen: () => ipcRenderer.invoke("window:toggleFullscreen"),
+      exitWindowFullscreen: () => ipcRenderer.invoke("window:exitFullscreen"),
+      onWindowState: (handler) => ipcRenderer.on("window:state", (_event, payload) => handler(payload)),
+      onImportProgress: (handler) => ipcRenderer.on("import:progress", (_event, payload) => handler(payload)),
+      onGMTRenderProgress: (handler) => ipcRenderer.on("gmt:progress", (_event, payload) => handler(payload)),
       recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
       openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
       openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)
@@ -953,15 +859,27 @@ function startTerrainTask(webContents, payload) {
 function clearTerrainCache() {
   const gmtInfo = resolveGMT();
   if (!gmtInfo.available) return { ok: false, message: "未找到 GMT，无法清理地形缓存。" };
-  const result = spawnSync(gmtInfo.path, ["clear", "data=earth"], {
-    cwd: savedOutputDirectory(),
-    encoding: "utf8",
-    env: gmtChildEnv(gmtInfo)
+  return new Promise((resolve) => {
+    const child = spawn(gmtInfo.path, ["clear", "data=earth"], {
+      cwd: savedOutputDirectory(),
+      env: gmtChildEnv(gmtInfo)
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", (error) => {
+      resolve({ ok: false, message: error.message || String(error) });
+    });
+    child.on("close", (code) => {
+      const message = stderr || stdout || "已清理 GMT 地形数据缓存。";
+      resolve(code === 0 ? { ok: true, message } : { ok: false, message: message || "GMT 地形缓存清理失败。" });
+    });
   });
-  if (result.status !== 0) {
-    return { ok: false, message: result.stderr || result.stdout || "GMT 地形缓存清理失败。" };
-  }
-  return { ok: true, message: result.stderr || result.stdout || "已清理 GMT 地形数据缓存。" };
 }
 
 function gmtChildEnv(gmtInfo, config = {}) {

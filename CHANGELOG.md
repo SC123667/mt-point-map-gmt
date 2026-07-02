@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.8 - 2026-07-03
+
+- Moved large point/Excel/EDI imports, field remapping, and structural-line summaries into an isolated import worker so thousand-file datasets do not block the Electron main process.
+- Moved GMT preview/export rendering into an isolated worker, including large station table generation, overlay file generation, and Windows ASCII workspace handling.
+- Added reusable Windows terrain input caching so large local GRD/shade files are not copied again for every preview/export when the source file has not changed.
+- Replaced Base64 preview image transfer and native-title image embedding with local file URL loading to reduce high-DPI PNG memory pressure.
+- Added worker smoke tests for large station rendering and background import paths, and adjusted auto-preview debounce timing for multi-thousand-station datasets.
+
 ## v0.9.7 - 2026-07-03
 
 - Moved high-resolution SRTM terrain preparation into an isolated worker process so large basemap jobs no longer run inside the Electron main process.

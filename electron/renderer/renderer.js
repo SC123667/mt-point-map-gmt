@@ -1456,11 +1456,19 @@ function scheduleAutoPreview(message, options = {}) {
   state.preview.autoTimer = setTimeout(() => {
     state.preview.autoTimer = null;
     refreshPreviewAutomatically();
-  }, options.delay ?? AUTO_PREVIEW_DELAY_MS);
+  }, options.delay ?? autoPreviewDelay());
 }
 
 async function refreshPreviewAutomatically() {
   await exportMap(["png"], false, { auto: true });
+}
+
+function autoPreviewDelay() {
+  const count = state.records.length;
+  if (count >= 10000) return 1400;
+  if (count >= 5000) return 1150;
+  if (count >= 2000) return 900;
+  return AUTO_PREVIEW_DELAY_MS;
 }
 
 function setPreviewBusy(active, message = "") {
