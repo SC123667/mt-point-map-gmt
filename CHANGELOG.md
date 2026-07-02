@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.7 - 2026-07-03
+
+- Moved high-resolution SRTM terrain preparation into an isolated worker process so large basemap jobs no longer run inside the Electron main process.
+- Reworked SRTM XYZ generation to stream buffered chunks with backpressure instead of pushing very large text output through uncontrolled writes.
+- Added SRTM worker smoke coverage to verify terrain worker startup, grid generation handoff, and shade generation handoff.
+
 ## v0.9.6 - 2026-07-03
 
 - Removed the hard terrain-size safety stop so large SRTM basemap preparation can continue after showing a performance warning.
