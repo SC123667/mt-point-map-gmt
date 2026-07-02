@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.7.1 - 2026-07-02
+
+- Fixed legend entries so station symbols follow the selected point shape, size, fill color, and border color instead of always using a red circle.
+- Added plot-type legend entries for strike, phase tensor, and tipper maps, with strike legend color matching the plotted strike line.
+- Added editable legend entry labels for the station item and the active MT overlay item.
+
 ## v0.7.0 - 2026-07-02
 
 - Added editable legend styling for width, title size, label size, text color, background color, background transparency, border color, and border width.

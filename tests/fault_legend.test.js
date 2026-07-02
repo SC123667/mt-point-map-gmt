@@ -50,10 +50,10 @@ try {
   assert(overlayText.includes("101.00000000\t35.00000000"));
 
   const legend = buildLegendSpec([
-    { label: "MT station", symbol: "point", fill: "#d7191c", pen: "0.35p,black", size: "0.22c" },
+    { label: "Station", symbol: "point", gmtSymbol: "t", fill: "#d7191c", pen: "0.35p,black", size: "0.22c" },
     { label: "Faults", symbol: "line", pen: "0.9p,#ff0000" }
   ]);
-  assert(legend.includes("S 0.14c c 0.22c #d7191c 0.35p,black 0.45c MT station"));
+  assert(legend.includes("S 0.14c t 0.22c #d7191c 0.35p,black 0.45c Station"));
   assert(legend.includes("S 0.14c - 0.42c - 0.9p,#ff0000 0.45c Faults"));
 
   const styledLegend = normalizeLegendConfig({
@@ -98,7 +98,7 @@ try {
     showTerrain: false,
     outputName: "mt_point_map",
     faultLayers: [{ path: gmtFile, name: "Faults", color: "#ff0000" }],
-    legend: { show: true, title: "Legend", position: "n0.98/0.98+jTR", includeFaults: true }
+    legend: { show: true, title: "Legend", stationLabel: "Site", position: "n0.98/0.98+jTR", includeFaults: true }
   }, scriptDir, ["png"]);
 
   assert(script.includes("Structural line overlays"));
@@ -107,6 +107,43 @@ try {
   assert(!script.includes("...(config"));
   assert(fs.existsSync(path.join(scriptDir, "fault_overlays.tsv")));
   assert(fs.existsSync(path.join(scriptDir, "map_legend.txt")));
+  assert(fs.readFileSync(path.join(scriptDir, "map_legend.txt"), "utf8").includes("0.45c Site"));
+
+  const strikeScriptDir = path.join(tmp, "strike-script-output");
+  const strikeScript = buildScript([
+    { name: "S01", lon: 101.0, lat: 35.0, mtResponses: [{ period: 1, z: { xy: { re: 1, im: 2 }, yx: { re: -2, im: -1 } }, provided: { strike: 35 } }] },
+    { name: "S02", lon: 101.2, lat: 35.1, mtResponses: [{ period: 1, z: { xy: { re: 1, im: 1 }, yx: { re: -1, im: -1 } }, provided: { strike: 65 } }] }
+  ], {
+    title: "MT Strike",
+    plotType: "strikeMap",
+    mtPeriod: 1,
+    region: "100.9/101.3/34.9/35.2",
+    projection: "M16c",
+    frame: "af",
+    showGrid: true,
+    showLabels: false,
+    showScale: false,
+    showNorthArrow: false,
+    pointSymbol: "s",
+    pointSize: 0.24,
+    pointFill: "#2b83ba",
+    pointPenWidth: 0.5,
+    pointPenColor: "#333333",
+    labelFontSize: 8,
+    labelColor: "black",
+    labelDX: 0.08,
+    labelDY: 0.08,
+    showTerrain: false,
+    strikeColor: "#984ea3",
+    strikeWidth: 1.6,
+    outputName: "mt_strike_map",
+    faultLayers: [],
+    legend: { show: true, title: "Legend", stationLabel: "Site", overlayLabel: "Impedance strike", position: "n0.98/0.98+jTR", includeFaults: true }
+  }, strikeScriptDir, ["png"]);
+  const strikeLegend = fs.readFileSync(path.join(strikeScriptDir, "map_legend.txt"), "utf8");
+  assert(strikeScript.includes("-W1.60p,#984ea3"));
+  assert(strikeLegend.includes("S 0.14c s 0.24c #2b83ba 0.50p,#333333 0.45c Site"));
+  assert(strikeLegend.includes("S 0.14c - 0.42c - 1.60p,#984ea3 0.45c Impedance strike"));
 
   console.log("Fault overlay and legend tests passed");
 } finally {

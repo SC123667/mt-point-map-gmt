@@ -37,6 +37,10 @@ const state = {
     y: 0.98,
     justify: "TR",
     dragging: false
+  },
+  legendLabels: {
+    stationTouched: false,
+    overlayTouched: false
   }
 };
 
@@ -98,6 +102,7 @@ const ids = [
   "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput",
   "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
   "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput", "legendPositionHint",
+  "legendStationLabelInput", "legendOverlayLabelInput",
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
   "legendBorderColorPicker", "legendBorderWidthInput",
@@ -184,6 +189,14 @@ function wireLegendControls() {
   el.showLegendInput.addEventListener("change", () => queueLegendPreview("图例显示状态已更改，正在自动更新预览..."));
   el.legendIncludeFaultsInput.addEventListener("change", () => queueLegendPreview("图例内容已更改，正在自动更新预览..."));
   el.legendTitleInput.addEventListener("input", () => queueLegendPreview("图例标题已更改，正在自动更新预览..."));
+  el.legendStationLabelInput.addEventListener("input", () => {
+    state.legendLabels.stationTouched = true;
+    queueLegendPreview("图例文字已更改，正在自动更新预览...");
+  });
+  el.legendOverlayLabelInput.addEventListener("input", () => {
+    state.legendLabels.overlayTouched = true;
+    queueLegendPreview("图例文字已更改，正在自动更新预览...");
+  });
   el.legendPositionInput.addEventListener("change", () => {
     const next = parseLegendPosition(el.legendPositionInput.value);
     if (next) state.legendPosition = { ...state.legendPosition, ...next, dragging: false };
@@ -197,6 +210,16 @@ function wireLegendControls() {
     el.legendBorderWidthInput
   ].forEach((control) => {
     control.addEventListener("input", () => queueLegendPreview("图例样式已更改，正在自动更新预览..."));
+  });
+  [
+    el.symbolInput,
+    el.pointSizeInput,
+    el.penWidthInput,
+    el.strikeColorInput,
+    el.tensorPenColorInput
+  ].forEach((control) => {
+    control.addEventListener("input", () => queueLegendPreview("图件符号已更改，正在自动更新预览..."));
+    control.addEventListener("change", () => queueLegendPreview("图件符号已更改，正在自动更新预览..."));
   });
 }
 
@@ -216,6 +239,7 @@ function setPlotType(plotType) {
   const [title, hint] = labels[state.plotType] || labels.stationMap;
   el.inspectorTitle.textContent = title;
   el.plotTypeHint.textContent = hint;
+  syncLegendLabelDefaults();
   el.outputNameInput.value = defaultOutputNameForPlot(state.plotType);
   renderPlaceholder();
 }
@@ -228,6 +252,19 @@ function defaultOutputNameForPlot(plotType) {
     tipperMap: "mt_tipper_map",
     responseCurve: "mt_response_curve"
   }[plotType] || "mt_point_map";
+}
+
+function syncLegendLabelDefaults() {
+  if (!state.legendLabels.stationTouched) el.legendStationLabelInput.value = "Station";
+  if (!state.legendLabels.overlayTouched) el.legendOverlayLabelInput.value = defaultLegendOverlayLabel(state.plotType);
+}
+
+function defaultLegendOverlayLabel(plotType) {
+  return {
+    strikeMap: "Strike",
+    phaseTensorMap: "Phase tensor",
+    tipperMap: "Tipper"
+  }[plotType] || "Overlay";
 }
 
 function showTableHelp() {
@@ -527,6 +564,8 @@ function readConfig() {
     legend: {
       show: el.showLegendInput.checked,
       title: el.legendTitleInput.value.trim() || "Legend",
+      stationLabel: el.legendStationLabelInput.value.trim() || "Station",
+      overlayLabel: el.legendOverlayLabelInput.value.trim() || defaultLegendOverlayLabel(state.plotType),
       position: legendPositionValue(),
       includeFaults: el.legendIncludeFaultsInput.checked,
       width: `${clamp(Number(el.legendWidthInput.value), 2, 8).toFixed(2)}c`,
@@ -970,8 +1009,12 @@ function validatePlotReadiness(config) {
 }
 
 function populateColorControls() {
-  setupColorControl("pointFill", "#d7191c");
-  setupColorControl("penColor", "black");
+  setupColorControl("pointFill", "#d7191c", () => {
+    scheduleAutoPreview("点位颜色已更改，正在自动更新预览...");
+  });
+  setupColorControl("penColor", "black", () => {
+    scheduleAutoPreview("点位边框色已更改，正在自动更新预览...");
+  });
   setupColorControl("labelColor", "black");
   setupColorControl("legendTextColor", "black", () => {
     renderLegendDragHandle();

@@ -22,12 +22,15 @@ const DEFAULT_LEGEND_CONFIG = {
 function buildLegendEntries(config) {
   const entries = [];
   entries.push({
-    label: "MT station",
+    label: config.legend?.stationLabel || "Station",
     symbol: "point",
+    gmtSymbol: safePointSymbol(config.pointSymbol),
     fill: config.pointFill || "#d7191c",
     pen: `${Number(config.pointPenWidth || 0.35).toFixed(2)}p,${config.pointPenColor || "black"}`,
     size: `${Number(config.pointSize || 0.22).toFixed(2)}c`
   });
+  const mtOverlayEntry = buildMTOverlayLegendEntry(config);
+  if (mtOverlayEntry) entries.push(mtOverlayEntry);
   if (config.legend?.includeFaults !== false) {
     for (const layer of config.faultLayers || []) {
       entries.push({
@@ -50,7 +53,7 @@ function buildLegendSpec(entries, config = {}) {
     const label = String(entry.label || "").trim();
     if (!label) continue;
     if (entry.symbol === "point") {
-      lines.push(`S 0.14c c ${entry.size || "0.22c"} ${entry.fill || "#d7191c"} ${entry.pen || "0.35p,black"} 0.45c ${label}`);
+      lines.push(`S 0.14c ${entry.gmtSymbol || "c"} ${entry.size || "0.22c"} ${entry.fill || "#d7191c"} ${entry.pen || "0.35p,black"} 0.45c ${label}`);
     } else {
       lines.push(`S 0.14c - 0.42c - ${entry.pen || "0.8p,black"} 0.45c ${label}`);
     }
@@ -104,6 +107,36 @@ function normalizeLegendConfig(config = {}) {
   };
 }
 
+function buildMTOverlayLegendEntry(config = {}) {
+  const plotType = config.plotType || "stationMap";
+  if (plotType === "strikeMap") {
+    return {
+      label: config.legend?.overlayLabel || "Strike",
+      symbol: "line",
+      pen: `${Number(config.strikeWidth || 1.2).toFixed(2)}p,${config.strikeColor || "blue"}`
+    };
+  }
+  if (plotType === "phaseTensorMap") {
+    return {
+      label: config.legend?.overlayLabel || "Phase tensor",
+      symbol: "line",
+      pen: `${Number(config.tensorPenWidth || 0.35).toFixed(2)}p,${config.tensorPenColor || "black"}`
+    };
+  }
+  if (plotType === "tipperMap") {
+    return {
+      label: config.legend?.overlayLabel || "Tipper",
+      symbol: "line",
+      pen: `${Number(config.tipperWidth || 1).toFixed(2)}p,${config.tipperColor || "purple"}`
+    };
+  }
+  return null;
+}
+
+function safePointSymbol(symbol) {
+  return new Set(["c", "t", "s", "d"]).has(symbol) ? symbol : "c";
+}
+
 function normalizeLength(value, fallback) {
   const text = String(value || "").trim();
   if (/^\d+(\.\d+)?[cip]$/.test(text)) return text;
@@ -134,6 +167,7 @@ function quote(value, shell) {
 module.exports = {
   DEFAULT_LEGEND_FILE,
   DEFAULT_LEGEND_CONFIG,
+  buildMTOverlayLegendEntry,
   buildLegendEntries,
   buildLegendSpec,
   normalizeLegendConfig,
