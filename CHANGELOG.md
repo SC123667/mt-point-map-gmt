@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.10 - 2026-07-03
+
+- Added a legend item order control so station symbols can appear before or after MT/structural overlay entries.
+- Added regression coverage for overlay-first legend generation.
+
 ## v0.9.9 - 2026-07-03
 
 - Added `.mtgmt` project save/open support for restoring imported data, filters, terrain settings, structural overlays, legend settings, and plotting parameters.

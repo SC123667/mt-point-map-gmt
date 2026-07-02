@@ -4,7 +4,7 @@ const os = require("os");
 const path = require("path");
 
 const { autodetectAndParse, buildFaultOverlay, recolorPen, summarizeFaultFile } = require("../electron/faults");
-const { buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
+const { buildLegendEntries, buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
 const { buildScript, terrainEstimate, terrainPaths } = require("../electron/gmt");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mt-gmt-fault-test-"));
@@ -55,6 +55,16 @@ try {
   ]);
   assert(legend.includes("S 0.14c t 0.22c #d7191c 0.35p,black 0.45c Station"));
   assert(legend.includes("S 0.14c - 0.42c - 0.9p,#ff0000 0.45c Faults"));
+  const reversedLegend = buildLegendSpec(buildLegendEntries({
+    pointSymbol: "c",
+    pointFill: "#d7191c",
+    pointPenWidth: 0.35,
+    pointPenColor: "black",
+    pointSize: 0.22,
+    faultLayers: [{ path: gmtFile, name: "Faults", color: "#ff0000" }],
+    legend: { stationLabel: "Station", includeFaults: true, order: "overlay-first" }
+  }));
+  assert(reversedLegend.indexOf("Faults") < reversedLegend.indexOf("Station"));
 
   const styledLegend = normalizeLegendConfig({
     width: "5.6c",

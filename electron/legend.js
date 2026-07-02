@@ -20,27 +20,27 @@ const DEFAULT_LEGEND_CONFIG = {
 };
 
 function buildLegendEntries(config) {
-  const entries = [];
-  entries.push({
+  const stationEntry = {
     label: config.legend?.stationLabel || "Station",
     symbol: "point",
     gmtSymbol: safePointSymbol(config.pointSymbol),
     fill: config.pointFill || "#d7191c",
     pen: `${Number(config.pointPenWidth || 0.35).toFixed(2)}p,${config.pointPenColor || "black"}`,
     size: `${Number(config.pointSize || 0.22).toFixed(2)}c`
-  });
+  };
+  const overlayEntries = [];
   const mtOverlayEntry = buildMTOverlayLegendEntry(config);
-  if (mtOverlayEntry) entries.push(mtOverlayEntry);
+  if (mtOverlayEntry) overlayEntries.push(mtOverlayEntry);
   if (config.legend?.includeFaults !== false) {
     for (const layer of config.faultLayers || []) {
-      entries.push({
+      overlayEntries.push({
         label: layer.name || path.basename(layer.path || "Fault"),
         symbol: "line",
         pen: `0.9p,${layer.color || "#d7191c"}`
       });
     }
   }
-  return entries;
+  return config.legend?.order === "overlay-first" ? [...overlayEntries, stationEntry] : [stationEntry, ...overlayEntries];
 }
 
 function buildLegendSpec(entries, config = {}) {

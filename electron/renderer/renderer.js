@@ -143,7 +143,7 @@ const ids = [
 	  "showGridInput", "showScaleInput", "scalePositionInput", "showNorthInput", "northPositionInput", "pngDpiInput", "outputNameInput",
   "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
   "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput", "legendPositionHint",
-  "legendStationLabelInput", "legendOverlayLabelInput",
+  "legendOrderInput", "legendStationLabelInput", "legendOverlayLabelInput",
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
   "legendBorderColorPicker", "legendBorderWidthInput",
@@ -304,6 +304,7 @@ function wireLegendControls() {
   };
   el.showLegendInput.addEventListener("change", () => queueLegendPreview("图例显示状态已更改，正在自动更新预览..."));
   el.legendIncludeFaultsInput.addEventListener("change", () => queueLegendPreview("图例内容已更改，正在自动更新预览..."));
+  el.legendOrderInput.addEventListener("change", () => queueLegendPreview("图例顺序已更改，正在自动更新预览..."));
   el.legendTitleInput.addEventListener("input", () => queueLegendPreview("图例标题已更改，正在自动更新预览..."));
   el.legendStationLabelInput.addEventListener("input", () => {
     state.legendLabels.stationTouched = true;
@@ -591,6 +592,7 @@ function applyConfigToUI(config) {
       if (parsed) state.legendPosition = { ...state.legendPosition, ...parsed };
     }
     setChecked(el.legendIncludeFaultsInput, config.legend.includeFaults);
+    setInputValue(el.legendOrderInput, config.legend.order);
     setInputValue(el.legendWidthInput, parseFloat(config.legend.width) || config.legend.width);
     setInputValue(el.legendTitleSizeInput, config.legend.titleFontSize);
     setInputValue(el.legendLabelSizeInput, config.legend.labelFontSize);
@@ -1083,6 +1085,7 @@ function readConfig() {
       title: el.legendTitleInput.value.trim() || "Legend",
       stationLabel: el.legendStationLabelInput.value.trim() || "Station",
       overlayLabel: el.legendOverlayLabelInput.value.trim() || defaultLegendOverlayLabel(state.plotType),
+      order: el.legendOrderInput.value,
       position: legendPositionValue(),
       includeFaults: el.legendIncludeFaultsInput.checked,
       width: `${clamp(Number(el.legendWidthInput.value), 2, 8).toFixed(2)}c`,
