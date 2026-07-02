@@ -75,6 +75,32 @@ function runTask(payload) {
     assert.strictEqual(edi.totalEdiFiles, 2);
     assert.strictEqual(edi.skippedEdiFiles.length, 1);
 
+    const bulkEdiDir = path.join(tmp, "bulk-edi");
+    fs.mkdirSync(bulkEdiDir);
+    const frequencies = Array.from({ length: 40 }, (_value, index) => (0.01 + index * 0.02).toFixed(4));
+    const values = Array.from({ length: 40 }, (_value, index) => (1 + index / 10).toFixed(3));
+    for (let index = 0; index < 80; index += 1) {
+      const name = `B${String(index + 1).padStart(3, "0")}`;
+      fs.writeFileSync(path.join(bulkEdiDir, `${name}.edi`), [
+        ">HEAD",
+        `DATAID=${name}`,
+        `LAT=${35 + index / 1000}`,
+        `LONG=${101 + index / 1000}`,
+        "ELEV=100",
+        `>FREQ // ${frequencies.length}`,
+        frequencies.join(" "),
+        `>ZXYR // ${values.length}`,
+        values.join(" "),
+        `>ZXYI // ${values.length}`,
+        values.join(" "),
+        ""
+      ].join("\n"), "utf8");
+    }
+    const bulk = await runTask({ mode: "ediDirectory", directory: bulkEdiDir });
+    assert.strictEqual(bulk.records.length, 80);
+    assert.strictEqual(bulk.totalEdiFiles, 80);
+    assert.strictEqual(bulk.records[0].mtResponses.length, 40);
+
     console.log("Import worker tests passed");
   } finally {
     cleanup();

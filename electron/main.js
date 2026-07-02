@@ -621,7 +621,7 @@ function runForkWorker(scriptName, payload, webContents, progressChannel, option
     child.on("error", (error) => settle(reject, error));
     child.on("exit", (code) => {
       if (settled) return;
-      const details = stderr || stdout || `退出码 ${code}`;
+      const details = stderr || stdout || (code === 0 ? "worker 已退出但主进程没有收到结果消息" : `退出码 ${code}`);
       settle(reject, new Error(`${scriptName} 后台任务异常结束：${details}`));
     });
     child.send({ type: "start", payload });

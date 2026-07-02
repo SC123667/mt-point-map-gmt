@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.12 - 2026-07-03
+
+- Fixed EDI directory imports that could fail with `import-worker.js 后台任务异常结束：退出码 0` when the worker exited before a large IPC result finished transferring.
+- Added bulk EDI import worker coverage so large multi-period EDI results are returned before the worker disconnects.
+
 ## v0.9.11 - 2026-07-03
 
 - Added original table-row coordinate validation so the quality panel can count mapped source rows with invalid, placeholder, or out-of-range coordinates.

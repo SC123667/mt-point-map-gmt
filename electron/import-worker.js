@@ -10,18 +10,40 @@ process.on("message", async (message) => {
   if (!message || message.type !== "start") return;
   try {
     const result = await handleTask(message.payload || {});
-    send({ type: "result", result });
-    setImmediate(() => process.exit(0));
+    await send({ type: "result", result });
+    finish(0);
   } catch (error) {
-    send({ type: "error", message: error.message || String(error), stack: error.stack || "" });
-    setImmediate(() => process.exit(1));
+    try {
+      await send({ type: "error", message: error.message || String(error), stack: error.stack || "" });
+    } finally {
+      finish(1);
+    }
   }
 });
 
-process.on("disconnect", () => process.exit(0));
+process.on("disconnect", () => process.exit(process.exitCode || 0));
 
 function send(payload) {
-  if (process.connected) process.send(payload);
+  if (!process.connected) return Promise.resolve(false);
+  return new Promise((resolve, reject) => {
+    process.send(payload, (error) => {
+      if (error) reject(error);
+      else resolve(true);
+    });
+  });
+}
+
+function sendProgress(payload) {
+  void send(payload).catch(() => {});
+}
+
+function finish(code) {
+  process.exitCode = code;
+  if (process.connected) {
+    process.disconnect();
+    return;
+  }
+  setImmediate(() => process.exit(code));
 }
 
 async function handleTask(payload) {
@@ -73,7 +95,7 @@ function loadEdiDirectory(directory) {
       });
     }
     if (index % 25 === 0 || index === ediFiles.length - 1) {
-      send({
+      sendProgress({
         type: "progress",
         progress: {
           mode: "ediDirectory",
@@ -119,7 +141,7 @@ function summarizeFaultFiles(filePaths, color) {
       try {
         const summary = summarizeFaultFile(filePath, faultColor);
         if (index % 5 === 0 || index === filePaths.length - 1) {
-          send({
+          sendProgress({
             type: "progress",
             progress: {
               mode: "faultFiles",
