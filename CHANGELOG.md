@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.8.1 - 2026-07-03
+
+- Refined the preview-first workspace with macOS-style translucent glass panels, softer depth, and a more polished toolbar.
+- Added clearer hover, active, and keyboard-focus states for compact plot tabs, module buttons, forms, dialogs, and preview controls.
+- Improved the preview canvas, status bar, table styling, and scrollbars while keeping the workflow and control density unchanged.
+
 ## v0.8.0 - 2026-07-03
 
 - Redesigned the workspace around a large preview-first canvas with compact Photoshop-style module buttons in the top toolbar.
