@@ -41,6 +41,10 @@ const state = {
   legendLabels: {
     stationTouched: false,
     overlayTouched: false
+  },
+  settingsDialog: {
+    panel: "",
+    items: []
   }
 };
 
@@ -77,6 +81,18 @@ const TERRAIN_RESOLUTIONS = {
   "01s": { seconds: 1, label: "1 秒，约 30 m", source: "srtm" }
 };
 const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
+const SETTINGS_PANELS = {
+  data: "数据",
+  fields: "字段识别",
+  mtFields: "MT 响应字段",
+  frame: "图幅",
+  terrain: "地形底图",
+  overlay: "叠加层与图例",
+  symbol: "点位符号",
+  labels: "测点标签",
+  elements: "图件元素",
+  mtParams: "MT 图件参数"
+};
 
 const ids = [
   "appStatus", "dataSummary", "nameColumn", "lonColumn", "latColumn",
@@ -89,6 +105,7 @@ const ids = [
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
+  "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
   "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
   "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
   "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
@@ -106,7 +123,7 @@ const ids = [
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
   "legendBorderColorPicker", "legendBorderWidthInput",
-  "deleteOutputBtn"
+  "deleteOutputBtn", "versionText"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
@@ -119,60 +136,84 @@ window.addEventListener("DOMContentLoaded", async () => {
   await refreshStatus();
 });
 
+function bind(control, eventName, handler, options) {
+  if (control) control.addEventListener(eventName, handler, options);
+}
+
 function wireEvents() {
   window.mtApp.onMenuOpenFile(openPointFile);
   window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
   window.mtApp.onMenuLoadSample(loadSampleData);
   window.mtApp.onMenuChooseOutputDirectory(chooseOutputDirectory);
-  window.mtApp.onMenuShowTableHelp(showTableHelp);
+  window.mtApp.onMenuShowTableHelp?.(showTableHelp);
+  window.mtApp.onMenuExportPng?.(() => exportMap(["png"], true));
+  window.mtApp.onMenuExportPdf?.(() => exportMap(["pdf"], true));
+  window.mtApp.onMenuExportBoth?.(() => exportMap(["png", "pdf"], true));
+  window.mtApp.onMenuSaveScript?.(saveScript);
+  window.mtApp.onMenuDeleteOutputs?.(deleteCurrentOutputs);
+  window.mtApp.onMenuOpenSettingsPanel?.((panel) => openSettingsPanel(panel));
+  window.mtApp.onMenuRecheckGMT?.(recheckGMT);
+  window.mtApp.onMenuInstallGMT?.(installGMT);
   document.querySelectorAll(".tool-tab").forEach((button) => {
     button.addEventListener("click", () => setPlotType(button.dataset.plotType));
   });
-  el.tableHelpBtn.addEventListener("click", showTableHelp);
-  el.closeTableHelpBtn.addEventListener("click", () => el.tableHelpDialog.close());
-  el.applyMappingBtn.addEventListener("click", applyMapping);
-  el.autoRegionBtn.addEventListener("click", () => {
+  document.querySelectorAll(".settings-tool").forEach((button) => {
+    button.addEventListener("click", () => openSettingsPanel(button.dataset.settingsPanel));
+  });
+  bind(el.tableHelpBtn, "click", showTableHelp);
+  bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
+  bind(el.closeTableHelpBtn, "click", () => el.tableHelpDialog.close());
+  bind(el.applyMappingBtn, "click", () => applyMapping({ autoPreview: true }));
+  bind(el.settingsCloseBtn, "click", closeSettingsDialog);
+  bind(el.settingsCancelBtn, "click", closeSettingsDialog);
+  bind(el.settingsConfirmBtn, "click", confirmSettingsDialog);
+  bind(el.settingsDialog, "cancel", (event) => {
+    event.preventDefault();
+    closeSettingsDialog();
+  });
+  bind(el.autoRegionBtn, "click", () => {
     if (!state.records.length) return notify("请先导入点位文件。");
     el.regionInput.value = autoRegionClient(state.records);
+    scheduleAutoPreview("图幅范围已更新，正在自动绘制预览...", { delay: 100 });
   });
-  el.previewBtn.addEventListener("click", () => exportMap(["png"], false));
-  el.exportPngBtn.addEventListener("click", () => exportMap(["png"], true));
-  el.exportPdfBtn.addEventListener("click", () => exportMap(["pdf"], true));
-  el.exportBothBtn.addEventListener("click", () => exportMap(["png", "pdf"], true));
-  el.saveScriptBtn.addEventListener("click", saveScript);
-  el.deleteOutputBtn.addEventListener("click", deleteCurrentOutputs);
-  el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
-  el.importFaultBtn.addEventListener("click", importFaultLayers);
-  el.clearFaultsBtn.addEventListener("click", clearFaultLayers);
+  bind(el.previewBtn, "click", () => exportMap(["png"], false));
+  bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
+  bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
+  bind(el.exportBothBtn, "click", () => exportMap(["png", "pdf"], true));
+  bind(el.saveScriptBtn, "click", saveScript);
+  bind(el.deleteOutputBtn, "click", deleteCurrentOutputs);
+  bind(el.chooseOutputBtn, "click", chooseOutputDirectory);
+  bind(el.importFaultBtn, "click", importFaultLayers);
+  bind(el.clearFaultsBtn, "click", clearFaultLayers);
   wireLegendControls();
-  el.previewFitBtn.addEventListener("click", () => resetPreviewView());
-  el.previewBox.addEventListener("wheel", handlePreviewWheel, { passive: false });
-  el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
-  el.previewBox.addEventListener("pointermove", handlePreviewPointerMove);
-  el.previewBox.addEventListener("pointerup", handlePreviewPointerUp);
-  el.previewBox.addEventListener("pointercancel", cancelPreviewInteraction);
-  el.legendDragHandle.addEventListener("pointerdown", handleLegendPointerDown);
-  el.legendDragHandle.addEventListener("pointermove", handleLegendPointerMove);
-  el.legendDragHandle.addEventListener("pointerup", handleLegendPointerUp);
-  el.legendDragHandle.addEventListener("pointercancel", cancelLegendDrag);
-  el.prepareTerrainBtn.addEventListener("click", () => prepareTerrain(false));
-  el.pauseTerrainBtn.addEventListener("click", () => window.mtApp.pauseTerrain());
-  el.resumeTerrainBtn.addEventListener("click", () => window.mtApp.resumeTerrain());
-  el.cancelTerrainBtn.addEventListener("click", () => window.mtApp.cancelTerrain());
-  el.deleteTerrainBtn.addEventListener("click", deleteLocalTerrain);
-  el.clearTerrainCacheBtn.addEventListener("click", clearTerrainCache);
-  el.chooseLocalTerrainBtn.addEventListener("click", chooseLocalTerrainGrid);
-  el.clearLocalTerrainBtn.addEventListener("click", clearLocalTerrainGrid);
-  el.terrainDocsBtn.addEventListener("click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
+  bind(el.previewFitBtn, "click", () => resetPreviewView());
+  bind(el.previewBox, "wheel", handlePreviewWheel, { passive: false });
+  bind(el.previewBox, "pointerdown", handlePreviewPointerDown);
+  bind(el.previewBox, "pointermove", handlePreviewPointerMove);
+  bind(el.previewBox, "pointerup", handlePreviewPointerUp);
+  bind(el.previewBox, "pointercancel", cancelPreviewInteraction);
+  bind(el.legendDragHandle, "pointerdown", handleLegendPointerDown);
+  bind(el.legendDragHandle, "pointermove", handleLegendPointerMove);
+  bind(el.legendDragHandle, "pointerup", handleLegendPointerUp);
+  bind(el.legendDragHandle, "pointercancel", cancelLegendDrag);
+  bind(el.prepareTerrainBtn, "click", () => prepareTerrain(false));
+  bind(el.pauseTerrainBtn, "click", () => window.mtApp.pauseTerrain());
+  bind(el.resumeTerrainBtn, "click", () => window.mtApp.resumeTerrain());
+  bind(el.cancelTerrainBtn, "click", () => window.mtApp.cancelTerrain());
+  bind(el.deleteTerrainBtn, "click", deleteLocalTerrain);
+  bind(el.clearTerrainCacheBtn, "click", clearTerrainCache);
+  bind(el.chooseLocalTerrainBtn, "click", chooseLocalTerrainGrid);
+  bind(el.clearLocalTerrainBtn, "click", clearLocalTerrainGrid);
+  bind(el.terrainDocsBtn, "click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
   [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput].forEach((control) => {
-    control.addEventListener("input", updateTerrainEstimate);
-    control.addEventListener("change", updateTerrainEstimate);
+    bind(control, "input", updateTerrainEstimate);
+    bind(control, "change", updateTerrainEstimate);
   });
-  el.recheckBtn.addEventListener("click", recheckGMT);
-  el.installBtn.addEventListener("click", installGMT);
-  el.pauseDownloadBtn.addEventListener("click", () => window.mtApp.pauseGMTDownload());
-  el.resumeDownloadBtn.addEventListener("click", () => window.mtApp.resumeGMTDownload());
-  el.cancelDownloadBtn.addEventListener("click", () => window.mtApp.cancelGMTDownload());
+  bind(el.recheckBtn, "click", recheckGMT);
+  bind(el.installBtn, "click", installGMT);
+  bind(el.pauseDownloadBtn, "click", () => window.mtApp.pauseGMTDownload());
+  bind(el.resumeDownloadBtn, "click", () => window.mtApp.resumeGMTDownload());
+  bind(el.cancelDownloadBtn, "click", () => window.mtApp.cancelGMTDownload());
   window.mtApp.onGMTDownloadProgress(renderDownloadProgress);
   window.mtApp.onTerrainProgress(renderTerrainProgress);
   document.querySelectorAll("[data-link]").forEach((button) => {
@@ -242,6 +283,7 @@ function setPlotType(plotType) {
   syncLegendLabelDefaults();
   el.outputNameInput.value = defaultOutputNameForPlot(state.plotType);
   renderPlaceholder();
+  scheduleAutoPreview("图件类型已切换，正在自动绘制预览...", { delay: 120 });
 }
 
 function defaultOutputNameForPlot(plotType) {
@@ -270,6 +312,51 @@ function defaultLegendOverlayLabel(plotType) {
 function showTableHelp() {
   if (typeof el.tableHelpDialog.showModal === "function") el.tableHelpDialog.showModal();
   else notify("表格格式：基础列为测点名、经度、纬度；MT 列为 period/freq、ZXXR/ZXXI、ZXYR/ZXYI、ZYXR/ZYXI、ZYYR/ZYYI、TXR/TXI、TYR/TYI。");
+}
+
+function openSettingsPanel(panel) {
+  const panelKey = SETTINGS_PANELS[panel] ? panel : "frame";
+  closeSettingsDialog();
+  const nodes = Array.from(document.querySelectorAll(`[data-settings-panel="${panelKey}"]`));
+  if (!nodes.length) return notify("这个设置面板还没有可编辑内容。");
+  el.settingsDialogTitle.textContent = SETTINGS_PANELS[panelKey];
+  el.settingsDialogBody.replaceChildren();
+  state.settingsDialog.panel = panelKey;
+  state.settingsDialog.items = nodes.map((node) => {
+    const placeholder = document.createComment(`settings:${panelKey}`);
+    node.parentNode.insertBefore(placeholder, node);
+    if (node.tagName === "DETAILS") node.open = true;
+    el.settingsDialogBody.append(node);
+    return { node, placeholder };
+  });
+  if (typeof el.settingsDialog.showModal === "function") el.settingsDialog.showModal();
+  else el.settingsDialog.setAttribute("open", "");
+}
+
+function closeSettingsDialog(options = {}) {
+  restoreSettingsDialogNodes();
+  state.settingsDialog.panel = "";
+  if (!options.keepClosed && el.settingsDialog?.open) el.settingsDialog.close();
+}
+
+function restoreSettingsDialogNodes() {
+  for (const item of state.settingsDialog.items) {
+    if (!item.placeholder?.parentNode) continue;
+    item.placeholder.parentNode.insertBefore(item.node, item.placeholder);
+    item.placeholder.remove();
+  }
+  state.settingsDialog.items = [];
+  el.settingsDialogBody?.replaceChildren();
+}
+
+async function confirmSettingsDialog() {
+  const panel = state.settingsDialog.panel;
+  if (panel === "fields" || panel === "mtFields") {
+    const applied = await applyMapping({ silent: true });
+    if (!applied) return;
+  }
+  closeSettingsDialog();
+  scheduleAutoPreview(`${SETTINGS_PANELS[panel] || "设置"}已更新，正在自动绘制预览...`, { delay: 120 });
 }
 
 async function openPointFile() {
@@ -301,6 +388,7 @@ async function loadSampleData() {
 async function refreshStatus() {
   const status = await window.mtApp.status();
   state.outputDirectory = status.outputDirectory;
+  if (el.versionText) el.versionText.textContent = `v${status.version || ""}`;
   renderOutputDirectory();
   renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
   updateTerrainEstimate();
@@ -399,6 +487,7 @@ function loadParsed(parsed) {
   renderPlaceholder();
   resetTerrainPaths();
   updateTerrainEstimate();
+  scheduleAutoPreview("数据已导入，正在自动绘制预览...", { delay: 150 });
 }
 
 function populateColumnSelects() {
@@ -448,13 +537,20 @@ function setMTColumnValues(mapping) {
   }
 }
 
-async function applyMapping() {
-  if (!state.parsed) return notify("请先导入点位文件。");
+async function applyMapping(options = {}) {
+  if (!state.parsed) {
+    notify("请先导入点位文件。");
+    return false;
+  }
   const mapping = readMapping();
   if (mapping.coordinateType === "projected") {
-    if (!mapping.easting || !mapping.northing) return notify("投影坐标列必须选择。");
+    if (!mapping.easting || !mapping.northing) {
+      notify("投影坐标列必须选择。");
+      return false;
+    }
   } else if (!mapping.lon || !mapping.lat) {
-    return notify("经度和纬度列必须选择。");
+    notify("经度和纬度列必须选择。");
+    return false;
   }
   try {
     const result = await window.mtApp.applyMapping({ rows: state.parsed.rows, mapping });
@@ -465,9 +561,12 @@ async function applyMapping() {
     populateMTControls();
     resetTerrainPaths();
     updateTerrainEstimate();
-    notify("字段映射已更新。");
+    if (!options.silent) notify("字段映射已更新。");
+    if (options.autoPreview) scheduleAutoPreview("字段映射已更新，正在自动绘制预览...", { delay: 120 });
+    return true;
   } catch (error) {
     notify(error.message);
+    return false;
   }
 }
 
@@ -1173,11 +1272,11 @@ function clearPreviewImage() {
 
 function renderPlaceholder() {
   const labels = {
-    stationMap: "点击“生成预览”绘制点位图",
-    strikeMap: "选择周期后生成走向图",
-    phaseTensorMap: "选择周期后生成相位张量椭圆图",
-    tipperMap: "选择周期和分量后生成感应矢量图",
-    responseCurve: "选择测点后生成视电阻率和相位曲线"
+    stationMap: "导入点位后自动绘制点位图",
+    strikeMap: "导入 MT 数据并选择周期后自动绘制走向图",
+    phaseTensorMap: "导入 MT 数据并选择周期后自动绘制相位张量椭圆图",
+    tipperMap: "导入 MT 数据并选择周期后自动绘制感应矢量图",
+    responseCurve: "导入 MT 数据并选择测点后自动绘制视电阻率和相位曲线"
   };
   clearPreviewImage();
   el.previewPlaceholder.hidden = false;
@@ -1205,8 +1304,10 @@ async function refreshPreviewAutomatically() {
 }
 
 function setPreviewBusy(active, message = "") {
-  el.previewBtn.disabled = active;
-  el.previewBtn.textContent = active ? "生成中..." : "生成预览";
+  if (el.previewBtn) {
+    el.previewBtn.disabled = active;
+    el.previewBtn.textContent = active ? "生成中..." : "生成预览";
+  }
   if (active) setPreviewStatus(message || "正在生成预览...", "busy");
   else if (el.previewStatus.dataset.kind === "busy") hidePreviewStatus();
 }
@@ -1331,15 +1432,22 @@ function renderLegendDragHandle() {
 
 function previewImageFitRect() {
   const box = el.previewBox.getBoundingClientRect();
+  const layerStyle = getComputedStyle(el.previewImageLayer);
+  const padLeft = Number.parseFloat(layerStyle.paddingLeft) || 0;
+  const padRight = Number.parseFloat(layerStyle.paddingRight) || 0;
+  const padTop = Number.parseFloat(layerStyle.paddingTop) || 0;
+  const padBottom = Number.parseFloat(layerStyle.paddingBottom) || 0;
+  const contentWidth = Math.max(0, box.width - padLeft - padRight);
+  const contentHeight = Math.max(0, box.height - padTop - padBottom);
   const imageWidth = state.preview.imageWidth || box.width;
   const imageHeight = state.preview.imageHeight || box.height;
-  if (!box.width || !box.height || !imageWidth || !imageHeight) return { left: 0, top: 0, width: 0, height: 0 };
-  const scale = Math.min(box.width / imageWidth, box.height / imageHeight);
+  if (!contentWidth || !contentHeight || !imageWidth || !imageHeight) return { left: 0, top: 0, width: 0, height: 0 };
+  const scale = Math.min(contentWidth / imageWidth, contentHeight / imageHeight);
   const width = imageWidth * scale;
   const height = imageHeight * scale;
   return {
-    left: (box.width - width) / 2,
-    top: (box.height - height) / 2,
+    left: padLeft + (contentWidth - width) / 2,
+    top: padTop + (contentHeight - height) / 2,
     width,
     height
   };

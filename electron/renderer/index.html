@@ -10,9 +10,9 @@
     <header class="app-header">
       <div>
         <h1>MT点位图制作工具—GMT</h1>
-        <p id="appStatus">正在检测 GMT...</p>
+        <p id="appStatus" class="gmt-status-cache">正在检测 GMT...</p>
       </div>
-      <div class="header-actions">
+      <div class="header-actions gmt-header-actions">
         <button id="recheckBtn">重新检测 GMT</button>
         <button id="installBtn" class="primary">安装 GMT</button>
       </div>
@@ -52,15 +52,27 @@
         </label>
         <button id="tableHelpBtn" type="button">表格格式</button>
       </div>
+      <div class="settings-toolbar" aria-label="参数模块">
+        <button class="settings-tool" data-settings-panel="data" title="数据" type="button">数据</button>
+        <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段</button>
+        <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
+        <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
+        <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形</button>
+        <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加</button>
+        <button class="settings-tool" data-settings-panel="symbol" title="点位符号" type="button">符号</button>
+        <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">标签</button>
+        <button class="settings-tool" data-settings-panel="elements" title="图件元素" type="button">元素</button>
+        <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
+      </div>
     </nav>
 
     <main class="layout">
       <section class="pane data-pane">
-        <div class="section-title">
+        <div class="section-title" data-settings-panel="data">
           <h2>数据</h2>
           <p id="dataSummary">未导入点位文件</p>
         </div>
-        <fieldset>
+        <fieldset data-settings-panel="fields">
           <legend>字段识别</legend>
           <label>测点名<select id="nameColumn"></select></label>
           <label>经度<select id="lonColumn"></select></label>
@@ -70,7 +82,7 @@
           <button id="applyMappingBtn">应用字段映射</button>
         </fieldset>
 
-        <details class="mt-field-details">
+        <details class="mt-field-details" data-settings-panel="mtFields">
           <summary>MT 响应字段</summary>
           <div class="mt-field-grid">
             <label>周期<select id="periodColumn"></select></label>
@@ -96,7 +108,7 @@
           <p class="field-note">表格可一行一个周期，按测点名分组；也可只提供预计算走向、相位张量或 tipper 列。</p>
         </details>
 
-        <table>
+        <table data-settings-panel="data">
           <thead>
             <tr><th>测点</th><th>经度</th><th>纬度</th></tr>
           </thead>
@@ -105,16 +117,6 @@
       </section>
 
       <section class="pane preview-pane">
-        <div class="section-title horizontal">
-          <div>
-            <h2>地图预览</h2>
-            <div class="output-row">
-              <p id="outputPath">输出目录将在导出后显示</p>
-              <button id="chooseOutputBtn" type="button">选择导出目录</button>
-            </div>
-          </div>
-          <button id="previewBtn" class="primary">生成预览</button>
-        </div>
         <div class="preview-box" id="previewBox" tabindex="0">
           <div class="preview-image-layer" id="previewImageLayer" aria-hidden="true"></div>
           <div class="preview-selection" id="previewSelection" aria-hidden="true"></div>
@@ -125,13 +127,6 @@
           <button id="legendDragHandle" class="legend-drag-handle hidden" type="button" aria-label="拖动图例位置"></button>
           <span id="previewStatus" class="preview-status hidden" aria-live="polite"></span>
           <span id="previewPlaceholder">导入点位后生成预览</span>
-        </div>
-        <div class="button-row export-row">
-          <button id="exportPngBtn">导出 PNG</button>
-          <button id="exportPdfBtn">导出 PDF</button>
-          <button id="exportBothBtn">导出 PNG + PDF</button>
-          <button id="saveScriptBtn">保存 GMT 脚本</button>
-          <button id="deleteOutputBtn" class="danger">删除当前图件</button>
         </div>
         <details>
           <summary>GMT 安装说明</summary>
@@ -144,11 +139,11 @@
       </section>
 
       <section class="pane parameter-pane">
-        <div class="section-title">
+        <div class="section-title" data-settings-panel="mtParams">
           <h2 id="inspectorTitle">绘图参数</h2>
           <p id="plotTypeHint">点位图模式</p>
         </div>
-        <fieldset class="map-settings">
+        <fieldset class="map-settings" data-settings-panel="frame">
           <legend>图幅</legend>
           <label>标题<input id="titleInput" value="MT Survey Stations" /></label>
           <label>范围 -R<input id="regionInput" /></label>
@@ -157,7 +152,7 @@
           <button id="autoRegionBtn">根据点位自动范围</button>
         </fieldset>
 
-        <fieldset class="map-settings">
+        <fieldset class="map-settings" data-settings-panel="terrain">
           <legend>地形底图</legend>
           <label class="check"><input id="showTerrainInput" type="checkbox" />启用地形晕渲底图</label>
           <label>分辨率
@@ -208,7 +203,7 @@
           </div>
         </fieldset>
 
-        <fieldset class="analysis-settings">
+        <fieldset class="analysis-settings" data-settings-panel="mtParams">
           <legend>MT 图件参数</legend>
           <label class="analysis-only curve-only">曲线测点<select id="curveStationInput"></select></label>
           <label class="analysis-only strike-only">走向长度<input id="strikeLengthInput" type="number" min="0.005" max="0.12" step="0.005" value="0.035" /></label>
@@ -242,7 +237,7 @@
           <label class="analysis-only tipper-only">箭头尺度<input id="tipperScaleInput" type="number" min="0.005" max="0.15" step="0.005" value="0.055" /></label>
         </fieldset>
 
-        <details class="map-settings overlay-details">
+        <details class="map-settings overlay-details" data-settings-panel="overlay">
           <summary>
             <span>叠加层与图例</span>
             <span id="faultOverlaySummary" class="summary-pill">无叠加</span>
@@ -301,7 +296,7 @@
           </div>
         </details>
 
-        <fieldset class="map-settings">
+        <fieldset class="map-settings" data-settings-panel="symbol">
           <legend>点位符号</legend>
           <label>形状
             <select id="symbolInput">
@@ -327,7 +322,7 @@
           </label>
         </fieldset>
 
-        <fieldset class="map-settings">
+        <fieldset class="map-settings" data-settings-panel="labels">
           <legend>测点标签</legend>
           <label class="check"><input id="showLabelsInput" type="checkbox" checked />显示测点名</label>
           <label>字号 pt<input id="labelSizeInput" type="number" min="5" max="18" step="0.5" value="8" /></label>
@@ -341,7 +336,7 @@
           <label>上移 cm<input id="labelDYInput" type="number" min="-0.5" max="0.8" step="0.01" value="0.08" /></label>
         </fieldset>
 
-        <fieldset class="map-settings">
+        <fieldset class="map-settings" data-settings-panel="elements">
           <legend>图件元素</legend>
           <label class="check"><input id="showGridInput" type="checkbox" checked />经纬网</label>
           <label class="check"><input id="showScaleInput" type="checkbox" checked />比例尺</label>
@@ -350,6 +345,23 @@
         </fieldset>
       </section>
     </main>
+
+    <footer class="status-bar">
+      <span id="outputPath">输出目录将在导出后显示</span>
+      <span id="versionText">v0.8.0</span>
+    </footer>
+
+    <dialog id="settingsDialog" class="settings-dialog">
+      <div class="dialog-head">
+        <h2 id="settingsDialogTitle">设置</h2>
+        <button id="settingsCloseBtn" type="button">关闭</button>
+      </div>
+      <div id="settingsDialogBody" class="settings-dialog-body"></div>
+      <div class="settings-dialog-footer">
+        <button id="settingsCancelBtn" type="button">取消</button>
+        <button id="settingsConfirmBtn" class="primary" type="button">确认并更新预览</button>
+      </div>
+    </dialog>
 
     <dialog id="tableHelpDialog" class="table-help-dialog">
       <div class="dialog-head">

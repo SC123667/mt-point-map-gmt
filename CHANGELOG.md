@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.8.0 - 2026-07-03
+
+- Redesigned the workspace around a large preview-first canvas with compact Photoshop-style module buttons in the top toolbar.
+- Moved data, field mapping, MT response fields, frame, terrain, overlay/legend, symbol, label, element, and MT plot settings into separate confirmation dialogs.
+- Moved all export actions and output-directory selection out of the main UI and into `File > Export`.
+- Added automatic preview rendering after data import, plot-type switching, and confirmed settings changes, removing the main `Generate Preview` button.
+- Moved the output directory and app version into a bottom status bar, and moved GMT detection/install controls into a dedicated desktop `GMT` menu.
+- Added internal preview padding so rendered maps do not sit too close to the preview frame.
+
 ## v0.7.2 - 2026-07-02
 
 - Replaced the visible text legend drag handle with a small unlabeled control point so the preview no longer appears to contain a second legend box.

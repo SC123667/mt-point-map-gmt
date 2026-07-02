@@ -89,8 +89,36 @@ function configureMenu(win) {
         },
         { type: "separator" },
         {
-          label: "选择导出目录...",
-          click: () => sendMenuAction(win, "menu:chooseOutputDirectory")
+          label: "导出",
+          submenu: [
+            {
+              label: "导出 PNG...",
+              accelerator: "CmdOrCtrl+E",
+              click: () => sendMenuAction(win, "menu:exportPng")
+            },
+            {
+              label: "导出 PDF...",
+              click: () => sendMenuAction(win, "menu:exportPdf")
+            },
+            {
+              label: "导出 PNG + PDF...",
+              accelerator: "CmdOrCtrl+Shift+E",
+              click: () => sendMenuAction(win, "menu:exportBoth")
+            },
+            {
+              label: "保存 GMT 脚本...",
+              click: () => sendMenuAction(win, "menu:saveScript")
+            },
+            { type: "separator" },
+            {
+              label: "选择导出目录...",
+              click: () => sendMenuAction(win, "menu:chooseOutputDirectory")
+            },
+            {
+              label: "删除当前图件...",
+              click: () => sendMenuAction(win, "menu:deleteOutputs")
+            }
+          ]
         },
         { type: "separator" },
         isMac ? { role: "close", label: "关闭窗口" } : { role: "quit", label: "退出" }
@@ -106,6 +134,44 @@ function configureMenu(win) {
         { role: "copy", label: "复制" },
         { role: "paste", label: "粘贴" },
         { role: "selectAll", label: "全选" }
+      ]
+    },
+    {
+      label: "设置",
+      submenu: [
+        { label: "数据", click: () => sendMenuAction(win, "menu:openSettingsPanel", "data") },
+        { label: "字段识别", click: () => sendMenuAction(win, "menu:openSettingsPanel", "fields") },
+        { label: "MT 响应字段", click: () => sendMenuAction(win, "menu:openSettingsPanel", "mtFields") },
+        { type: "separator" },
+        { label: "图幅", click: () => sendMenuAction(win, "menu:openSettingsPanel", "frame") },
+        { label: "地形底图", click: () => sendMenuAction(win, "menu:openSettingsPanel", "terrain") },
+        { label: "叠加层与图例", click: () => sendMenuAction(win, "menu:openSettingsPanel", "overlay") },
+        { label: "点位符号", click: () => sendMenuAction(win, "menu:openSettingsPanel", "symbol") },
+        { label: "测点标签", click: () => sendMenuAction(win, "menu:openSettingsPanel", "labels") },
+        { label: "图件元素", click: () => sendMenuAction(win, "menu:openSettingsPanel", "elements") },
+        { label: "MT 图件参数", click: () => sendMenuAction(win, "menu:openSettingsPanel", "mtParams") }
+      ]
+    },
+    {
+      label: "GMT",
+      submenu: [
+        {
+          label: "重新检测 GMT",
+          click: () => sendMenuAction(win, "menu:recheckGMT")
+        },
+        {
+          label: "下载并安装 GMT",
+          click: () => sendMenuAction(win, "menu:installGMT")
+        },
+        { type: "separator" },
+        {
+          label: "GMT 中文手册安装页",
+          click: () => shell.openExternal("https://docs.gmt-china.org/latest/install/")
+        },
+        {
+          label: "GMT 官方下载页",
+          click: () => shell.openExternal("https://www.generic-mapping-tools.org/download/")
+        }
       ]
     },
     {
@@ -133,15 +199,6 @@ function configureMenu(win) {
       label: "帮助",
       submenu: [
         {
-          label: "GMT 中文手册安装页",
-          click: () => shell.openExternal("https://docs.gmt-china.org/latest/install/")
-        },
-        {
-          label: "GMT 官方下载页",
-          click: () => shell.openExternal("https://www.generic-mapping-tools.org/download/")
-        },
-        { type: "separator" },
-        {
           label: "表格格式说明",
           click: () => sendMenuAction(win, "menu:showTableHelp")
         }
@@ -151,8 +208,8 @@ function configureMenu(win) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function sendMenuAction(win, action) {
-  if (win && !win.isDestroyed()) win.webContents.send(action);
+function sendMenuAction(win, action, payload) {
+  if (win && !win.isDestroyed()) win.webContents.send(action, payload);
 }
 
 app.whenReady().then(() => {
@@ -723,7 +780,15 @@ function loadRenderer(win) {
       onMenuOpenEdiDirectory: (handler) => ipcRenderer.on("menu:openEdiDirectory", handler),
       onMenuLoadSample: (handler) => ipcRenderer.on("menu:loadSample", handler),
       onMenuChooseOutputDirectory: (handler) => ipcRenderer.on("menu:chooseOutputDirectory", handler),
+      onMenuExportPng: (handler) => ipcRenderer.on("menu:exportPng", handler),
+      onMenuExportPdf: (handler) => ipcRenderer.on("menu:exportPdf", handler),
+      onMenuExportBoth: (handler) => ipcRenderer.on("menu:exportBoth", handler),
+      onMenuSaveScript: (handler) => ipcRenderer.on("menu:saveScript", handler),
+      onMenuDeleteOutputs: (handler) => ipcRenderer.on("menu:deleteOutputs", handler),
       onMenuShowTableHelp: (handler) => ipcRenderer.on("menu:showTableHelp", handler),
+      onMenuOpenSettingsPanel: (handler) => ipcRenderer.on("menu:openSettingsPanel", (_event, panel) => handler(panel)),
+      onMenuRecheckGMT: (handler) => ipcRenderer.on("menu:recheckGMT", handler),
+      onMenuInstallGMT: (handler) => ipcRenderer.on("menu:installGMT", handler),
       recheckGMT: () => ipcRenderer.invoke("gmt:recheck"),
       openExternal: (url) => ipcRenderer.invoke("shell:openExternal", url),
       openPath: (targetPath) => ipcRenderer.invoke("shell:openPath", targetPath)
