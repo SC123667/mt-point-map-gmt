@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.6.0 - 2026-07-02
+
+- Added compact structural-line overlays for GMT multi-segment, BLN, and simple longitude/latitude files, with per-file color control.
+- Added optional GMT legend generation for station points and imported structural-line layers.
+- Kept the interface compact by placing overlays and legend controls inside a collapsible parameter section instead of adding another top-level plot tab.
+- Added regression coverage for fault parsing, overlay data generation, legend specs, and generated GMT script wiring.
 - Prepared the project for public GitHub distribution with a bilingual README, repository metadata, and an explicit MIT license file.
 - Added Chinese/English parallel public documentation and package description for GitHub exposure.
 

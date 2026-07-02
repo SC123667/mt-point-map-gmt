@@ -240,6 +240,32 @@
           <label class="analysis-only tipper-only">箭头尺度<input id="tipperScaleInput" type="number" min="0.005" max="0.15" step="0.005" value="0.055" /></label>
         </fieldset>
 
+        <details class="map-settings overlay-details">
+          <summary>
+            <span>叠加层与图例</span>
+            <span id="faultOverlaySummary" class="summary-pill">无叠加</span>
+          </summary>
+          <div class="compact-row">
+            <label class="color-chip-label">颜色<input id="faultColorInput" type="color" value="#d7191c" /></label>
+            <button id="importFaultBtn" type="button">导入构造线</button>
+            <button id="clearFaultsBtn" type="button">清空</button>
+          </div>
+          <div id="faultFileList" class="layer-list" aria-live="polite"></div>
+          <div class="legend-options">
+            <label class="check"><input id="showLegendInput" type="checkbox" />显示图例</label>
+            <label>标题<input id="legendTitleInput" value="Legend" /></label>
+            <label>位置
+              <select id="legendPositionInput">
+                <option value="n0.98/0.98+jTR" selected>右上</option>
+                <option value="n0.02/0.98+jTL">左上</option>
+                <option value="n0.98/0.02+jBR">右下</option>
+                <option value="n0.02/0.02+jBL">左下</option>
+              </select>
+            </label>
+            <label class="check"><input id="legendIncludeFaultsInput" type="checkbox" checked />包含构造线</label>
+          </div>
+        </details>
+
         <fieldset class="map-settings">
           <legend>点位符号</legend>
           <label>形状

@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("mtApp", {
   deleteLocalTerrain: (payload) => ipcRenderer.invoke("terrain:deleteLocal", payload),
   clearTerrainCache: () => ipcRenderer.invoke("terrain:clearCache"),
   onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
+  openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),
   imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
   installGMT: () => ipcRenderer.invoke("gmt:install"),
   pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),

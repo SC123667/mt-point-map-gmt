@@ -1,6 +1,6 @@
 {
   "name": "mt-point-map-gmt",
-  "version": "0.5.8",
+  "version": "0.6.0",
   "description": "MT点位图制作工具-GMT / Cross-platform GMT desktop tool for magnetotelluric station maps, EDI parsing, phase tensor, tipper, and MT sounding curves.",
   "main": "electron/main.js",
   "author": "CWN",
@@ -27,7 +27,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test:node": "node tests/parser_edi.test.js",
+    "test:node": "node tests/parser_edi.test.js && node tests/fault_legend.test.js",
     "dist:mac": "electron-builder --mac dmg dir",
     "dist:win": "electron-builder --win nsis portable",
     "pack:mac": "electron-builder --mac dir",

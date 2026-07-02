@@ -6,7 +6,10 @@ const { spawn, spawnSync } = require("child_process");
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, shell } = require("electron");
 const XLSX = require("xlsx");
 const { parseStationText, parseEdiStationText, buildEdiParsedResult, buildRecords } = require("./parser");
+const { summarizeFaultFile } = require("./faults");
 const {
+  DEFAULT_LEGEND_FILE,
+  DEFAULT_OVERLAY_FILE,
   autoRegion,
   buildScript,
   defaultOutputDirectory,
@@ -291,6 +294,33 @@ ipcMain.handle("terrain:chooseLocalGrid", async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle("fault:openFiles", async (_event, payload) => {
+  const result = await dialog.showOpenDialog({
+    title: "选择构造线或断层线文件",
+    properties: ["openFile", "multiSelections"],
+    filters: [
+      { name: "构造线文件", extensions: ["txt", "csv", "dat", "tsv", "xy", "gmt", "bln"] },
+      { name: "所有文件", extensions: ["*"] }
+    ]
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const color = String(payload?.color || "#d7191c");
+  return {
+    files: result.filePaths.map((filePath) => {
+      try {
+        return summarizeFaultFile(filePath, color);
+      } catch (error) {
+        return {
+          path: filePath,
+          name: path.basename(filePath),
+          color,
+          error: error.message || String(error)
+        };
+      }
+    })
+  };
+});
+
 ipcMain.handle("terrain:prepare", (event, payload) => startTerrainTask(event.sender, payload));
 ipcMain.handle("terrain:pause", () => {
   if (!currentTerrainTask) return { ok: false, message: "当前没有正在准备的地形底图。" };
@@ -521,6 +551,8 @@ function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, fo
     }
     copyIfExists(path.join(workspace.directory, "stations_points.tsv"), path.join(outputDirectory, "stations_points.tsv"));
     copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
+    copyIfExists(path.join(workspace.directory, DEFAULT_OVERLAY_FILE), path.join(outputDirectory, DEFAULT_OVERLAY_FILE));
+    copyIfExists(path.join(workspace.directory, DEFAULT_LEGEND_FILE), path.join(outputDirectory, DEFAULT_LEGEND_FILE));
     fs.rmSync(workspace.directory, { recursive: true, force: true });
   }
 }
@@ -680,6 +712,7 @@ function loadRenderer(win) {
       deleteLocalTerrain: (payload) => ipcRenderer.invoke("terrain:deleteLocal", payload),
       clearTerrainCache: () => ipcRenderer.invoke("terrain:clearCache"),
       onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
+      openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),
       imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
       pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),
@@ -721,7 +754,9 @@ function deleteCurrentOutputs(outputDirectory, outputName) {
   const candidates = [
     ...extensions.map((extension) => path.join(outputDirectory, `${outputName}.${extension}`)),
     path.join(outputDirectory, "stations_points.tsv"),
-    path.join(outputDirectory, "stations_labels.tsv")
+    path.join(outputDirectory, "stations_labels.tsv"),
+    path.join(outputDirectory, DEFAULT_OVERLAY_FILE),
+    path.join(outputDirectory, DEFAULT_LEGEND_FILE)
   ];
   const deleted = [];
   for (const filePath of candidates) {

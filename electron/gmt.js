@@ -4,6 +4,8 @@ const https = require("https");
 const path = require("path");
 const { execFileSync, spawn, spawnSync } = require("child_process");
 const { nearestResponse, metricsForResponse } = require("./mt");
+const { DEFAULT_OVERLAY_FILE, buildFaultOverlay } = require("./faults");
+const { DEFAULT_LEGEND_FILE, buildLegendEntries, legendCommand, writeLegendFile } = require("./legend");
 
 const GMT_MAC_VERSION = "6.5.0";
 const GMT_WINDOWS_VERSION = "6.6.0";
@@ -317,6 +319,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const environmentLines = gmtEnvironmentLines(gmt, shell);
   const terrain = terrainScriptParts(config, region, outputDirectory, shell);
   const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
+  const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
+  const legend = legendScriptPart(config, outputDirectory, region, shell);
   if (shell === "bat") {
     return [
       "@echo off",
@@ -328,11 +332,13 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       ...terrain.preCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
       terrain.imageCommand || `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+      ...faultOverlay.commands,
       `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
       ...mtOverlay.commands,
       config.showLabels ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
       config.showScale ? `gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
       config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
+      legend.command,
       "gmt end",
       ""
     ].filter(Boolean).join("\r\n");
@@ -347,14 +353,51 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     ...terrain.preCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
     terrain.imageCommand || `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+    ...faultOverlay.commands,
     `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
     ...mtOverlay.commands,
     config.showLabels ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
     config.showScale ? `  gmt basemap -R${region} -J${config.projection} -LjBR+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
     config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -TdjTR+w1.0c+o0.4c/0.4c` : "",
+    legend.command,
     "gmt end",
     ""
   ].filter(Boolean).join("\n");
+}
+
+function faultOverlayScriptParts(config, outputDirectory, region, shell) {
+  const layers = (config.faultLayers || [])
+    .filter((layer) => layer && layer.path)
+    .map((layer) => ({
+      path: String(layer.path),
+      name: String(layer.name || path.basename(layer.path)),
+      color: String(layer.color || "#d7191c")
+    }));
+  if (!layers.length) return { commands: [] };
+  const overlay = buildFaultOverlay(layers, outputDirectory, { filename: DEFAULT_OVERLAY_FILE });
+  if (overlay.empty) return { commands: [] };
+  const prefix = shell === "bat" ? "" : "  ";
+  const dataPath = shell === "bat" ? overlay.filename : overlay.path;
+  return {
+    commands: [
+      `${prefix}# Structural line overlays`,
+      `${prefix}gmt plot ${quote(dataPath)} -R${region} -J${config.projection}`
+    ]
+  };
+}
+
+function legendScriptPart(config, outputDirectory, region, shell) {
+  if (!config.legend?.show) return { command: "" };
+  const entries = buildLegendEntries(config);
+  if (!entries.length) return { command: "" };
+  const legend = writeLegendFile(entries, outputDirectory, {
+    ...config.legend,
+    filename: DEFAULT_LEGEND_FILE
+  });
+  const legendPath = shell === "bat" ? legend.filename : legend.path;
+  return {
+    command: legendCommand(legendPath, region, config.projection, shell, legend.config)
+  };
 }
 
 function mtOverlayScriptParts(records, config, outputDirectory, regionText, region, shell) {
@@ -956,5 +999,7 @@ module.exports = {
   terrainResolutionSeconds,
   terrainSource,
   terrainIntensity,
+  DEFAULT_OVERLAY_FILE,
+  DEFAULT_LEGEND_FILE,
   needsNativeTextRendering
 };

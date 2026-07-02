@@ -25,7 +25,8 @@ const state = {
     dragStart: null,
     dragPanStart: null
   },
-  terrainWaiter: null
+  terrainWaiter: null,
+  faultLayers: []
 };
 
 const PREVIEW_MIN_ZOOM = 1;
@@ -81,7 +82,10 @@ const ids = [
   "symbolInput", "pointSizeInput", "pointFillInput", "pointFillPicker", "penWidthInput",
   "penColorInput", "penColorPicker", "showLabelsInput", "labelSizeInput", "labelColorInput", "labelColorPicker",
   "labelDXInput", "labelDYInput",
-  "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput", "deleteOutputBtn"
+  "showGridInput", "showScaleInput", "showNorthInput", "outputNameInput",
+  "faultColorInput", "importFaultBtn", "clearFaultsBtn", "faultFileList", "faultOverlaySummary",
+  "showLegendInput", "legendTitleInput", "legendPositionInput", "legendIncludeFaultsInput",
+  "deleteOutputBtn"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
@@ -89,6 +93,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   populateColorControls();
   wireEvents();
   renderLocalTerrainGrid();
+  renderFaultLayers();
   setPlotType("stationMap");
   await refreshStatus();
 });
@@ -116,6 +121,10 @@ function wireEvents() {
   el.saveScriptBtn.addEventListener("click", saveScript);
   el.deleteOutputBtn.addEventListener("click", deleteCurrentOutputs);
   el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
+  el.importFaultBtn.addEventListener("click", importFaultLayers);
+  el.clearFaultsBtn.addEventListener("click", clearFaultLayers);
+  el.showLegendInput.addEventListener("change", renderFaultLayers);
+  el.legendIncludeFaultsInput.addEventListener("change", renderFaultLayers);
   el.previewFitBtn.addEventListener("click", () => resetPreviewView());
   el.previewBox.addEventListener("wheel", handlePreviewWheel, { passive: false });
   el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
@@ -466,10 +475,97 @@ function readConfig() {
     localTerrainGridPath: state.terrain.localGridPath,
     terrainGridPath: state.terrain.localGridPath || state.terrain.gridPath,
     terrainShadePath: state.terrain.shadePath,
+    faultLayers: state.faultLayers.map((layer) => ({
+      path: layer.path,
+      name: layer.name,
+      color: layer.color
+    })),
+    legend: {
+      show: el.showLegendInput.checked,
+      title: el.legendTitleInput.value.trim() || "Legend",
+      position: el.legendPositionInput.value,
+      includeFaults: el.legendIncludeFaultsInput.checked
+    },
     outputName: el.outputNameInput.value.trim() || "mt_point_map"
   };
   if (state.plotType === "responseCurve") config.showTerrain = false;
   return config;
+}
+
+async function importFaultLayers() {
+  try {
+    const result = await window.mtApp.openFaultFiles({ color: el.faultColorInput.value || "#d7191c" });
+    if (!result?.files?.length) return;
+    let imported = 0;
+    for (const file of result.files) {
+      if (file.error) {
+        notify(`${file.name}：${file.error}`);
+        continue;
+      }
+      const existing = state.faultLayers.findIndex((layer) => layer.path === file.path);
+      const layer = {
+        path: file.path,
+        name: file.name || baseName(file.path),
+        color: file.color || el.faultColorInput.value || "#d7191c",
+        segmentCount: file.segmentCount || 0,
+        pointCount: file.pointCount || 0
+      };
+      if (existing >= 0) state.faultLayers.splice(existing, 1, layer);
+      else state.faultLayers.push(layer);
+      imported += 1;
+    }
+    renderFaultLayers();
+    if (imported) notify(`已导入 ${imported} 个构造线文件。`);
+  } catch (error) {
+    notify(error.message || String(error));
+  }
+}
+
+function clearFaultLayers() {
+  if (!state.faultLayers.length) return;
+  state.faultLayers = [];
+  renderFaultLayers();
+}
+
+function removeFaultLayer(index) {
+  state.faultLayers.splice(index, 1);
+  renderFaultLayers();
+}
+
+function renderFaultLayers() {
+  el.faultFileList.innerHTML = "";
+  el.faultOverlaySummary.textContent = state.faultLayers.length ? `${state.faultLayers.length} 个叠加层` : "无叠加";
+  el.clearFaultsBtn.disabled = !state.faultLayers.length;
+  el.legendIncludeFaultsInput.disabled = !state.faultLayers.length;
+  if (!state.faultLayers.length) {
+    const empty = document.createElement("p");
+    empty.className = "field-note layer-empty";
+    empty.textContent = "未导入构造线";
+    el.faultFileList.append(empty);
+    return;
+  }
+  state.faultLayers.forEach((layer, index) => {
+    const row = document.createElement("div");
+    row.className = "layer-item";
+
+    const swatch = document.createElement("span");
+    swatch.className = "layer-swatch";
+    swatch.style.background = layer.color || "#d7191c";
+
+    const label = document.createElement("span");
+    label.className = "layer-label";
+    label.textContent = `${layer.name} · ${layer.segmentCount} 段`;
+    label.title = layer.path;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "small-danger";
+    remove.textContent = "移除";
+    remove.addEventListener("click", () => removeFaultLayer(index));
+
+    row.append(swatch, label, remove);
+    el.faultFileList.append(row);
+  });
 }
 
 async function exportMap(formats, showAlert) {

@@ -26,6 +26,8 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Draw MT station maps with labels, symbols, grid, scale bar, and north arrow.
 - 支持 GMT 在线/缓存地形晕渲底图，也支持导入本地 GMT `.grd`/`.nc` 地形网格。
 - Support GMT online/cache shaded-relief basemaps and local GMT `.grd`/`.nc` terrain grids.
+- 支持导入构造线/断层线文件并作为 GMT 叠加层绘制，可为图件生成简洁图例。
+- Import structural or fault-line files as GMT overlays, with optional compact legends.
 - 绘制阻抗张量走向 / 电性主轴图。
 - Draw impedance strike / electric principal axis maps.
 - 绘制相位张量椭圆图。
@@ -158,6 +160,7 @@ Release artifacts are written to `release/`.
 - `mt_point_map.pdf`
 - `mt_point_map.gmt`
 - 中间点位文件和地形文件 / intermediate station and terrain files
+- 构造线叠加和图例中间文件 / structural-line overlay and legend intermediate files
 
 ## 技术栈 / Technology
 
