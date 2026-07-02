@@ -208,6 +208,7 @@ function wireEvents() {
   document.querySelectorAll(".tool-tab").forEach((button) => {
     button.addEventListener("click", () => setPlotType(button.dataset.plotType));
   });
+  wireToolbarMenus();
   document.querySelectorAll(".settings-tool[data-settings-panel]").forEach((button) => {
     button.addEventListener("click", () => openSettingsPanel(button.dataset.settingsPanel));
   });
@@ -331,6 +332,34 @@ async function initWindowControls() {
   } catch (_error) {
     renderWindowControls({ platform: "" });
   }
+}
+
+function wireToolbarMenus() {
+  const menus = Array.from(document.querySelectorAll(".toolbar-menu"));
+  menus.forEach((menu) => {
+    menu.addEventListener("toggle", () => {
+      if (!menu.open) return;
+      menus.forEach((other) => {
+        if (other !== menu) other.removeAttribute("open");
+      });
+    });
+  });
+  document.querySelectorAll(".toolbar-menu button").forEach((button) => {
+    button.addEventListener("click", () => window.setTimeout(closeToolbarMenus, 0));
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".toolbar-menu")) closeToolbarMenus();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeToolbarMenus();
+  });
+  closeToolbarMenus();
+}
+
+function closeToolbarMenus() {
+  document.querySelectorAll(".toolbar-menu[open]").forEach((menu) => {
+    menu.removeAttribute("open");
+  });
 }
 
 function renderWindowControls(snapshot = {}) {

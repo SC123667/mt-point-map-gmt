@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.9.14 - 2026-07-03
+
+- Reworked the workbench toolbar into overlay command menus so future features can be added under Data, Mapping, Layers, Labels, Export, or Tools without crowding the main interface.
+- Kept MT plot selection and period selection visible while moving secondary commands into lightweight floating menus with outside-click and Escape dismissal.
+
 ## v0.9.13 - 2026-07-03
 
 - Reworked the main UI into a grouped MT/GMT workbench toolbar for Data, Mapping, Layers, Labels, Export, and Tools while keeping the preview as the primary workspace.

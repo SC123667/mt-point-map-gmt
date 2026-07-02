@@ -55,54 +55,54 @@
         </div>
       </section>
       <div class="settings-toolbar" aria-label="参数模块">
-        <section class="toolbar-group" aria-label="数据">
-          <span class="toolbar-group-title">数据</span>
-          <div class="toolbar-items">
-            <button class="settings-tool" data-settings-panel="data" title="数据预览" type="button">数据</button>
-            <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段</button>
+        <details class="toolbar-menu">
+          <summary>数据</summary>
+          <div class="toolbar-menu-panel">
+            <button class="settings-tool" data-settings-panel="data" title="数据预览" type="button">数据表格</button>
+            <button class="settings-tool" data-settings-panel="fields" title="字段识别" type="button">字段识别</button>
             <button class="settings-tool" data-settings-panel="mtFields" title="MT 响应字段" type="button">MT字段</button>
           </div>
-        </section>
-        <section class="toolbar-group" aria-label="制图">
-          <span class="toolbar-group-title">制图</span>
-          <div class="toolbar-items">
+        </details>
+        <details class="toolbar-menu">
+          <summary>制图</summary>
+          <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
-            <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形</button>
-            <button class="settings-tool" data-settings-panel="symbol" title="点位符号" type="button">符号</button>
-            <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">预设</button>
+            <button class="settings-tool" data-settings-panel="terrain" title="地形底图" type="button">地形底图</button>
+            <button class="settings-tool" data-settings-panel="symbol" title="点位符号" type="button">点位符号</button>
+            <button class="settings-tool" data-settings-panel="presets" title="绘图预设" type="button">绘图预设</button>
           </div>
-        </section>
-        <section class="toolbar-group" aria-label="图层">
-          <span class="toolbar-group-title">图层</span>
-          <div class="toolbar-items">
-            <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加</button>
-            <button class="settings-tool" data-settings-panel="elements" title="比例尺、指北针和经纬网" type="button">元素</button>
+        </details>
+        <details class="toolbar-menu">
+          <summary>图层</summary>
+          <div class="toolbar-menu-panel">
+            <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加与图例</button>
+            <button class="settings-tool" data-settings-panel="elements" title="比例尺、指北针和经纬网" type="button">图件元素</button>
           </div>
-        </section>
-        <section class="toolbar-group" aria-label="标注">
-          <span class="toolbar-group-title">标注</span>
-          <div class="toolbar-items">
-            <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">标签</button>
+        </details>
+        <details class="toolbar-menu">
+          <summary>标注</summary>
+          <div class="toolbar-menu-panel">
+            <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">测点标签</button>
             <button class="settings-tool" data-settings-panel="mtParams" title="MT 图件参数" type="button">MT参数</button>
           </div>
-        </section>
-        <section class="toolbar-group export-tools" aria-label="导出">
-          <span class="toolbar-group-title">导出</span>
-          <div class="toolbar-items">
+        </details>
+        <details class="toolbar-menu export-tools">
+          <summary>导出</summary>
+          <div class="toolbar-menu-panel">
             <button id="exportPngBtn" class="settings-tool" title="导出 PNG" type="button">PNG</button>
             <button id="exportPdfBtn" class="settings-tool" title="导出 PDF 矢量图" type="button">PDF</button>
-            <button id="exportAllBtn" class="settings-tool" title="导出 PNG + PDF + EPS" type="button">全部</button>
-            <button id="saveScriptBtn" class="settings-tool" title="保存 GMT 脚本" type="button">脚本</button>
+            <button id="exportAllBtn" class="settings-tool" title="导出 PNG + PDF + EPS" type="button">全部格式</button>
+            <button id="saveScriptBtn" class="settings-tool" title="保存 GMT 脚本" type="button">GMT脚本</button>
           </div>
-        </section>
-        <section class="toolbar-group" aria-label="工具">
-          <span class="toolbar-group-title">工具</span>
-          <div class="toolbar-items">
-            <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">质检</button>
-            <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选</button>
-            <button id="tableHelpBtn" class="settings-tool" type="button" title="表格格式说明">格式</button>
+        </details>
+        <details class="toolbar-menu">
+          <summary>工具</summary>
+          <div class="toolbar-menu-panel">
+            <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">数据质检</button>
+            <button class="settings-tool" data-settings-panel="filters" title="筛选绘图" type="button">筛选绘图</button>
+            <button id="tableHelpBtn" class="settings-tool" type="button" title="表格格式说明">表格格式</button>
           </div>
-        </section>
+        </details>
       </div>
       <div class="toolbar-context">
         <label>周期
