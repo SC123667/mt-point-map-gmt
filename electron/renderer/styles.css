@@ -670,18 +670,39 @@ td:nth-child(3) {
 .legend-drag-handle {
   position: absolute;
   z-index: 5;
-  min-height: 30px;
-  min-width: 56px;
-  padding: 5px 10px;
-  border: 1px solid #64748b;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  border: 2px solid #0f766e;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.22);
   cursor: grab;
   touch-action: none;
+}
+
+.legend-drag-handle::before,
+.legend-drag-handle::after {
+  content: "";
+  position: absolute;
+  background: #0f766e;
+  pointer-events: none;
+}
+
+.legend-drag-handle::before {
+  left: 4px;
+  right: 4px;
+  top: 7px;
+  height: 2px;
+}
+
+.legend-drag-handle::after {
+  top: 4px;
+  bottom: 4px;
+  left: 7px;
+  width: 2px;
 }
 
 .legend-drag-handle:hover,

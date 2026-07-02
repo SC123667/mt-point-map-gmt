@@ -1316,17 +1316,14 @@ function renderLegendDragHandle() {
     el.legendPositionHint.classList.add("hidden");
     return;
   }
-  const { x, y, justify } = state.legendPosition;
+  const { x, y } = state.legendPosition;
   const baseX = fit.left + clamp(x, 0.02, 0.98) * fit.width;
   const baseY = fit.top + (1 - clamp(y, 0.02, 0.98)) * fit.height;
   const screenX = state.preview.panX + baseX * state.preview.zoom;
   const screenY = state.preview.panY + baseY * state.preview.zoom;
   el.legendDragHandle.style.left = `${screenX.toFixed(1)}px`;
   el.legendDragHandle.style.top = `${screenY.toFixed(1)}px`;
-  el.legendDragHandle.style.transform = `translate(${justify.includes("R") ? "-100%" : "0"}, ${justify.includes("B") ? "-100%" : "0"})`;
-  el.legendDragHandle.style.color = readColor("legendTextColor");
-  el.legendDragHandle.style.background = readColor("legendBackground");
-  el.legendDragHandle.style.borderColor = readColor("legendBorderColor");
+  el.legendDragHandle.style.transform = `translate(-50%, -50%)${state.legendPosition.dragging ? " scale(1.08)" : ""}`;
   el.legendPositionHint.textContent = `X ${x.toFixed(2)} / Y ${y.toFixed(2)}`;
   el.legendPositionHint.classList.remove("hidden");
   el.legendDragHandle.classList.remove("hidden");

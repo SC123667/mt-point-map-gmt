@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.7.2 - 2026-07-02
+
+- Replaced the visible text legend drag handle with a small unlabeled control point so the preview no longer appears to contain a second legend box.
+- Kept the drag handle as preview-only UI; exported GMT maps are unchanged.
+
 ## v0.7.1 - 2026-07-02
 
 - Fixed legend entries so station symbols follow the selected point shape, size, fill color, and border color instead of always using a red circle.
