@@ -4,6 +4,10 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v0.6.1 - 2026-07-02
+
+- Mark the current preview as stale when overlay or legend settings change, so users know to regenerate the map before expecting the legend to appear.
+
 ## v0.6.0 - 2026-07-02
 
 - Added compact structural-line overlays for GMT multi-segment, BLN, and simple longitude/latitude files, with per-file color control.

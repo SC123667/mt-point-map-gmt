@@ -123,8 +123,16 @@ function wireEvents() {
   el.chooseOutputBtn.addEventListener("click", chooseOutputDirectory);
   el.importFaultBtn.addEventListener("click", importFaultLayers);
   el.clearFaultsBtn.addEventListener("click", clearFaultLayers);
-  el.showLegendInput.addEventListener("change", renderFaultLayers);
-  el.legendIncludeFaultsInput.addEventListener("change", renderFaultLayers);
+  el.showLegendInput.addEventListener("change", () => {
+    renderFaultLayers();
+    markPreviewStale("图例设置已更改，点击“生成预览”更新图件");
+  });
+  el.legendIncludeFaultsInput.addEventListener("change", () => {
+    renderFaultLayers();
+    markPreviewStale("图例设置已更改，点击“生成预览”更新图件");
+  });
+  el.legendTitleInput.addEventListener("input", () => markPreviewStale("图例标题已更改，点击“生成预览”更新图件"));
+  el.legendPositionInput.addEventListener("change", () => markPreviewStale("图例位置已更改，点击“生成预览”更新图件"));
   el.previewFitBtn.addEventListener("click", () => resetPreviewView());
   el.previewBox.addEventListener("wheel", handlePreviewWheel, { passive: false });
   el.previewBox.addEventListener("pointerdown", handlePreviewPointerDown);
@@ -515,6 +523,7 @@ async function importFaultLayers() {
       imported += 1;
     }
     renderFaultLayers();
+    markPreviewStale("构造线叠加层已更改，点击“生成预览”更新图件");
     if (imported) notify(`已导入 ${imported} 个构造线文件。`);
   } catch (error) {
     notify(error.message || String(error));
@@ -525,11 +534,13 @@ function clearFaultLayers() {
   if (!state.faultLayers.length) return;
   state.faultLayers = [];
   renderFaultLayers();
+  markPreviewStale("构造线叠加层已清空，点击“生成预览”更新图件");
 }
 
 function removeFaultLayer(index) {
   state.faultLayers.splice(index, 1);
   renderFaultLayers();
+  markPreviewStale("构造线叠加层已更改，点击“生成预览”更新图件");
 }
 
 function renderFaultLayers() {
@@ -1036,6 +1047,13 @@ function renderPlaceholder() {
   clearPreviewImage();
   el.previewPlaceholder.hidden = false;
   el.previewPlaceholder.textContent = labels[state.plotType] || labels.stationMap;
+}
+
+function markPreviewStale(message) {
+  if (!state.preview.hasImage) return;
+  clearPreviewImage();
+  el.previewPlaceholder.hidden = false;
+  el.previewPlaceholder.textContent = message;
 }
 
 function resetPreviewView() {
