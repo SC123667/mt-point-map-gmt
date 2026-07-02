@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.0.0 - 2026-07-03
+
+- Promoted the MT/GMT desktop application to its first formal 1.0 release.
+- Includes stable station maps, strike maps, phase tensor maps, tipper maps, and MT response curve workflows.
+- Includes CSV/Excel/EDI import, EDI directory parsing, field mapping, MT response field mapping, project save/open, data quality checks, large-dataset filters, and skipped-EDI export.
+- Includes terrain basemaps with online SRTM preparation, local GRD/NC terrain import, terrain cache management, and high-resolution worker isolation.
+- Includes structural-line overlays, editable legends, draggable legend/scale/north-arrow placement, vector PDF/EPS export, PNG DPI control, GMT script export, and cross-platform Windows/macOS packaging.
+- Finalizes the 1.0 UI direction with compact overlay command menus, professional scientific-tool colors, platform-specific macOS/Windows chrome, preview-first layout, and bottom runtime status.
+
 ## v0.9.15 - 2026-07-03
 
 - Unified the UI visual system around a deeper navy primary color, geologic teal accent, cool gray background, and tokenized borders, radii, shadows, and focus states.

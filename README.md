@@ -1,10 +1,20 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-**MT点位图制作工具-GMT** 是一款面向大地电磁测深（MT/AMT/LMT）野外工作的跨平台桌面制图软件。它把常见 GMT 命令行绘图流程做成图形界面：导入点位表或递归扫描 EDI 文件夹，预览图件，调整论文制图参数，并导出 PNG/PDF 和可复现的 GMT 脚本。
+**MT点位图制作工具-GMT** 是一款面向大地电磁测深（MT/AMT/LMT）野外工作的跨平台桌面制图软件。它把常见 GMT 命令行绘图流程做成图形界面：导入点位表或递归扫描 EDI 文件夹，预览图件，调整论文制图参数，并导出 PNG、矢量 PDF、EPS 和可复现的 GMT 脚本。
 
-**MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG/PDF plus reproducible GMT scripts.
+**MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
+
+## 软件界面 / Interface Preview
+
+![MT/GMT 1.0 workbench](docs/images/mt-gmt-workbench.png)
+
+1.0 正式版采用预览优先的工作台界面，主要图件切换和周期选择保持可见，数据、制图、图层、标注、导出和工具命令收进紧凑的叠加菜单。
+
+The 1.0 stable release uses a preview-first workbench. Figure switching and period selection stay visible, while data, mapping, layer, label, export, and utility commands live in compact overlay menus.
+
+![MT/GMT overlay command menu](docs/images/mt-gmt-overlay-menu.png)
 
 ## 为什么做这个工具 / Why This Tool
 
@@ -28,6 +38,8 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Support GMT online/cache shaded-relief basemaps and local GMT `.grd`/`.nc` terrain grids.
 - 支持导入构造线/断层线文件并作为 GMT 叠加层绘制，可为图件生成简洁图例。
 - Import structural or fault-line files as GMT overlays, with optional compact legends.
+- 支持可编辑图例、比例尺、指北针位置和图件元素。
+- Support editable legend content plus draggable legend, scale-bar, north-arrow, and map-element placement.
 - 绘制阻抗张量走向 / 电性主轴图。
 - Draw impedance strike / electric principal axis maps.
 - 绘制相位张量椭圆图。
@@ -38,10 +50,20 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Draw apparent-resistivity and phase sounding curves from EDI impedance tensors.
 - 预览区支持滚轮缩放、框选局部放大、拖拽平移。
 - Preview supports mouse-wheel zoom, box zoom, and drag-to-pan.
-- 导出 PNG、PDF、PNG+PDF，并保存可复现 GMT 脚本。
-- Export PNG, PDF, PNG+PDF, and save reproducible GMT scripts.
+- 支持 PNG 自定义 DPI、矢量 PDF、EPS、全格式导出，并保存可复现 GMT 脚本。
+- Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
 - Build distributable macOS and Windows desktop packages.
+
+## 正式版下载 / Stable Release
+
+1.0.0 起作为正式版发布。建议普通用户从 GitHub Releases 下载安装包，开发者再从源码构建。
+
+Starting with 1.0.0, this project is published as a stable release. End users should download installers from GitHub Releases; source builds are mainly for development.
+
+- macOS Apple Silicon: `.dmg`
+- Windows x64: setup installer and portable package
+- Windows ARM64: setup installer and portable package
 
 ## 图件类型 / Figure Types
 
@@ -158,6 +180,7 @@ Release artifacts are written to `release/`.
 
 - `mt_point_map.png`
 - `mt_point_map.pdf`
+- `mt_point_map.eps`
 - `mt_point_map.gmt`
 - 中间点位文件和地形文件 / intermediate station and terrain files
 - 构造线叠加和图例中间文件 / structural-line overlay and legend intermediate files
