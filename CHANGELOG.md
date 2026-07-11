@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.1.3 - 2026-07-11
+
+- Refreshed the bilingual GitHub README around the current canvas-first workbench, direct Data-menu imports, worker-based performance design, and scrollable quick inspector.
+- Replaced outdated v1.1.0 interface images with current v1.1.3 screenshots covering the main workbench, Data import menu, and expanded quick inspector.
+- Updated repository-facing version and download guidance for the v1.1.3 public installer release.
+
 ## v1.1.2 - 2026-07-11
 
 - Made the expanded right-side quick-parameter inspector independently scrollable when its controls exceed the available window height.

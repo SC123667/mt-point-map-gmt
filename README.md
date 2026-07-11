@@ -1,5 +1,11 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
+[![Source Version](https://img.shields.io/badge/source-v1.1.3-0d8584)](https://github.com/SC123667/mt-point-map-gmt/tags)
+[![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
+[![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
+[![License](https://img.shields.io/badge/license-MIT-64748b)](LICENSE)
+
 **MT点位图制作工具-GMT** 是一款面向大地电磁测深（MT/AMT/LMT）野外工作的跨平台桌面制图软件。它把常见 GMT 命令行绘图流程做成图形界面：导入点位表或递归扫描 EDI 文件夹，预览图件，调整论文制图参数，并导出 PNG、矢量 PDF、EPS 和可复现的 GMT 脚本。
 
 **MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
@@ -8,13 +14,29 @@
 
 ## 软件界面 / Interface Preview
 
-![MT/GMT 1.1 canvas-first workbench](docs/images/mt-gmt-workbench-1.1.png)
+### 画布优先工作台 / Canvas-first Workbench
 
-1.1 工作台采用画布优先布局：左侧常驻数据、制图、图层、标注、导出和工具入口，右侧快捷参数默认收起，让中央地图获得最大空间；需要时一键展开当前图件的高频参数。
+![MT/GMT 1.1.3 canvas-first workbench](docs/images/mt-gmt-workbench-1.1.3.png)
 
-The 1.1 workbench uses a canvas-first layout: data, mapping, layer, label, export, and utility entry points stay visible on the left, while the contextual quick inspector stays collapsed by default so the central map receives maximum space.
+1.1.3 工作台采用画布优先布局：左侧常驻数据、制图、图层、标注、导出和工具入口，右侧快捷参数默认收起，让中央地图获得最大空间。
 
-![MT/GMT 1.1 contextual quick inspector](docs/images/mt-gmt-quick-inspector-1.1.png)
+The 1.1.3 workbench uses a canvas-first layout: data, mapping, layer, label, export, and utility entry points stay visible on the left, while the contextual quick inspector stays collapsed by default so the central map receives maximum space.
+
+### 就近导入数据 / Direct Data Import
+
+![MT/GMT 1.1.3 data import menu](docs/images/mt-gmt-data-menu-1.1.3.png)
+
+TXT/CSV/Excel、EDI 文件夹和示例数据都可直接从左侧“数据”菜单进入，原有系统文件菜单与快捷键仍然保留。
+
+TXT/CSV/Excel tables, EDI folders, and sample data are directly available from the left Data menu, while the native File menu and shortcuts remain available.
+
+### 可滚动快捷参数 / Scrollable Quick Inspector
+
+![MT/GMT 1.1.3 contextual quick inspector](docs/images/mt-gmt-quick-inspector-1.1.3.png)
+
+右侧快捷参数按需展开，中间参数区支持鼠标滚轮、触控板和键盘滚动；顶部标题与底部操作始终可见，不会压缩成难以操作的长面板。
+
+The contextual quick inspector opens on demand. Its middle content supports mouse-wheel, trackpad, and keyboard scrolling, while the title and bottom actions remain reachable.
 
 ## 为什么做这个工具 / Why This Tool
 
@@ -26,6 +48,8 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 
 - 导入 TXT、CSV、DAT、TSV、XLSX、XLS 点位表。
 - Import TXT, CSV, DAT, TSV, XLSX, and XLS station tables.
+- 从左侧数据菜单直接导入点位表、EDI 文件夹或示例数据，无需在界面中寻找隐藏入口。
+- Import station tables, EDI folders, or sample data directly from the persistent Data menu.
 - 递归扫描文件夹中的 `.edi` 文件，读取测点坐标和可用的 MT 响应数据。
 - Recursively scan `.edi` folders and extract station coordinates plus available MT response data.
 - 自动识别测点名、经度、纬度、测线、高程等字段，也支持手动指定列含义。
@@ -50,6 +74,8 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Draw apparent-resistivity and phase sounding curves from EDI impedance tensors.
 - 预览区支持滚轮缩放、框选局部放大、拖拽平移。
 - Preview supports mouse-wheel zoom, box zoom, and drag-to-pan.
+- 导入、GMT 渲染和 SRTM 地形准备使用后台 worker，减少大数据和高分辨率任务对界面的阻塞。
+- Import, GMT rendering, and SRTM terrain preparation use background workers to keep large-data and high-resolution tasks responsive.
 - 支持 PNG 自定义 DPI、矢量 PDF、EPS、全格式导出，并保存可复现 GMT 脚本。
 - Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
@@ -57,9 +83,11 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 
 ## 正式版下载 / Stable Release
 
-1.0.0 起作为正式版发布。建议普通用户从 GitHub Releases 下载安装包，开发者再从源码构建。
+当前源码与最新公开安装包版本均为 **v1.1.3**。普通用户可从 GitHub Releases 下载安装包，开发者也可以检出同版本标签从源码构建。
 
-Starting with 1.0.0, this project is published as a stable release. End users should download installers from GitHub Releases; source builds are mainly for development.
+The current source version and latest public installer release are both **v1.1.3**. End users can download installers from GitHub Releases, while developers can build the matching tag from source.
+
+[打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 
 - macOS Apple Silicon: `.dmg`
 - Windows x64: setup installer and portable package
@@ -112,9 +140,9 @@ Values such as `38515597.72` are interpreted as belt-prefixed Gauss coordinates 
 
 ### EDI 文件夹 / EDI Folder
 
-通过 `文件 > 导入 > 导入 EDI 文件夹` 选择目录，软件会扫描该目录及所有子目录下的 `.edi` 文件，读取坐标、频率/周期、阻抗张量、Tipper 等可用字段。
+通过左侧 `数据 > 导入 EDI 文件夹`（或系统菜单 `文件 > 导入`）选择目录，软件会扫描该目录及所有子目录下的 `.edi` 文件，读取坐标、频率/周期、阻抗张量、Tipper 等可用字段。
 
-Use `File > Import > Import EDI Folder` to scan all `.edi` files in a directory and its subfolders. The parser reads coordinates, frequency/period arrays, impedance tensors, Tipper data, and other available fields.
+Use `Data > Import EDI Folder` in the left workflow menu (or `File > Import`) to scan every `.edi` file in a directory and its subfolders. The parser reads coordinates, frequency/period arrays, impedance tensors, Tipper data, and other available fields.
 
 ### 本地地形网格 / Local Terrain Grid
 
