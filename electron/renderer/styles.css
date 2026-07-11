@@ -2587,6 +2587,17 @@ body {
 
 .toolbar-menu-panel .settings-tool:hover { border-color: #d2e2e2; background: #f2f8f7; color: var(--workbench-teal-dark); }
 
+.toolbar-menu-panel .sidebar-import-action {
+  color: var(--workbench-teal-dark);
+  font-weight: 680;
+}
+
+.toolbar-menu-separator {
+  height: 1px;
+  margin: 5px 4px;
+  background: #e1e7e9;
+}
+
 .sidebar-spacer { flex: 1 1 auto; min-height: 16px; }
 .sidebar-engine-card {
   display: flex;

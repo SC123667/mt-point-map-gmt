@@ -16,6 +16,12 @@ const missingIds = Array.from(referencedIds).filter((id) => !ids.includes(id) &&
 assert.deepStrictEqual(missingIds, [], `renderer.js references missing HTML IDs: ${missingIds.join(", ")}`);
 
 assert(html.includes('id="quickInspectorToggle"'), "quick-inspector toggle missing");
+assert(html.includes('id="sidebarImportFileBtn"'), "sidebar table import action missing");
+assert(html.includes('id="sidebarImportEdiBtn"'), "sidebar EDI import action missing");
+assert(html.includes('id="sidebarLoadSampleBtn"'), "sidebar sample-data action missing");
+assert(renderer.includes('bind(el.sidebarImportFileBtn, "click", openPointFile)'), "sidebar table import wiring missing");
+assert(renderer.includes('bind(el.sidebarImportEdiBtn, "click", openEdiDirectory)'), "sidebar EDI import wiring missing");
+assert(renderer.includes('bind(el.sidebarLoadSampleBtn, "click", loadSampleData)'), "sidebar sample-data wiring missing");
 assert(html.includes('id="quickInspector" class="quick-inspector" aria-hidden="true"'), "quick inspector must launch hidden");
 assert(html.includes('<main class="layout">'), "workbench layout must not launch with the inspector open");
 assert(renderer.includes("setOpen(false);"), "renderer must explicitly reset the inspector to closed on launch");

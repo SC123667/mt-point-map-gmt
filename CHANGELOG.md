@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.1.1 - 2026-07-11
+
+- Restored direct TXT/CSV/Excel, EDI-folder, and sample-data import actions inside the persistent left-side Data menu.
+- Kept the existing native File menu import commands and shortcuts while making the sidebar workflow label match the actions users can actually find there.
+- Extended UI regression coverage so the three sidebar import actions and their renderer bindings cannot disappear unnoticed.
+
 ## v1.1.0 - 2026-07-11
 
 - Rebuilt the Electron workbench around a premium canvas-first layout with persistent left-side workflow navigation and clearer project/export actions.

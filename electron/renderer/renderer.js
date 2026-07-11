@@ -169,6 +169,7 @@ const ids = [
   "legendBorderColorPicker", "legendBorderWidthInput",
   "deleteOutputBtn", "runtimeStatus", "gmtStatusText", "versionText",
   "headerProjectName", "headerOpenProjectBtn", "headerSaveProjectBtn", "headerExportBtn", "sidebarGMTVersion", "sidebarGMTButton",
+  "sidebarImportFileBtn", "sidebarImportEdiBtn", "sidebarLoadSampleBtn",
   "quickInspector", "quickInspectorToggle", "quickInspectorClose", "quickInspectorTitle", "quickStationCount", "quickLineCount",
   "quickValidCount", "quickQualityButton", "quickQualityTitle", "quickQualityHint", "quickPointSizeInput", "quickPointFillInput",
   "quickLabelsToggle", "quickTerrainToggle", "quickTerrainHint", "quickFaultSummary", "quickStationLayer", "quickApplyButton",
@@ -223,6 +224,9 @@ function wireEvents() {
   bind(el.headerSaveProjectBtn, "click", saveProjectFile);
   bind(el.headerExportBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
   bind(el.sidebarGMTButton, "click", recheckGMT);
+  bind(el.sidebarImportFileBtn, "click", openPointFile);
+  bind(el.sidebarImportEdiBtn, "click", openEdiDirectory);
+  bind(el.sidebarLoadSampleBtn, "click", loadSampleData);
   bind(el.tableHelpBtn, "click", showTableHelp);
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
   bind(el.closeTableHelpBtn, "click", () => el.tableHelpDialog.close());
