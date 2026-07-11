@@ -287,7 +287,8 @@
           <button id="quickInspectorClose" type="button" aria-label="关闭快捷参数">×</button>
         </header>
 
-        <section class="quick-section">
+        <div class="quick-inspector-scroll" role="region" aria-label="快捷参数内容" tabindex="0">
+          <section class="quick-section">
           <div class="quick-section-title"><b>数据状态</b><button class="quick-open-settings" data-quick-panel="data" type="button">查看全部</button></div>
           <div class="quick-metrics">
             <div><strong id="quickStationCount">0</strong><small>当前测点</small></div>
@@ -297,9 +298,9 @@
           <button id="quickQualityButton" class="quick-quality" data-quick-panel="quality" type="button">
             <span>!</span><p><b id="quickQualityTitle">导入数据后显示质检结果</b><small id="quickQualityHint">点击可打开完整质检面板</small></p><em>处理</em>
           </button>
-        </section>
+          </section>
 
-        <section class="quick-section">
+          <section class="quick-section">
           <div class="quick-section-title"><b>显示效果</b><button class="quick-open-settings" data-quick-panel="symbol" type="button">完整设置</button></div>
           <label class="quick-field-label">点位符号</label>
           <div class="quick-symbols" role="group" aria-label="点位符号">
@@ -312,13 +313,14 @@
           <label class="quick-field-row"><span>填充颜色</span><input id="quickPointFillInput" class="quick-color" type="color" value="#d7191c" /></label>
           <div class="quick-switch-row"><span><b>显示测点名</b><small>使用当前标签规则</small></span><button id="quickLabelsToggle" class="quick-switch active" type="button" aria-pressed="true"><i></i></button></div>
           <div class="quick-switch-row"><span><b>地形晕渲</b><small id="quickTerrainHint">SRTM · 6 分</small></span><button id="quickTerrainToggle" class="quick-switch" type="button" aria-pressed="false"><i></i></button></div>
-        </section>
+          </section>
 
-        <section class="quick-section">
+          <section class="quick-section">
           <div class="quick-section-title"><b>图件元素</b><button class="quick-open-settings" data-quick-panel="overlay" type="button">管理图层</button></div>
           <div class="quick-layer-row"><i class="quick-layer-swatch fault"></i><p><b>构造线叠加</b><small id="quickFaultSummary">未导入构造线</small></p></div>
           <div class="quick-layer-row"><i class="quick-layer-swatch station"></i><p><b>MT 测点</b><small id="quickStationLayer">station_points · 0</small></p></div>
-        </section>
+          </section>
+        </div>
 
         <footer class="quick-inspector-footer">
           <button class="quick-open-settings" data-quick-panel="frame" type="button">完整参数</button>

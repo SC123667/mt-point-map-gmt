@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.1.2 - 2026-07-11
+
+- Made the expanded right-side quick-parameter inspector independently scrollable when its controls exceed the available window height.
+- Kept the inspector title and bottom actions visible while the middle parameter content scrolls, with keyboard focus support and no horizontal overflow.
+- Added UI regression checks for the scroll region and its overflow containment rules.
+
 ## v1.1.1 - 2026-07-11
 
 - Restored direct TXT/CSV/Excel, EDI-folder, and sample-data import actions inside the persistent left-side Data menu.

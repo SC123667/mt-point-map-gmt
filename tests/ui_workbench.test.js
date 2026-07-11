@@ -28,6 +28,11 @@ assert(renderer.includes("setOpen(false);"), "renderer must explicitly reset the
 assert(renderer.includes('classList.toggle("quick-inspector-open"'), "inspector toggle wiring missing");
 assert(css.includes("grid-template-columns: var(--workbench-sidebar) minmax(0, 1fr)"), "canvas-first workbench grid missing");
 assert(css.includes(".layout.quick-inspector-open"), "expanded inspector layout missing");
+assert(html.includes('class="quick-inspector-scroll" role="region" aria-label="快捷参数内容" tabindex="0"'), "quick inspector scroll region missing");
+assert(css.includes(".quick-inspector-scroll"), "quick inspector scroll styling missing");
+assert(css.includes("overflow-y: auto"), "quick inspector must allow vertical scrolling");
+assert(css.includes("overflow-x: hidden"), "quick inspector must not create horizontal scrolling");
+assert(css.includes("overscroll-behavior: contain"), "quick inspector scroll must stay within the panel");
 assert(css.includes('body[data-platform="darwin"]'), "macOS styling missing");
 assert(css.includes('body[data-platform="win32"]'), "Windows styling missing");
 
