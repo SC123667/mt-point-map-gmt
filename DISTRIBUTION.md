@@ -1,16 +1,16 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前正式版本为 `1.0.0`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发版本为 `1.1.0`，GitHub 最新公开版本仍为 `1.0.0`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The current stable version is `1.0.0`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The current local development version is `1.1.0`; the latest public GitHub release remains `1.0.0`.
 
 公开源码仓库：
 
 - https://github.com/SC123667/mt-point-map-gmt
 
-建议从 GitHub Releases 下载 `v1.0.0` 正式安装包；从源码构建适合二次开发和本地调试。
+公开用户仍建议从 GitHub Releases 下载 `v1.0.0` 正式安装包；本机可从源码构建 `v1.1.0` 进行开发和验证。
 
-Use the `v1.0.0` GitHub Release for ready-to-install packages. Build from source for development and local debugging.
+Public users should continue using the `v1.0.0` GitHub Release. Build local `v1.1.0` sources for development and validation.
 
 ## macOS
 
@@ -24,7 +24,7 @@ npm run dist:mac
 产物：
 
 - `release/mac-arm64/MT点位图制作工具—GMT.app`
-- `release/MT点位图制作工具—GMT-1.0.0-mac-arm64.dmg`
+- `release/MT点位图制作工具—GMT-1.1.0-mac-arm64.dmg`
 
 如果要公开分发给陌生用户，后续需要 Apple Developer ID 签名和 notarization。当前本地构建包适合自己或熟人测试使用。
 
@@ -41,10 +41,10 @@ npm run dist:win
 
 产物包括：
 
-- `release/MT点位图制作工具—GMT-1.0.0-win-x64-setup.exe`
-- `release/MT点位图制作工具—GMT-1.0.0-win-x64-portable.exe`
-- `release/MT点位图制作工具—GMT-1.0.0-win-arm64-setup.exe`
-- `release/MT点位图制作工具—GMT-1.0.0-win-arm64-portable.exe`
+- `release/MT点位图制作工具—GMT-1.1.0-win-x64-setup.exe`
+- `release/MT点位图制作工具—GMT-1.1.0-win-x64-portable.exe`
+- `release/MT点位图制作工具—GMT-1.1.0-win-arm64-setup.exe`
+- `release/MT点位图制作工具—GMT-1.1.0-win-arm64-portable.exe`
 
 ## GMT 依赖 / GMT Dependency
 

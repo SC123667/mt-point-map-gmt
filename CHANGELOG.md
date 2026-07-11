@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.1.0 - 2026-07-11
+
+- Rebuilt the Electron workbench around a premium canvas-first layout with persistent left-side workflow navigation and clearer project/export actions.
+- Added a contextual quick-parameter inspector for station symbols, point size and color, label visibility, terrain visibility, data quality, and layer status.
+- Kept the quick inspector closed by default so the map preview receives the maximum available width, with a single toolbar control to expand or collapse it.
+- Added platform-specific macOS glass and Windows Fluent-style treatments while preserving the same information architecture and functionality on both platforms.
+- Preserved the existing settings dialogs, import workers, GMT/SRTM workers, project files, automatic previews, and export workflows behind the redesigned interface.
+- Added UI regression coverage for DOM IDs, default inspector state, platform styling, and canvas-first layout wiring.
+
 ## v1.0.0 - 2026-07-03
 
 - Promoted the MT/GMT desktop application to its first formal 1.0 release.

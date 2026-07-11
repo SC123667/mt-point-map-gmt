@@ -9,10 +9,26 @@
   <body>
     <header class="app-header">
       <div class="app-title-block">
-        <h1>MT点位图制作工具—GMT</h1>
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <div class="brand-copy">
+          <h1>MT Point Map <b>GMT</b></h1>
+          <p>大地电磁专业制图工作台</p>
+        </div>
         <p id="appStatus" class="gmt-status-cache">正在检测 GMT...</p>
       </div>
-      <div class="header-actions gmt-header-actions">
+      <div class="header-project-state" aria-label="当前工作状态">
+        <span class="status-dot"></span>
+        <div><small>当前工作区</small><strong id="headerProjectName">未命名制图工程</strong></div>
+      </div>
+      <div class="header-actions">
+        <button id="headerOpenProjectBtn" class="header-button" type="button">打开工程</button>
+        <button id="headerSaveProjectBtn" class="header-button" type="button">保存工程</button>
+        <button id="headerExportBtn" class="header-button primary" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 16h12" /></svg>
+          导出图件
+        </button>
+      </div>
+      <div class="gmt-header-actions">
         <button id="recheckBtn">重新检测 GMT</button>
         <button id="installBtn" class="primary">安装 GMT</button>
       </div>
@@ -55,13 +71,14 @@
         </div>
       </section>
       <div class="settings-toolbar" aria-label="参数模块">
+        <div class="sidebar-title"><span>工作流程</span><small>从数据到图件导出</small></div>
         <details class="toolbar-menu menu-data">
           <summary>
             <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M3 3.5h10v9H3z" />
               <path d="M3 6.5h10M6.5 3.5v9" />
             </svg>
-            <span>数据</span>
+            <span class="nav-copy"><b>数据</b><small>导入 · 字段 · 质检</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="data" title="数据预览" type="button">数据表格</button>
@@ -75,7 +92,7 @@
               <path d="M2.75 4.5l3-1.25 4.5 1.5 3-1.25v8l-3 1.25-4.5-1.5-3 1.25z" />
               <path d="M5.75 3.25v8M10.25 4.75v8" />
             </svg>
-            <span>制图</span>
+            <span class="nav-copy"><b>制图</b><small>图幅 · 地形 · 符号</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="frame" title="图幅" type="button">图幅</button>
@@ -90,7 +107,7 @@
               <path d="M8 2.75l5.25 2.75L8 8.25 2.75 5.5z" />
               <path d="M3.25 8L8 10.5 12.75 8M3.25 10.5L8 13l4.75-2.5" />
             </svg>
-            <span>图层</span>
+            <span class="nav-copy"><b>图层</b><small>构造线 · 图例 · 元素</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="overlay" title="叠加层与图例" type="button">叠加与图例</button>
@@ -102,7 +119,7 @@
             <svg class="menu-icon" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M3 4.5h10M5.5 4.5v7M10.5 4.5v7M4.5 11.5h7" />
             </svg>
-            <span>标注</span>
+            <span class="nav-copy"><b>标注</b><small>测点名 · MT 参数</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="labels" title="测点标签" type="button">测点标签</button>
@@ -116,7 +133,7 @@
               <path d="M5.25 7.75L8 10.5l2.75-2.75" />
               <path d="M3.25 12.75h9.5" />
             </svg>
-            <span>导出</span>
+            <span class="nav-copy"><b>导出</b><small>PNG · PDF · GMT 脚本</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button id="exportPngBtn" class="settings-tool" title="导出 PNG" type="button">PNG</button>
@@ -131,7 +148,7 @@
               <path d="M9.5 2.75a3.5 3.5 0 0 0 3.75 3.75l-6.9 6.9a1.75 1.75 0 0 1-2.48-2.48l6.9-6.9" />
               <path d="M4.75 11.25l1 1" />
             </svg>
-            <span>工具</span>
+            <span class="nav-copy"><b>工具</b><small>质检 · 筛选 · 帮助</small></span>
           </summary>
           <div class="toolbar-menu-panel">
             <button class="settings-tool" data-settings-panel="quality" title="数据质检" type="button">数据质检</button>
@@ -139,11 +156,21 @@
             <button id="tableHelpBtn" class="settings-tool" type="button" title="表格格式说明">表格格式</button>
           </div>
         </details>
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-engine-card">
+          <span class="status-dot"></span>
+          <div><b id="sidebarGMTVersion">GMT 检测中</b><small>绘图引擎状态</small></div>
+          <button id="sidebarGMTButton" type="button" aria-label="GMT 设置">•••</button>
+        </div>
       </div>
       <div class="toolbar-context">
         <label>周期
           <select id="mtPeriodInput"></select>
         </label>
+        <button id="quickInspectorToggle" class="quick-inspector-trigger" type="button" aria-expanded="false" title="展开快捷参数">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 4h14v12H3zM12 4v12M6 8h3M6 12h3" /></svg>
+          <span>快捷参数</span>
+        </button>
       </div>
     </nav>
 
@@ -222,6 +249,10 @@
       </section>
 
       <section class="pane preview-pane">
+        <div class="preview-canvas-meta">
+          <div><span class="preview-synced"><i></i>自动预览</span><b id="canvasPlotTitle">点位图</b><small id="canvasDataMeta">尚未导入测点</small></div>
+          <div class="preview-meta-tools" aria-hidden="true"><span>滚轮缩放</span><i></i><span>拖拽平移</span></div>
+        </div>
         <div class="preview-box" id="previewBox" tabindex="0">
           <div class="preview-image-layer" id="previewImageLayer" aria-hidden="true"></div>
           <div class="preview-selection" id="previewSelection" aria-hidden="true"></div>
@@ -245,6 +276,51 @@
           </div>
         </details>
       </section>
+
+      <aside id="quickInspector" class="quick-inspector" aria-hidden="true">
+        <header class="quick-inspector-head">
+          <div><span>快捷参数</span><h2 id="quickInspectorTitle">点位图</h2></div>
+          <button id="quickInspectorClose" type="button" aria-label="关闭快捷参数">×</button>
+        </header>
+
+        <section class="quick-section">
+          <div class="quick-section-title"><b>数据状态</b><button class="quick-open-settings" data-quick-panel="data" type="button">查看全部</button></div>
+          <div class="quick-metrics">
+            <div><strong id="quickStationCount">0</strong><small>当前测点</small></div>
+            <div><strong id="quickLineCount">0</strong><small>测线</small></div>
+            <div><strong id="quickValidCount">0</strong><small>有效坐标</small></div>
+          </div>
+          <button id="quickQualityButton" class="quick-quality" data-quick-panel="quality" type="button">
+            <span>!</span><p><b id="quickQualityTitle">导入数据后显示质检结果</b><small id="quickQualityHint">点击可打开完整质检面板</small></p><em>处理</em>
+          </button>
+        </section>
+
+        <section class="quick-section">
+          <div class="quick-section-title"><b>显示效果</b><button class="quick-open-settings" data-quick-panel="symbol" type="button">完整设置</button></div>
+          <label class="quick-field-label">点位符号</label>
+          <div class="quick-symbols" role="group" aria-label="点位符号">
+            <button data-quick-symbol="c" class="active" type="button" aria-label="圆形">●</button>
+            <button data-quick-symbol="t" type="button" aria-label="三角形">▲</button>
+            <button data-quick-symbol="s" type="button" aria-label="方形">■</button>
+            <button data-quick-symbol="d" type="button" aria-label="菱形">◆</button>
+          </div>
+          <label class="quick-field-row"><span>点位大小</span><span class="quick-number"><input id="quickPointSizeInput" type="number" min="0.05" max="1.5" step="0.01" value="0.22" /><em>cm</em></span></label>
+          <label class="quick-field-row"><span>填充颜色</span><input id="quickPointFillInput" class="quick-color" type="color" value="#d7191c" /></label>
+          <div class="quick-switch-row"><span><b>显示测点名</b><small>使用当前标签规则</small></span><button id="quickLabelsToggle" class="quick-switch active" type="button" aria-pressed="true"><i></i></button></div>
+          <div class="quick-switch-row"><span><b>地形晕渲</b><small id="quickTerrainHint">SRTM · 6 分</small></span><button id="quickTerrainToggle" class="quick-switch" type="button" aria-pressed="false"><i></i></button></div>
+        </section>
+
+        <section class="quick-section">
+          <div class="quick-section-title"><b>图件元素</b><button class="quick-open-settings" data-quick-panel="overlay" type="button">管理图层</button></div>
+          <div class="quick-layer-row"><i class="quick-layer-swatch fault"></i><p><b>构造线叠加</b><small id="quickFaultSummary">未导入构造线</small></p></div>
+          <div class="quick-layer-row"><i class="quick-layer-swatch station"></i><p><b>MT 测点</b><small id="quickStationLayer">station_points · 0</small></p></div>
+        </section>
+
+        <footer class="quick-inspector-footer">
+          <button class="quick-open-settings" data-quick-panel="frame" type="button">完整参数</button>
+          <button id="quickApplyButton" class="primary" type="button">应用并刷新</button>
+        </footer>
+      </aside>
 
       <section class="pane parameter-pane">
         <div class="section-title" data-settings-panel="mtParams">

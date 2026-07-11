@@ -8,13 +8,13 @@
 
 ## 软件界面 / Interface Preview
 
-![MT/GMT 1.0 workbench](docs/images/mt-gmt-workbench.png)
+![MT/GMT 1.1 canvas-first workbench](docs/images/mt-gmt-workbench-1.1.png)
 
-1.0 正式版采用预览优先的工作台界面，主要图件切换和周期选择保持可见，数据、制图、图层、标注、导出和工具命令收进紧凑的叠加菜单。
+1.1 工作台采用画布优先布局：左侧常驻数据、制图、图层、标注、导出和工具入口，右侧快捷参数默认收起，让中央地图获得最大空间；需要时一键展开当前图件的高频参数。
 
-The 1.0 stable release uses a preview-first workbench. Figure switching and period selection stay visible, while data, mapping, layer, label, export, and utility commands live in compact overlay menus.
+The 1.1 workbench uses a canvas-first layout: data, mapping, layer, label, export, and utility entry points stay visible on the left, while the contextual quick inspector stays collapsed by default so the central map receives maximum space.
 
-![MT/GMT overlay command menu](docs/images/mt-gmt-overlay-menu.png)
+![MT/GMT 1.1 contextual quick inspector](docs/images/mt-gmt-quick-inspector-1.1.png)
 
 ## 为什么做这个工具 / Why This Tool
 

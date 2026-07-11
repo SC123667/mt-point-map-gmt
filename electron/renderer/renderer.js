@@ -167,7 +167,12 @@ const ids = [
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
   "legendBorderColorPicker", "legendBorderWidthInput",
-  "deleteOutputBtn", "runtimeStatus", "gmtStatusText", "versionText"
+  "deleteOutputBtn", "runtimeStatus", "gmtStatusText", "versionText",
+  "headerProjectName", "headerOpenProjectBtn", "headerSaveProjectBtn", "headerExportBtn", "sidebarGMTVersion", "sidebarGMTButton",
+  "quickInspector", "quickInspectorToggle", "quickInspectorClose", "quickInspectorTitle", "quickStationCount", "quickLineCount",
+  "quickValidCount", "quickQualityButton", "quickQualityTitle", "quickQualityHint", "quickPointSizeInput", "quickPointFillInput",
+  "quickLabelsToggle", "quickTerrainToggle", "quickTerrainHint", "quickFaultSummary", "quickStationLayer", "quickApplyButton",
+  "canvasPlotTitle", "canvasDataMeta"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
@@ -178,6 +183,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   renderTerrainDataServerCustom();
   renderFaultLayers();
   setPlotType("stationMap");
+  renderQuickInspector();
   await refreshStatus();
 });
 
@@ -212,6 +218,11 @@ function wireEvents() {
   document.querySelectorAll(".settings-tool[data-settings-panel]").forEach((button) => {
     button.addEventListener("click", () => openSettingsPanel(button.dataset.settingsPanel));
   });
+  wireQuickInspector();
+  bind(el.headerOpenProjectBtn, "click", openProjectFile);
+  bind(el.headerSaveProjectBtn, "click", saveProjectFile);
+  bind(el.headerExportBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
+  bind(el.sidebarGMTButton, "click", recheckGMT);
   bind(el.tableHelpBtn, "click", showTableHelp);
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
   bind(el.closeTableHelpBtn, "click", () => el.tableHelpDialog.close());
@@ -362,6 +373,127 @@ function closeToolbarMenus() {
   });
 }
 
+function wireQuickInspector() {
+  const layout = document.querySelector(".layout");
+  const setOpen = (open) => {
+    layout?.classList.toggle("quick-inspector-open", Boolean(open));
+    el.quickInspector?.setAttribute("aria-hidden", String(!open));
+    el.quickInspectorToggle?.classList.toggle("active", Boolean(open));
+    el.quickInspectorToggle?.setAttribute("aria-expanded", String(Boolean(open)));
+    if (el.quickInspectorToggle) {
+      el.quickInspectorToggle.title = open ? "收起快捷参数" : "展开快捷参数";
+      el.quickInspectorToggle.setAttribute("aria-label", open ? "收起快捷参数" : "展开快捷参数");
+    }
+  };
+  setOpen(false);
+  bind(el.quickInspectorToggle, "click", () => setOpen(!layout?.classList.contains("quick-inspector-open")));
+  bind(el.quickInspectorClose, "click", () => setOpen(false));
+  document.querySelectorAll("[data-quick-panel]").forEach((button) => {
+    button.addEventListener("click", () => openSettingsPanel(button.dataset.quickPanel));
+  });
+  document.querySelectorAll("[data-quick-symbol]").forEach((button) => {
+    button.addEventListener("click", () => {
+      el.symbolInput.value = button.dataset.quickSymbol;
+      el.symbolInput.dispatchEvent(new Event("change", { bubbles: true }));
+      renderQuickInspector();
+    });
+  });
+  bind(el.quickPointSizeInput, "input", () => {
+    el.pointSizeInput.value = el.quickPointSizeInput.value;
+    el.pointSizeInput.dispatchEvent(new Event("input", { bubbles: true }));
+    renderQuickInspector();
+  });
+  bind(el.quickPointFillInput, "input", () => {
+    setColorControlValue("pointFill", el.quickPointFillInput.value);
+    el.pointFillPicker.dispatchEvent(new Event("input", { bubbles: true }));
+    renderQuickInspector();
+  });
+  bind(el.quickLabelsToggle, "click", () => {
+    el.showLabelsInput.checked = !el.showLabelsInput.checked;
+    el.showLabelsInput.dispatchEvent(new Event("change", { bubbles: true }));
+    renderQuickInspector();
+    scheduleAutoPreview("测点标签显示状态已更改，正在自动更新预览...", { delay: 100 });
+  });
+  bind(el.quickTerrainToggle, "click", () => {
+    el.showTerrainInput.checked = !el.showTerrainInput.checked;
+    el.showTerrainInput.dispatchEvent(new Event("change", { bubbles: true }));
+    renderQuickInspector();
+    scheduleAutoPreview("地形底图显示状态已更改，正在自动更新预览...", { delay: 100 });
+  });
+  bind(el.quickApplyButton, "click", () => {
+    scheduleAutoPreview("快捷参数已应用，正在自动更新预览...", { delay: 80 });
+    setRuntimeStatus("快捷参数已应用", "ready");
+  });
+  [el.symbolInput, el.pointSizeInput, el.pointFillInput, el.pointFillPicker, el.showLabelsInput, el.showTerrainInput, el.terrainResolutionInput]
+    .forEach((control) => {
+      bind(control, "input", renderQuickInspector);
+      bind(control, "change", renderQuickInspector);
+    });
+}
+
+function renderQuickInspector() {
+  const plotLabels = {
+    stationMap: "点位图",
+    strikeMap: "走向图",
+    phaseTensorMap: "相位张量",
+    tipperMap: "感应矢量",
+    responseCurve: "响应曲线"
+  };
+  const plotLabel = plotLabels[state.plotType] || plotLabels.stationMap;
+  if (el.quickInspectorTitle) el.quickInspectorTitle.textContent = plotLabel;
+  if (el.canvasPlotTitle) el.canvasPlotTitle.textContent = plotLabel;
+  const records = state.records || [];
+  const validCount = records.filter((record) => Number.isFinite(record.lon) && Number.isFinite(record.lat) && Math.abs(record.lon) <= 180 && Math.abs(record.lat) <= 90).length;
+  const lineCount = new Set(records.map((record) => String(record.line || "").trim()).filter(Boolean)).size;
+  if (el.quickStationCount) el.quickStationCount.textContent = String(records.length);
+  if (el.quickLineCount) el.quickLineCount.textContent = String(lineCount);
+  if (el.quickValidCount) el.quickValidCount.textContent = String(validCount);
+  if (el.quickStationLayer) el.quickStationLayer.textContent = `station_points · ${records.length}`;
+  if (el.canvasDataMeta) {
+    el.canvasDataMeta.textContent = records.length ? `${records.length} 个测点${lineCount ? ` · ${lineCount} 条测线` : ""}` : "尚未导入测点";
+  }
+  let issueCount = 0;
+  if (state.allRecords.length) {
+    try {
+      const report = buildQualityReport();
+      issueCount = report.duplicateNameCount + report.duplicateCoordinateCount + report.invalidCoordinateCount + report.skippedCount;
+    } catch (_error) {
+      issueCount = 0;
+    }
+  }
+  if (el.quickQualityTitle) el.quickQualityTitle.textContent = state.allRecords.length
+    ? (issueCount ? `${issueCount} 项数据需要检查` : "未发现明显数据问题")
+    : "导入数据后显示质检结果";
+  if (el.quickQualityHint) el.quickQualityHint.textContent = state.allRecords.length
+    ? (issueCount ? "点击打开完整质检面板" : "坐标、重复项与 EDI 状态正常")
+    : "点击可打开完整质检面板";
+  if (el.quickQualityButton) el.quickQualityButton.classList.toggle("is-clear", Boolean(state.allRecords.length && !issueCount));
+  const qualityIcon = el.quickQualityButton?.querySelector(":scope > span");
+  if (qualityIcon) qualityIcon.textContent = state.allRecords.length && !issueCount ? "✓" : "!";
+  document.querySelectorAll("[data-quick-symbol]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.quickSymbol === el.symbolInput?.value);
+  });
+  if (el.quickPointSizeInput && document.activeElement !== el.quickPointSizeInput) el.quickPointSizeInput.value = el.pointSizeInput?.value || "0.22";
+  if (el.quickPointFillInput) el.quickPointFillInput.value = colorToHex(readColor("pointFill"));
+  syncQuickSwitch(el.quickLabelsToggle, Boolean(el.showLabelsInput?.checked));
+  syncQuickSwitch(el.quickTerrainToggle, Boolean(el.showTerrainInput?.checked));
+  if (el.quickTerrainHint) {
+    const local = state.terrain.localGridPath ? `本地 · ${baseName(state.terrain.localGridPath)}` : `SRTM · ${el.terrainResolutionInput?.value || "06m"}`;
+    el.quickTerrainHint.textContent = local;
+  }
+  if (el.quickFaultSummary) el.quickFaultSummary.textContent = state.faultLayers.length ? `${state.faultLayers.length} 个叠加层` : "未导入构造线";
+  if (el.headerProjectName) {
+    const source = state.projectPath || state.parsed?.filePath || "";
+    el.headerProjectName.textContent = source ? baseName(source).replace(/\.mtgmt$/i, "") : "未命名制图工程";
+  }
+}
+
+function syncQuickSwitch(control, active) {
+  if (!control) return;
+  control.classList.toggle("active", active);
+  control.setAttribute("aria-pressed", String(active));
+}
+
 function renderWindowControls(snapshot = {}) {
   state.window = {
     platform: snapshot.platform || state.window.platform || "",
@@ -445,6 +577,7 @@ function setPlotType(plotType) {
   syncLegendLabelDefaults();
   el.outputNameInput.value = defaultOutputNameForPlot(state.plotType);
   renderPlaceholder();
+  renderQuickInspector();
   scheduleAutoPreview("图件类型已切换，正在自动绘制预览...", { delay: 120 });
 }
 
@@ -557,6 +690,7 @@ async function saveProjectFile() {
     });
     if (!saved) return;
     state.projectPath = saved;
+    renderQuickInspector();
     notify(`工程已保存：${saved}`);
   } catch (error) {
     notify(error.message || String(error));
@@ -697,6 +831,7 @@ function applyConfigToUI(config) {
     setColorControlValue("legendBorderColor", config.legend.borderColor || "gray50");
     setInputValue(el.legendBorderWidthInput, config.legend.borderWidth);
   }
+  renderQuickInspector();
 }
 
 function setInputValue(input, value) {
@@ -798,6 +933,7 @@ function renderFilterSummary() {
 function renderDataSummary() {
   if (!state.parsed) {
     el.dataSummary.textContent = "未导入点位文件";
+    renderQuickInspector();
     return;
   }
   const parsed = state.parsed;
@@ -810,6 +946,7 @@ function renderDataSummary() {
   } else {
     el.dataSummary.textContent = `${fileName(parsed.filePath)}\n已识别 ${state.allRecords.length} 个${coordinateText}${filterText}`;
   }
+  renderQuickInspector();
 }
 
 function renderQualityPanel() {
@@ -817,6 +954,7 @@ function renderQualityPanel() {
     el.qualitySummary.innerHTML = '<p class="field-note">导入数据后显示质检结果。</p>';
     el.qualityIssueList.innerHTML = "";
     el.exportSkippedEdiBtn.disabled = true;
+    renderQuickInspector();
     return;
   }
   const report = buildQualityReport();
@@ -838,6 +976,7 @@ function renderQualityPanel() {
   if (!issues.length) issues.push("未发现明显坐标、重复或 EDI 跳过问题。");
   el.qualityIssueList.innerHTML = issues.map((item) => `<p class="field-note">${escapeHTML(item)}</p>`).join("");
   el.exportSkippedEdiBtn.disabled = !report.skippedCount;
+  renderQuickInspector();
 }
 
 function qualityMetric(label, value) {
@@ -990,6 +1129,7 @@ function renderGMTStatus(available, plan, gmtInfo) {
     el.gmtStatusText.textContent = available ? `GMT ${gmtInfo.version || "已就绪"}` : "GMT 未就绪";
     el.gmtStatusText.dataset.state = available ? "ready" : "error";
   }
+  if (el.sidebarGMTVersion) el.sidebarGMTVersion.textContent = available ? `GMT ${gmtInfo.version || "已就绪"}` : "GMT 未就绪";
   const downloadText = plan.download ? `将下载：${plan.download.fileName}` : "请参考官方安装文档";
   el.installPlanText.textContent = `${plan.platform}：${downloadText}`;
   el.installBtn.disabled = available || !plan.canAutoInstall;
@@ -1309,6 +1449,7 @@ function renderFaultLayers() {
   el.faultOverlaySummary.textContent = state.faultLayers.length ? `${state.faultLayers.length} 个叠加层` : "无叠加";
   el.clearFaultsBtn.disabled = !state.faultLayers.length;
   el.legendIncludeFaultsInput.disabled = !state.faultLayers.length;
+  renderQuickInspector();
   if (!state.faultLayers.length) {
     const empty = document.createElement("p");
     empty.className = "field-note layer-empty";
@@ -1865,6 +2006,7 @@ function applyPlotPreset(preset) {
   renderLegendDragHandle();
   renderDraggableMapElements();
   updateTerrainEstimate();
+  renderQuickInspector();
   scheduleAutoPreview("绘图预设已应用，正在自动更新预览...", { delay: 120 });
 }
 
