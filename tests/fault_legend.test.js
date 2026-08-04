@@ -129,6 +129,53 @@ try {
   assert(fs.existsSync(path.join(scriptDir, "map_legend.txt")));
   assert(fs.readFileSync(path.join(scriptDir, "map_legend.txt"), "utf8").includes("0.45c Site"));
 
+  const groupedScriptDir = path.join(tmp, "grouped-landscape-output");
+  const groupedScript = buildScript([
+    { name: "MT-01", lon: 113.61, lat: 40.03, line: "MTAMT-L1" },
+    { name: "IP-A", lon: 113.62, lat: 40.04, line: "激电中梯-AB极" },
+    { name: "HD-001", lon: 113.63, lat: 40.05, line: "高密度-L1" }
+  ], {
+    title: "大同实习综合物探测点分布图（128点）",
+    plotType: "stationMap",
+    region: "113.60/113.64/40.02/40.06",
+    projection: "X20c/12c",
+    frame: "af",
+    showGrid: true,
+    showLabels: true,
+    labelNames: ["IP-A", "HD-001"],
+    showScale: true,
+    showNorthArrow: true,
+    swapAxes: true,
+    xAxisLabel: "Latitude (N)",
+    yAxisLabel: "Longitude (E)",
+    pointSymbol: "c",
+    pointSize: 0.22,
+    pointFill: "#d7191c",
+    pointPenWidth: 0.35,
+    pointPenColor: "black",
+    labelFontSize: 8,
+    labelColor: "black",
+    labelDX: 0.08,
+    labelDY: 0.08,
+    showTerrain: false,
+    outputName: "grouped_landscape",
+    stationGroups: [
+      { id: "mt", label: "MT/AMT", match: { linePrefixes: ["MTAMT"] }, symbol: "c", fill: "#0072B2", size: 0.24 },
+      { id: "ip", label: "激电中梯", match: { linePrefixes: ["激电中梯"] }, symbol: "s", fill: "#D55E00", size: 0.23 },
+      { id: "hd", label: "高密度电法", match: { linePrefixes: ["高密度"] }, symbol: "t", fill: "#009E73", size: 0.23 }
+    ],
+    legend: { show: true, title: "测量方法", position: "n0.98/0.98+jTR", includeFaults: false }
+  }, groupedScriptDir, ["png"]);
+  assert(groupedScript.includes("-R40.02/40.06/113.6/113.64"));
+  assert(groupedScript.includes("-JX20c/12c"));
+  assert(groupedScript.includes("-Bxafg+l'Latitude (N)'"));
+  assert(!groupedScript.includes("gmt coast"));
+  assert(!groupedScript.includes(" -L"));
+  assert(!groupedScript.includes(" -Td"));
+  assert.strictEqual(fs.readFileSync(path.join(groupedScriptDir, "stations_labels.tsv"), "utf8").trim().split(/\n/).length, 2);
+  assert(fs.readFileSync(path.join(groupedScriptDir, "stations_group_01_mt.tsv"), "utf8").startsWith("40.03000000\t113.61000000"));
+  assert(fs.readFileSync(path.join(groupedScriptDir, "map_legend.txt"), "utf8").includes("高密度电法"));
+
   const customElementScript = buildScript([
     { name: "A01", lon: 101.0, lat: 35.0 }
   ], {

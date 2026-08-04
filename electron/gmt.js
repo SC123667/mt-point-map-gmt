@@ -303,17 +303,20 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   }
   const pointsPath = path.join(outputDirectory, "stations_points.tsv");
   const labelsPath = path.join(outputDirectory, "stations_labels.tsv");
-  const pointLines = records.map((record) => `${record.lon.toFixed(8)}\t${record.lat.toFixed(8)}\t${record.name}`).join("\n") + "\n";
+  const pointLines = records.map((record) => stationRow(record, config)).join("\n") + "\n";
   const labelRecords = recordsForLabels(records, config);
-  const labelLines = labelRecords.map((record) => `${record.lon.toFixed(8)}\t${record.lat.toFixed(8)}\t${record.name}`).join("\n") + (labelRecords.length ? "\n" : "");
+  const labelLines = labelRecords.map((record) => stationRow(record, config)).join("\n") + (labelRecords.length ? "\n" : "");
   fs.writeFileSync(pointsPath, pointLines, "utf8");
   fs.writeFileSync(labelsPath, labelLines, "utf8");
 
-  const region = (config.region || "").trim() || autoRegion(records);
+  const sourceRegion = (config.region || "").trim() || autoRegion(records);
+  const region = plotRegion(sourceRegion, config);
   const regionValues = parseRegion(region);
   const shell = process.platform === "win32" ? "bat" : "sh";
   const gridPrefix = config.showGrid ? "g" : "";
-  const frameOption = `-B${gridPrefix}${config.frame}`;
+  const frameOption = config.swapAxes
+    ? `${axisFrameOption("x", config.xAxisLabel || "Latitude (N)", gridPrefix, shell)} ${axisFrameOption("y", config.yAxisLabel || "Longitude (E)", gridPrefix, shell)} -BWSen`
+    : `-B${gridPrefix}${config.frame}`;
   const title = (config.title || "").trim();
   const titleOption = title && (!needsNativeTextRendering(title) || config.forceGMTTitle) ? ` -B+t${quote(title)}` : "";
   const outputPrefix = shell === "bat" ? config.outputName || "mt_point_map" : path.join(outputDirectory, config.outputName || "mt_point_map");
@@ -327,7 +330,11 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const terrain = terrainScriptParts(config, region, outputDirectory, shell);
   const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
+  const stationPlots = stationPlotScriptParts(records, config, outputDirectory, region, shell);
   const legend = legendScriptPart(config, outputDirectory, region, shell);
+  const backgroundCommand = config.swapAxes
+    ? ""
+    : (terrain.imageCommand || `${shell === "bat" ? "" : "  "}gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`);
   if (shell === "bat") {
     return [
       "@echo off",
@@ -338,13 +345,13 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
       ...terrain.preCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-      terrain.imageCommand || `gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+      backgroundCommand,
       ...faultOverlay.commands,
-      `gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+      ...stationPlots.commands,
       ...mtOverlay.commands,
       config.showLabels && labelRecords.length ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-      config.showScale ? `gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-      config.showNorthArrow ? `gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+      config.showScale && !config.swapAxes ? `gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+      config.showNorthArrow && !config.swapAxes ? `gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
       legend.command,
       "gmt end",
       ""
@@ -359,13 +366,13 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
     ...terrain.preCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-    terrain.imageCommand || `  gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`,
+    backgroundCommand,
     ...faultOverlay.commands,
-    `  gmt plot ${quote(pointsPathForScript)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`,
+    ...stationPlots.commands,
     ...mtOverlay.commands,
     config.showLabels && labelRecords.length ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
-    config.showScale ? `  gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
-    config.showNorthArrow ? `  gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+    config.showScale && !config.swapAxes ? `  gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
+    config.showNorthArrow && !config.swapAxes ? `  gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
     legend.command,
     "gmt end",
     ""
@@ -373,6 +380,10 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
 }
 
 function recordsForLabels(records, config = {}) {
+  if (Array.isArray(config.labelNames) && config.labelNames.length) {
+    const names = new Set(config.labelNames.map((name) => String(name)));
+    return records.filter((record) => names.has(String(record.name || "")));
+  }
   const mode = String(config.labelMode || "all");
   if (mode === "mtOnly") return records.filter((record) => record.mtResponses?.length);
   if (mode === "prefix") {
@@ -385,6 +396,109 @@ function recordsForLabels(records, config = {}) {
     return records.filter((_record, index) => index % step === 0);
   }
   return records;
+}
+
+function stationRow(record, config = {}) {
+  const x = config.swapAxes ? record.lat : record.lon;
+  const y = config.swapAxes ? record.lon : record.lat;
+  return `${Number(x).toFixed(8)}\t${Number(y).toFixed(8)}\t${record.name}`;
+}
+
+function plotRegion(region, config = {}) {
+  if (!config.swapAxes) return region;
+  const parsed = parseRegion(region);
+  if (!parsed) return region;
+  return `${parsed.south}/${parsed.north}/${parsed.west}/${parsed.east}`;
+}
+
+function axisFrameOption(axis, label, gridPrefix, shell) {
+  return `-B${axis}af${gridPrefix}+l${quote(label, shell)}`;
+}
+
+function stationPlotScriptParts(records, config, outputDirectory, region, shell) {
+  const prefix = shell === "bat" ? "" : "  ";
+  const defaultCommand = (dataPath) => `${prefix}gmt plot ${quote(dataPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`;
+  const defaultPath = shell === "bat" ? "stations_points.tsv" : path.join(outputDirectory, "stations_points.tsv");
+  const groups = normalizeStationGroups(config.stationGroups);
+  if (!groups.length) return { commands: [defaultCommand(defaultPath)] };
+
+  const assigned = new Set();
+  const commands = [];
+  groups.forEach((group, index) => {
+    const groupRecords = records.filter((record, recordIndex) => {
+      if (assigned.has(recordIndex) || !stationRecordMatchesGroup(record, group)) return false;
+      assigned.add(recordIndex);
+      return true;
+    });
+    if (!groupRecords.length) return;
+    const filename = `stations_group_${String(index + 1).padStart(2, "0")}_${safeFilenamePart(group.id || group.label || "group")}.tsv`;
+    const filePath = path.join(outputDirectory, filename);
+    const rows = groupRecords.map((record) => stationRow(record, config)).join("\n") + "\n";
+    fs.writeFileSync(filePath, rows, "utf8");
+    const scriptPath = shell === "bat" ? filename : filePath;
+    commands.push(`${prefix}gmt plot ${quote(scriptPath)} -R${region} -J${config.projection} -S${group.symbol}${group.size.toFixed(3)}c -G${quote(group.fill)} -W${group.penWidth.toFixed(3)}p,${group.penColor}`);
+  });
+
+  const ungrouped = records.filter((_record, index) => !assigned.has(index));
+  if (ungrouped.length) {
+    const filename = "stations_group_ungrouped.tsv";
+    const filePath = path.join(outputDirectory, filename);
+    const rows = ungrouped.map((record) => stationRow(record, config)).join("\n") + "\n";
+    fs.writeFileSync(filePath, rows, "utf8");
+    commands.push(defaultCommand(shell === "bat" ? filename : filePath));
+  }
+  return { commands };
+}
+
+function normalizeStationGroups(groups) {
+  if (!Array.isArray(groups)) return [];
+  return groups
+    .filter((group) => group && typeof group === "object")
+    .map((group, index) => ({
+      ...group,
+      id: String(group.id || `group-${index + 1}`),
+      label: String(group.label || group.id || `Group ${index + 1}`),
+      symbol: new Set(["c", "t", "s", "d"]).has(group.symbol) ? group.symbol : "c",
+      size: clampNumber(group.size, 0.03, 2, 0.22),
+      fill: safePlotColor(group.fill, "#d7191c"),
+      penWidth: clampNumber(group.penWidth, 0, 5, 0.35),
+      penColor: safePlotColor(group.penColor, "black")
+    }));
+}
+
+function stationRecordMatchesGroup(record, group) {
+  const name = String(record?.name || "");
+  const line = String(record?.line || "");
+  const match = group.match && typeof group.match === "object" ? group.match : group;
+  const exactNames = stringArray(match.names || match.matchNames);
+  const exactLines = stringArray(match.lines || match.matchLines);
+  const namePrefixes = stringArray(match.namePrefixes || match.matchNamePrefixes);
+  const linePrefixes = stringArray(match.linePrefixes || match.matchLinePrefixes);
+  return exactNames.includes(name)
+    || exactLines.includes(line)
+    || namePrefixes.some((prefix) => name.startsWith(prefix))
+    || linePrefixes.some((prefix) => line.startsWith(prefix));
+}
+
+function stringArray(value) {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function safeFilenamePart(value) {
+  const ascii = String(value || "group").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return ascii || "group";
+}
+
+function safePlotColor(value, fallback) {
+  const text = String(value || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(text) || /^[A-Za-z][A-Za-z0-9_]*([0-9]+)?$/.test(text)) return text;
+  return fallback;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
 }
 
 function mapRefpoint(value, fallback) {

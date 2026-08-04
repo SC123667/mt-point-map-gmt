@@ -20,14 +20,7 @@ const DEFAULT_LEGEND_CONFIG = {
 };
 
 function buildLegendEntries(config) {
-  const stationEntry = {
-    label: config.legend?.stationLabel || "Station",
-    symbol: "point",
-    gmtSymbol: safePointSymbol(config.pointSymbol),
-    fill: config.pointFill || "#d7191c",
-    pen: `${Number(config.pointPenWidth || 0.35).toFixed(2)}p,${config.pointPenColor || "black"}`,
-    size: `${Number(config.pointSize || 0.22).toFixed(2)}c`
-  };
+  const stationEntries = buildStationLegendEntries(config);
   const overlayEntries = [];
   const mtOverlayEntry = buildMTOverlayLegendEntry(config);
   if (mtOverlayEntry) overlayEntries.push(mtOverlayEntry);
@@ -40,7 +33,29 @@ function buildLegendEntries(config) {
       });
     }
   }
-  return config.legend?.order === "overlay-first" ? [...overlayEntries, stationEntry] : [stationEntry, ...overlayEntries];
+  return config.legend?.order === "overlay-first" ? [...overlayEntries, ...stationEntries] : [...stationEntries, ...overlayEntries];
+}
+
+function buildStationLegendEntries(config = {}) {
+  const groups = Array.isArray(config.stationGroups) ? config.stationGroups.filter(Boolean) : [];
+  if (groups.length) {
+    return groups.map((group, index) => ({
+      label: group.label || group.id || `Group ${index + 1}`,
+      symbol: "point",
+      gmtSymbol: safePointSymbol(group.symbol || config.pointSymbol),
+      fill: group.fill || config.pointFill || "#d7191c",
+      pen: `${Number(group.penWidth ?? config.pointPenWidth ?? 0.35).toFixed(2)}p,${group.penColor || config.pointPenColor || "black"}`,
+      size: `${Number(group.size ?? config.pointSize ?? 0.22).toFixed(2)}c`
+    }));
+  }
+  return [{
+    label: config.legend?.stationLabel || "Station",
+    symbol: "point",
+    gmtSymbol: safePointSymbol(config.pointSymbol),
+    fill: config.pointFill || "#d7191c",
+    pen: `${Number(config.pointPenWidth || 0.35).toFixed(2)}p,${config.pointPenColor || "black"}`,
+    size: `${Number(config.pointSize || 0.22).toFixed(2)}c`
+  }];
 }
 
 function buildLegendSpec(entries, config = {}) {
@@ -168,6 +183,7 @@ module.exports = {
   DEFAULT_LEGEND_FILE,
   DEFAULT_LEGEND_CONFIG,
   buildMTOverlayLegendEntry,
+  buildStationLegendEntries,
   buildLegendEntries,
   buildLegendSpec,
   normalizeLegendConfig,

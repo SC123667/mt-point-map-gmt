@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.2.0 - 2026-08-04
+
+- Added project-embedded station groups so different survey methods can use independent colors, symbols, sizes, and legend entries.
+- Added landscape axis-swapped station maps that plot latitude on X and longitude on Y without changing the stored source coordinates.
+- Added native Chinese legend rendering alongside the existing native Chinese title path, avoiding GMT PostScript font limitations in PNG/PDF output.
+- Added scientifically oriented Cartesian scale bars and compass roses for swapped-axis maps, including north-right/east-up orientation and document-ready landscape layouts.
+- Added explicit label-name selection for uncluttered endpoint and electrode annotations.
+
 ## v1.1.3 - 2026-07-11
 
 - Refreshed the bilingual GitHub README around the current canvas-first workbench, direct Data-menu imports, worker-based performance design, and scrollable quick inspector.

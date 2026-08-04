@@ -53,13 +53,17 @@ async function exportGMTMap(payload) {
   const formats = payload.formats || ["png"];
   const outputName = payload.config?.outputName || "mt_point_map";
   const includesVector = formats.some(isVectorFormat);
-  const needsTitleOverlay = !includesVector && formats.includes("png") && shouldOverlayTitle(payload.config);
-  const gmtFormats = needsTitleOverlay && !formats.includes("png") ? [...formats, "png"] : formats;
+  const nativeTitle = shouldOverlayTitle(payload.config);
+  const nativeLegend = shouldOverlayLegend(payload.config);
+  const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
+  const needsNativeDecorations = formats.some((format) => ["png", "pdf"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements);
+  const gmtFormats = needsNativeDecorations && !formats.includes("png") ? [...formats, "png"] : formats;
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
     ...gmtWorkspace.config,
-    forceGMTTitle: includesVector && shouldOverlayTitle(payload.config)
+    legend: nativeLegend ? { ...(gmtWorkspace.config.legend || {}), show: false } : gmtWorkspace.config.legend,
+    forceGMTTitle: includesVector && nativeTitle && !needsNativeDecorations
   };
   sendProgress("script", 22, `正在生成 GMT 脚本和 ${payload.records?.length || 0} 个测点数据文件...`);
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
@@ -69,7 +73,7 @@ async function exportGMTMap(payload) {
   if (result.ok) {
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
     result.outputDirectory = outputDirectory;
-    result.needsTitleOverlay = needsTitleOverlay;
+    result.needsNativeDecorations = needsNativeDecorations;
   }
   sendProgress(result.ok ? "completed" : "failed", result.ok ? 100 : 90, result.ok ? "GMT 绘图完成。" : (result.message || "GMT 绘图失败。"));
   return result;
@@ -295,6 +299,18 @@ function copyIfExists(source, target) {
 function shouldOverlayTitle(config) {
   const title = String(config?.title || "").trim();
   return title && needsNativeTextRendering(title);
+}
+
+function shouldOverlayLegend(config) {
+  if (!config?.legend?.show) return false;
+  const labels = [
+    config.legend.title,
+    config.legend.stationLabel,
+    config.legend.overlayLabel,
+    ...(Array.isArray(config.stationGroups) ? config.stationGroups.map((group) => group?.label) : []),
+    ...(Array.isArray(config.faultLayers) ? config.faultLayers.map((layer) => layer?.name) : [])
+  ];
+  return labels.some((label) => needsNativeTextRendering(label));
 }
 
 function isVectorFormat(format) {

@@ -41,6 +41,13 @@ const state = {
   },
   terrainWaiter: null,
   faultLayers: [],
+  stationGroups: [],
+  labelNames: [],
+  axisTransform: {
+    swapAxes: false,
+    xAxisLabel: "Latitude (N)",
+    yAxisLabel: "Longitude (E)"
+  },
   window: {
     platform: "",
     isFullScreen: false
@@ -773,6 +780,13 @@ function restoreProjectSnapshot(project, filePath = "") {
 
 function applyConfigToUI(config) {
   if (!config) return;
+  state.stationGroups = Array.isArray(config.stationGroups) ? config.stationGroups.map((group) => ({ ...group })) : [];
+  state.labelNames = Array.isArray(config.labelNames) ? [...config.labelNames] : [];
+  state.axisTransform = {
+    swapAxes: Boolean(config.swapAxes),
+    xAxisLabel: String(config.xAxisLabel || "Latitude (N)"),
+    yAxisLabel: String(config.yAxisLabel || "Longitude (E)")
+  };
   if (config.plotType) setPlotType(config.plotType);
   setInputValue(el.titleInput, config.title);
   setInputValue(el.regionInput, config.region);
@@ -1363,6 +1377,11 @@ function readConfig() {
     pointFill: readColor("pointFill"),
     pointPenWidth: Number(el.penWidthInput.value),
     pointPenColor: readColor("penColor"),
+    stationGroups: state.stationGroups.map((group) => ({ ...group })),
+    labelNames: [...state.labelNames],
+    swapAxes: state.axisTransform.swapAxes,
+    xAxisLabel: state.axisTransform.xAxisLabel,
+    yAxisLabel: state.axisTransform.yAxisLabel,
     labelFontSize: Number(el.labelSizeInput.value),
     labelColor: readColor("labelColor"),
     labelDX: Number(el.labelDXInput.value),

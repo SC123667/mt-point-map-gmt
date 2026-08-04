@@ -4,6 +4,7 @@ const path = require("path");
 const { fork, spawn } = require("child_process");
 const { pathToFileURL } = require("url");
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require("electron");
+const { buildLegendEntries, normalizeLegendConfig } = require("./legend");
 const {
   DEFAULT_LEGEND_FILE,
   DEFAULT_OVERLAY_FILE,
@@ -451,8 +452,8 @@ ipcMain.handle("gmt:export", async (event, payload) => {
     formats,
     outputDirectory
   });
-  if (result.ok && result.needsTitleOverlay) {
-    await overlayNativeTitle(result, payload.config, outputName, formats);
+  if (result.ok && result.needsNativeDecorations) {
+    await overlayNativeDecorations(result, payload.config, outputName, formats);
   }
   return result;
 });
@@ -703,10 +704,10 @@ function writeSettings(settings) {
   }
 }
 
-async function overlayNativeTitle(result, config, outputName, requestedFormats) {
+async function overlayNativeDecorations(result, config, outputName, requestedFormats) {
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
-  if (!fs.existsSync(pngPath)) throw new Error(`中文标题叠加失败：未找到 PNG 底图 ${pngPath}`);
-  const rendered = await renderTitledMap(pngPath, String(config.title || "").trim());
+  if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
+  const rendered = await renderDecoratedMap(pngPath, config);
   fs.writeFileSync(pngPath, rendered.pngBuffer);
   if (requestedFormats.includes("pdf")) {
     fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), rendered.pdfBuffer);
@@ -720,14 +721,17 @@ async function overlayNativeTitle(result, config, outputName, requestedFormats) 
   }
 }
 
-async function renderTitledMap(pngPath, title) {
+async function renderDecoratedMap(pngPath, config = {}) {
   const image = nativeImage.createFromPath(pngPath);
   const size = image.getSize();
-  if (!size.width || !size.height) throw new Error("中文标题叠加失败：无法读取 GMT PNG 尺寸。");
-  const titleHeight = Math.max(72, Math.round(size.height * 0.085));
+  if (!size.width || !size.height) throw new Error("中文图名/图例叠加失败：无法读取 GMT PNG 尺寸。");
+  const title = String(config.title || "").trim();
+  const titleHeight = title ? Math.max(72, Math.round(size.height * 0.085)) : 0;
   const titleSize = Math.max(26, Math.min(54, Math.round(size.width * 0.032)));
   const totalHeight = size.height + titleHeight;
-  const imageUrl = pathToFileURL(pngPath).toString();
+  const imageUrl = image.toDataURL();
+  const legend = nativeLegendMarkup(config, size);
+  const mapElements = nativeMapElementsMarkup(config, size);
   const html = `<!doctype html>
 <html>
 <head>
@@ -754,16 +758,73 @@ async function renderTitledMap(pngPath, title) {
       line-height: 1.08;
       white-space: nowrap;
     }
-    img {
+    .map-wrap {
+      position: relative;
+      width: ${size.width}px;
+      height: ${size.height}px;
+    }
+    .map-wrap > img {
       display: block;
       width: ${size.width}px;
       height: ${size.height}px;
     }
+    .native-legend {
+      position: absolute;
+      z-index: 2;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+    }
+    .native-legend-title { font-weight: 700; line-height: 1.25; }
+    .native-legend-rule { height: 1px; background: rgba(90, 100, 110, 0.42); }
+    .native-legend-entry { display: flex; align-items: center; line-height: 1.25; }
+    .native-legend-symbol-wrap { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
+    .native-legend-symbol { display: inline-block; box-sizing: border-box; }
+    .native-legend-symbol.circle { border-radius: 50%; }
+    .native-legend-symbol.diamond { transform: rotate(45deg) scale(0.78); }
+    .native-legend-symbol.triangle { width: 0 !important; height: 0 !important; background: transparent !important; border-left-color: transparent !important; border-right-color: transparent !important; border-top: 0 !important; }
+    .native-legend-line { height: 0; }
+    .native-scale,
+    .native-compass {
+      position: absolute;
+      z-index: 3;
+      box-sizing: border-box;
+      color: #17212b;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      filter: drop-shadow(0 1px 1px rgba(255,255,255,0.9));
+    }
+    .native-scale-label { text-align: center; font-weight: 700; line-height: 1.15; }
+    .native-scale-bar {
+      display: flex;
+      height: 13px;
+      border: 2px solid #111;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .native-scale-bar > span { flex: 1 1 50%; }
+    .native-scale-bar > span:first-child { background: #111; }
+    .native-scale-ticks { position: relative; height: 1.35em; line-height: 1.25; }
+    .native-scale-ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+    .native-scale-ticks .start { left: 0; transform: none; }
+    .native-scale-ticks .middle { left: 50%; }
+    .native-scale-ticks .end { left: 100%; transform: translateX(-100%); }
+    .native-compass {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.90);
+      border: 1px solid rgba(65,76,88,0.48);
+      box-shadow: 0 3px 12px rgba(22,31,45,0.13);
+    }
+    .native-compass svg { display: block; width: 100%; height: 100%; overflow: visible; }
   </style>
 </head>
 <body>
-  <div class="title">${escapeHTML(title)}</div>
-  <img src="${escapeHTML(imageUrl)}" />
+  ${title ? `<div class="title">${escapeHTML(title)}</div>` : ""}
+  <div class="map-wrap">
+    <img src="${escapeHTML(imageUrl)}" />
+    ${legend}
+    ${mapElements}
+  </div>
 </body>
 </html>`;
   const win = new BrowserWindow({
@@ -780,8 +841,10 @@ async function renderTitledMap(pngPath, title) {
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
     await win.webContents.executeJavaScript(`
-      Promise.resolve(document.fonts && document.fonts.ready)
-        .then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      Promise.all([
+        Promise.resolve(document.fonts && document.fonts.ready),
+        ...Array.from(document.images).map((image) => image.decode ? image.decode() : Promise.resolve())
+      ]).then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     `);
     const pngBuffer = win.webContents.capturePage().then((captured) => captured.toPNG());
     const pdfBuffer = win.webContents.printToPDF({
@@ -794,6 +857,148 @@ async function renderTitledMap(pngPath, title) {
   } finally {
     win.destroy();
   }
+}
+
+function nativeMapElementsMarkup(config, imageSize) {
+  if (!config?.swapAxes) return "";
+  const scale = config.showScale ? nativeScaleMarkup(config, imageSize) : "";
+  const compass = config.showNorthArrow ? nativeCompassMarkup(config) : "";
+  return `${scale}${compass}`;
+}
+
+function nativeScaleMarkup(config, imageSize) {
+  const region = String(config.region || "").split("/").map(Number);
+  if (region.length !== 4 || region.some((value) => !Number.isFinite(value))) return "";
+  const latitudeSpan = Math.abs(region[3] - region[2]);
+  const midLatitude = (region[2] + region[3]) / 2;
+  const metersPerDegree = latitudeDegreeLength(midLatitude);
+  const mapMeters = latitudeSpan * metersPerDegree;
+  if (!(mapMeters > 0)) return "";
+  const scaleMeters = niceScaleDistance(mapMeters * 0.20);
+  const projectionWidth = projectionWidthCm(config.projection);
+  const dpi = clampNative(Number(config.pngDpi) || 300, 72, 1200);
+  const width = clampNative(Math.round((projectionWidth * dpi / 2.54) * (scaleMeters / mapMeters)), 110, Math.round(imageSize.width * 0.34));
+  const fontSize = clampNative(Math.round(imageSize.width * 0.0085), 18, 30);
+  const position = nativeCornerStyle(config.scalePosition, "BL", { x: 0.083, y: 0.105 });
+  const half = formatScaleDistance(scaleMeters / 2);
+  const full = formatScaleDistance(scaleMeters);
+  return `<div class="native-scale" style="${position};width:${width}px;font-size:${fontSize}px"><div class="native-scale-label">Scale</div><div class="native-scale-bar"><span></span><span></span></div><div class="native-scale-ticks"><span class="start">0</span><span class="middle">${half}</span><span class="end">${full}</span></div></div>`;
+}
+
+function nativeCompassMarkup(config) {
+  let position = nativeCornerStyle(config.northPosition, "TR", { x: 0.075, y: 0.085 });
+  const legendPosition = String(config?.legend?.position || "").toUpperCase();
+  if (config?.legend?.show && String(config.northPosition || "TR").toUpperCase() === "TR" && legendPosition.includes("+JTR")) {
+    position = "left:63%;top:8.5%;transform:translateX(-50%)";
+  }
+  return `<div class="native-compass" style="${position}" title="Axis orientation: north is right, east is up"><svg viewBox="0 0 112 112" role="img" aria-label="North points right; east points up"><circle cx="56" cy="56" r="31" fill="none" stroke="#56616d" stroke-width="1.5"/><line x1="21" y1="56" x2="91" y2="56" stroke="#34404c" stroke-width="2"/><line x1="56" y1="91" x2="56" y2="21" stroke="#34404c" stroke-width="2"/><path d="M91 56 L72 48 L76 56 L72 64 Z" fill="#d62828"/><path d="M56 21 L50 38 L56 35 L62 38 Z" fill="#34404c"/><circle cx="56" cy="56" r="4" fill="#17212b"/><text x="99" y="62" text-anchor="middle" font-size="17" font-weight="800" fill="#d62828">N</text><text x="56" y="16" text-anchor="middle" font-size="14" font-weight="700">E</text><text x="13" y="61" text-anchor="middle" font-size="12" font-weight="600">S</text><text x="56" y="107" text-anchor="middle" font-size="12" font-weight="600">W</text></svg></div>`;
+}
+
+function nativeCornerStyle(value, fallback, inset) {
+  const corner = String(value || fallback).toUpperCase();
+  const x = `${(inset.x * 100).toFixed(2)}%`;
+  const y = `${(inset.y * 100).toFixed(2)}%`;
+  return {
+    TL: `left:${x};top:${y}`,
+    TR: `right:${x};top:${y}`,
+    BL: `left:${x};bottom:${y}`,
+    BR: `right:${x};bottom:${y}`
+  }[corner] || `left:${x};bottom:${y}`;
+}
+
+function latitudeDegreeLength(latitude) {
+  const radians = Number(latitude) * Math.PI / 180;
+  return 111132.92 - 559.82 * Math.cos(2 * radians) + 1.175 * Math.cos(4 * radians) - 0.0023 * Math.cos(6 * radians);
+}
+
+function niceScaleDistance(targetMeters) {
+  if (!(targetMeters > 0)) return 100;
+  const power = 10 ** Math.floor(Math.log10(targetMeters));
+  const normalized = targetMeters / power;
+  const step = [1, 2, 2.5, 5, 10].filter((candidate) => candidate <= normalized).pop() || 1;
+  return step * power;
+}
+
+function formatScaleDistance(meters) {
+  if (meters >= 1000) return `${Number((meters / 1000).toFixed(2))} km`;
+  return `${Number(meters.toFixed(meters < 10 ? 1 : 0))} m`;
+}
+
+function nativeLegendMarkup(config, imageSize) {
+  if (!config?.legend?.show) return "";
+  const entries = buildLegendEntries(config);
+  if (!entries.length) return "";
+  const settings = normalizeLegendConfig(config.legend);
+  const position = parseNativeLegendPosition(settings.position);
+  const projectionWidth = projectionWidthCm(config.projection);
+  const pxPerCm = imageSize.width / projectionWidth;
+  const widthCm = Number.parseFloat(settings.width) || 4.2;
+  const width = clampNative(Math.round(widthCm * pxPerCm), 260, Math.round(imageSize.width * 0.38));
+  const titleSize = clampNative(Math.round(settings.titleFontSize * pxPerCm / 28.346), 22, 52);
+  const labelSize = clampNative(Math.round(settings.labelFontSize * pxPerCm / 28.346), 18, 44);
+  const symbolBox = clampNative(Math.round(0.52 * pxPerCm), 28, 58);
+  const padding = clampNative(Math.round(0.18 * pxPerCm), 14, 28);
+  const gap = clampNative(Math.round(0.10 * pxPerCm), 8, 18);
+  const alpha = 1 - clampNative(Number(settings.backgroundTransparency) || 0, 0, 100) / 100;
+  const transform = nativeLegendTransform(position.justify);
+  const rows = entries.map((entry) => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap)).join("");
+  return `<div class="native-legend" style="left:${(position.x * 100).toFixed(3)}%;top:${((1 - position.y) * 100).toFixed(3)}%;transform:${transform};width:${width}px;padding:${padding}px;background:${escapeHTML(settings.backgroundColor)};background-color:${colorWithAlpha(settings.backgroundColor, alpha)};border:${settings.borderWidth}px solid ${escapeHTML(settings.borderColor)};border-radius:${settings.cornerRadius}px;color:${escapeHTML(settings.textColor)};box-shadow:0 3px 14px rgba(22,31,45,0.12)"><div class="native-legend-title" style="font-size:${titleSize}px">${escapeHTML(settings.title || "图例")}</div><div class="native-legend-rule" style="margin:${gap}px 0"></div>${rows}</div>`;
+}
+
+function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
+  const penColor = String(entry.pen || "").split(",").pop() || "black";
+  const fill = entry.fill || "#d7191c";
+  let symbol;
+  if (entry.symbol === "line") {
+    symbol = `<span class="native-legend-line" style="width:${Math.round(symbolBox * 0.78)}px;border-top:${Math.max(2, Math.round(symbolBox * 0.08))}px solid ${escapeHTML(penColor)}"></span>`;
+  } else {
+    const gmtSymbol = entry.gmtSymbol || "c";
+    const size = Math.round(symbolBox * 0.48);
+    if (gmtSymbol === "t") {
+      symbol = `<span class="native-legend-symbol triangle" style="border-left:${Math.round(size * 0.55)}px solid transparent;border-right:${Math.round(size * 0.55)}px solid transparent;border-bottom:${size}px solid ${escapeHTML(fill)}"></span>`;
+    } else {
+      const shape = gmtSymbol === "d" ? "diamond" : (gmtSymbol === "c" ? "circle" : "square");
+      symbol = `<span class="native-legend-symbol ${shape}" style="width:${size}px;height:${size}px;background:${escapeHTML(fill)};border:${Math.max(1, Math.round(symbolBox * 0.04))}px solid ${escapeHTML(penColor)}"></span>`;
+    }
+  }
+  return `<div class="native-legend-entry" style="font-size:${labelSize}px;margin-top:${gap}px"><span class="native-legend-symbol-wrap" style="width:${symbolBox}px;height:${symbolBox}px;margin-right:${gap}px">${symbol}</span><span>${escapeHTML(entry.label)}</span></div>`;
+}
+
+function parseNativeLegendPosition(value) {
+  const match = String(value || "").match(/^n([0-9.]+)\/([0-9.]+)(?:\+j(TL|TR|BL|BR))?$/i);
+  if (!match) return { x: 0.98, y: 0.98, justify: "TR" };
+  return {
+    x: clampNative(Number(match[1]), 0, 1),
+    y: clampNative(Number(match[2]), 0, 1),
+    justify: String(match[3] || "TR").toUpperCase()
+  };
+}
+
+function nativeLegendTransform(justify) {
+  return {
+    TL: "translate(0,0)",
+    TR: "translate(-100%,0)",
+    BL: "translate(0,-100%)",
+    BR: "translate(-100%,-100%)"
+  }[justify] || "translate(-100%,0)";
+}
+
+function projectionWidthCm(value) {
+  const match = String(value || "").match(/^[A-Za-z]([0-9.]+)c/i);
+  const width = match ? Number(match[1]) : 16;
+  return Number.isFinite(width) && width > 0 ? width : 16;
+}
+
+function colorWithAlpha(color, alpha) {
+  const hex = String(color || "").match(/^#([0-9a-f]{6})$/i);
+  if (!hex) return color;
+  const value = Number.parseInt(hex[1], 16);
+  return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha.toFixed(3)})`;
+}
+
+function clampNative(value, min, max) {
+  const number = Number(value);
+  return Math.min(max, Math.max(min, Number.isFinite(number) ? number : min));
 }
 
 function escapeHTML(value) {
