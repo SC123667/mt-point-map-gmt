@@ -4,6 +4,11 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.2.1 - 2026-08-04
+
+- Restored terrain overlays for latitude-X/longitude-Y maps by transposing elevation and illumination grids without modifying their source files.
+- Fixed native scale and compass decorations so custom positions created by preview dragging are honored in the rendered PNG/PDF.
+
 ## v1.2.0 - 2026-08-04
 
 - Added project-embedded station groups so different survey methods can use independent colors, symbols, sizes, and legend entries.

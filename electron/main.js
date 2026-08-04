@@ -5,6 +5,7 @@ const { fork, spawn } = require("child_process");
 const { pathToFileURL } = require("url");
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require("electron");
 const { buildLegendEntries, normalizeLegendConfig } = require("./legend");
+const { nativePositionStyle } = require("./native-position");
 const {
   DEFAULT_LEGEND_FILE,
   DEFAULT_OVERLAY_FILE,
@@ -879,31 +880,19 @@ function nativeScaleMarkup(config, imageSize) {
   const dpi = clampNative(Number(config.pngDpi) || 300, 72, 1200);
   const width = clampNative(Math.round((projectionWidth * dpi / 2.54) * (scaleMeters / mapMeters)), 110, Math.round(imageSize.width * 0.34));
   const fontSize = clampNative(Math.round(imageSize.width * 0.0085), 18, 30);
-  const position = nativeCornerStyle(config.scalePosition, "BL", { x: 0.083, y: 0.105 });
+  const position = nativePositionStyle(config.scalePosition, "BL", { x: 0.083, y: 0.105 });
   const half = formatScaleDistance(scaleMeters / 2);
   const full = formatScaleDistance(scaleMeters);
   return `<div class="native-scale" style="${position};width:${width}px;font-size:${fontSize}px"><div class="native-scale-label">Scale</div><div class="native-scale-bar"><span></span><span></span></div><div class="native-scale-ticks"><span class="start">0</span><span class="middle">${half}</span><span class="end">${full}</span></div></div>`;
 }
 
 function nativeCompassMarkup(config) {
-  let position = nativeCornerStyle(config.northPosition, "TR", { x: 0.075, y: 0.085 });
+  let position = nativePositionStyle(config.northPosition, "TR", { x: 0.075, y: 0.085 });
   const legendPosition = String(config?.legend?.position || "").toUpperCase();
   if (config?.legend?.show && String(config.northPosition || "TR").toUpperCase() === "TR" && legendPosition.includes("+JTR")) {
     position = "left:63%;top:8.5%;transform:translateX(-50%)";
   }
   return `<div class="native-compass" style="${position}" title="Axis orientation: north is right, east is up"><svg viewBox="0 0 112 112" role="img" aria-label="North points right; east points up"><circle cx="56" cy="56" r="31" fill="none" stroke="#56616d" stroke-width="1.5"/><line x1="21" y1="56" x2="91" y2="56" stroke="#34404c" stroke-width="2"/><line x1="56" y1="91" x2="56" y2="21" stroke="#34404c" stroke-width="2"/><path d="M91 56 L72 48 L76 56 L72 64 Z" fill="#d62828"/><path d="M56 21 L50 38 L56 35 L62 38 Z" fill="#34404c"/><circle cx="56" cy="56" r="4" fill="#17212b"/><text x="99" y="62" text-anchor="middle" font-size="17" font-weight="800" fill="#d62828">N</text><text x="56" y="16" text-anchor="middle" font-size="14" font-weight="700">E</text><text x="13" y="61" text-anchor="middle" font-size="12" font-weight="600">S</text><text x="56" y="107" text-anchor="middle" font-size="12" font-weight="600">W</text></svg></div>`;
-}
-
-function nativeCornerStyle(value, fallback, inset) {
-  const corner = String(value || fallback).toUpperCase();
-  const x = `${(inset.x * 100).toFixed(2)}%`;
-  const y = `${(inset.y * 100).toFixed(2)}%`;
-  return {
-    TL: `left:${x};top:${y}`,
-    TR: `right:${x};top:${y}`,
-    BL: `left:${x};bottom:${y}`,
-    BR: `right:${x};bottom:${y}`
-  }[corner] || `left:${x};bottom:${y}`;
 }
 
 function latitudeDegreeLength(latitude) {

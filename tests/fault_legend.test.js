@@ -6,6 +6,7 @@ const path = require("path");
 const { autodetectAndParse, buildFaultOverlay, recolorPen, summarizeFaultFile } = require("../electron/faults");
 const { buildLegendEntries, buildLegendSpec, legendCommand, normalizeLegendConfig } = require("../electron/legend");
 const { buildScript, terrainEstimate, terrainPaths } = require("../electron/gmt");
+const { nativePositionStyle, parseNativePosition } = require("../electron/native-position");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mt-gmt-fault-test-"));
 
@@ -175,6 +176,50 @@ try {
   assert.strictEqual(fs.readFileSync(path.join(groupedScriptDir, "stations_labels.tsv"), "utf8").trim().split(/\n/).length, 2);
   assert(fs.readFileSync(path.join(groupedScriptDir, "stations_group_01_mt.tsv"), "utf8").startsWith("40.03000000\t113.61000000"));
   assert(fs.readFileSync(path.join(groupedScriptDir, "map_legend.txt"), "utf8").includes("高密度电法"));
+
+  const customNorth = parseNativePosition("n0.375/0.640+jTR");
+  assert.deepStrictEqual(customNorth, { x: 0.375, y: 0.64, justify: "TR" });
+  assert.strictEqual(nativePositionStyle("n0.375/0.640+jTR"), "left:37.500%;top:36.000%;transform:translate(-100%,0)");
+  assert(nativePositionStyle("TL", "TR", { x: 0.07, y: 0.09 }).includes("left:7.00%;top:9.00%"));
+
+  const terrainGrid = path.join(tmp, "terrain-source.nc");
+  const terrainShade = path.join(tmp, "terrain-shade.nc");
+  fs.writeFileSync(terrainGrid, "test-grid", "utf8");
+  fs.writeFileSync(terrainShade, "test-shade", "utf8");
+  const swappedTerrainDir = path.join(tmp, "swapped-terrain-output");
+  const swappedTerrainScript = buildScript([
+    { name: "T01", lon: 113.62, lat: 40.03 }
+  ], {
+    title: "Swapped terrain",
+    plotType: "stationMap",
+    region: "113.60/113.64/40.02/40.06",
+    projection: "X24c/12c",
+    frame: "af",
+    showGrid: true,
+    showLabels: false,
+    showScale: false,
+    showNorthArrow: false,
+    swapAxes: true,
+    xAxisLabel: "Latitude (N)",
+    yAxisLabel: "Longitude (E)",
+    pointSymbol: "c",
+    pointSize: 0.22,
+    pointFill: "#d7191c",
+    pointPenWidth: 0.35,
+    pointPenColor: "black",
+    showTerrain: true,
+    terrainGridPath: terrainGrid,
+    terrainShadePath: terrainShade,
+    terrainResolution: "01s",
+    terrainCpt: "geo",
+    terrainIntensity: 0.65,
+    outputName: "swapped_terrain",
+    legend: { show: false }
+  }, swappedTerrainDir, ["png"]);
+  assert(swappedTerrainScript.includes(`gmt grdedit ${terrainGrid} -Et`));
+  assert(swappedTerrainScript.includes(`gmt grdedit ${terrainShade} -Et`));
+  assert(swappedTerrainScript.includes("_swapxy.nc -R40.02/40.06/113.6/113.64 -JX24c/12c"));
+  assert(swappedTerrainScript.includes("_swapxy_shade.nc -Cgeo"));
 
   const customElementScript = buildScript([
     { name: "A01", lon: 101.0, lat: 35.0 }

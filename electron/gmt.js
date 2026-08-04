@@ -327,14 +327,14 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const scale = scaleForRegion(regionValues);
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell, config);
-  const terrain = terrainScriptParts(config, region, outputDirectory, shell);
+  const terrain = terrainScriptParts(config, region, outputDirectory, shell, sourceRegion);
   const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
   const stationPlots = stationPlotScriptParts(records, config, outputDirectory, region, shell);
   const legend = legendScriptPart(config, outputDirectory, region, shell);
-  const backgroundCommand = config.swapAxes
+  const backgroundCommand = terrain.imageCommand || (config.swapAxes
     ? ""
-    : (terrain.imageCommand || `${shell === "bat" ? "" : "  "}gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`);
+    : `${shell === "bat" ? "" : "  "}gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`);
   if (shell === "bat") {
     return [
       "@echo off",
@@ -816,9 +816,10 @@ function ceilPad(value, pad) {
   return Number.isFinite(value) ? Math.ceil((value + pad) * 10) / 10 : 1;
 }
 
-function terrainScriptParts(config, region, outputDirectory, shell) {
+function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion = config.region) {
   if (!config.showTerrain) return { preCommands: [], imageCommand: "" };
-  const paths = terrainPaths(outputDirectory, config, region);
+  const geographicRegion = String(sourceRegion || config.region || region);
+  const paths = terrainPaths(outputDirectory, config, geographicRegion);
   fs.mkdirSync(paths.directory, { recursive: true });
   const configuredGrid = config.terrainGridPath && fs.existsSync(config.terrainGridPath) ? config.terrainGridPath : "";
   const localGrid = config.localTerrainGridPath && fs.existsSync(config.localTerrainGridPath) ? config.localTerrainGridPath : configuredGrid;
@@ -834,13 +835,48 @@ function terrainScriptParts(config, region, outputDirectory, shell) {
   if (localGrid) {
     if (!fs.existsSync(shade)) preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
   } else if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
-    preCommands.push(`${prefix}gmt grdcut ${remote} -R${region} -G${quote(grid)} -V`);
+    preCommands.push(`${prefix}gmt grdcut ${remote} -R${geographicRegion} -G${quote(grid)} -V`);
     preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
+  }
+
+  let renderGrid = grid;
+  let renderShade = shade;
+  if (config.swapAxes) {
+    const swapped = swappedTerrainPaths(paths, config);
+    if (derivedTerrainNeedsRefresh(grid, swapped.gridPath)) {
+      preCommands.push(`${prefix}gmt grdedit ${quote(grid)} -Et -G${quote(swapped.gridPath)}`);
+    }
+    if (derivedTerrainNeedsRefresh(shade, swapped.shadePath)) {
+      preCommands.push(`${prefix}gmt grdedit ${quote(shade)} -Et -G${quote(swapped.shadePath)}`);
+    }
+    renderGrid = swapped.gridPath;
+    renderShade = swapped.shadePath;
   }
   return {
     preCommands,
-    imageCommand: `${prefix}gmt grdimage ${quote(grid)} -R${region} -J${config.projection} -I${quote(shade)} -C${cpt}`
+    imageCommand: `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt}`
   };
+}
+
+function swappedTerrainPaths(paths, config) {
+  const resolution = config.terrainResolution || "06m";
+  const stem = `earth_relief_${resolution}_${paths.key}_swapxy`;
+  return {
+    gridPath: path.join(paths.directory, `${stem}.nc`),
+    shadePath: path.join(paths.directory, `${stem}_shade.nc`)
+  };
+}
+
+function derivedTerrainNeedsRefresh(sourcePath, targetPath) {
+  if (!fs.existsSync(targetPath)) return true;
+  if (!fs.existsSync(sourcePath)) return true;
+  try {
+    const source = fs.statSync(sourcePath);
+    const target = fs.statSync(targetPath);
+    return target.size <= 0 || target.mtimeMs < source.mtimeMs;
+  } catch {
+    return true;
+  }
 }
 
 function saveScript(script, outputDirectory, outputName = "mt_point_map") {
