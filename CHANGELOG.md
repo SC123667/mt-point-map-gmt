@@ -4,6 +4,12 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.2.2 - 2026-09-02
+
+- Added a complete bilingual project handoff guide covering architecture, modules, data flows, UI constraints, testing, packaging, releases, local/remote version state, and known technical debt.
+- Corrected README and distribution guidance so the local v1.2.x development branch is clearly separated from the public v1.1.3 release.
+- Documented the Electron application as the official product line and the Python/Tkinter implementation as a retained legacy prototype.
+
 ## v1.2.1 - 2026-08-04
 
 - Restored terrain overlays for latitude-X/longitude-Y maps by transposing elevation and illumination grids without modifying their source files.

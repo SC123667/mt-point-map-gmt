@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Source Version](https://img.shields.io/badge/source-v1.1.3-0d8584)](https://github.com/SC123667/mt-point-map-gmt/tags)
+[![Development Version](https://img.shields.io/badge/development-v1.2.2-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -11,6 +11,12 @@
 **MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
+
+## 项目接手 / Developer Handoff
+
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.2.2**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.2.2**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 软件界面 / Interface Preview
 
@@ -80,12 +86,14 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
 - Build distributable macOS and Windows desktop packages.
+- 本地 v1.2.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注和原生中文图例；这些功能尚未进入公开 `main`。
+- The local v1.2.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, and native Chinese legends; these features are not yet on public `main`.
 
 ## 正式版下载 / Stable Release
 
-当前源码与最新公开安装包版本均为 **v1.1.3**。普通用户可从 GitHub Releases 下载安装包，开发者也可以检出同版本标签从源码构建。
+当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.2.2**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
 
-The current source version and latest public installer release are both **v1.1.3**. End users can download installers from GitHub Releases, while developers can build the matching tag from source.
+GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.2.2** and has not been published; end users should use the stable GitHub Release.
 
 [打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 
