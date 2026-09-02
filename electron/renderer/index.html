@@ -427,7 +427,15 @@
 
         <fieldset class="analysis-settings" data-settings-panel="mtParams">
           <legend>MT 图件参数</legend>
-          <label class="analysis-only curve-only">曲线测点<select id="curveStationInput"></select></label>
+          <div class="analysis-only curve-only curve-station-control">
+            <label>曲线测点<select id="curveStationInput" aria-label="曲线测点"></select></label>
+            <div class="curve-station-nav" role="group" aria-label="切换曲线测点">
+              <button id="curvePreviousBtn" type="button" title="上一测点（左方向键）">← 上一测点</button>
+              <span id="curveStationPosition" aria-live="polite">0 / 0</span>
+              <button id="curveNextBtn" type="button" title="下一测点（右方向键）">下一测点 →</button>
+            </div>
+            <p class="field-note curve-keyboard-hint">也可用键盘 ← / → 连续查看相邻测点。</p>
+          </div>
           <label class="analysis-only strike-only">走向长度<input id="strikeLengthInput" type="number" min="0.005" max="0.12" step="0.005" value="0.035" /></label>
           <label class="analysis-only strike-only">走向颜色
             <select id="strikeColorInput">

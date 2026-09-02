@@ -766,6 +766,44 @@ body[data-plot-type="responseCurve"] .analysis-settings {
   display: block;
 }
 
+.curve-station-control {
+  gap: 7px;
+}
+
+.curve-station-control > label {
+  margin-bottom: 0;
+}
+
+.curve-station-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.curve-station-nav button {
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.curve-station-nav button:last-child {
+  justify-self: stretch;
+}
+
+#curveStationPosition {
+  min-width: 48px;
+  color: #506174;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.curve-keyboard-hint {
+  margin: 0;
+  text-align: center;
+}
+
 legend {
   font-weight: 700;
   padding: 0 4px;

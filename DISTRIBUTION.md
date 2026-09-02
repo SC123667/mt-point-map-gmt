@@ -1,8 +1,8 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.2.2`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.2.3`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.2.2`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.2.3`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 

@@ -35,5 +35,13 @@ assert(css.includes("overflow-x: hidden"), "quick inspector must not create hori
 assert(css.includes("overscroll-behavior: contain"), "quick inspector scroll must stay within the panel");
 assert(css.includes('body[data-platform="darwin"]'), "macOS styling missing");
 assert(css.includes('body[data-platform="win32"]'), "Windows styling missing");
+assert(html.includes('id="curvePreviousBtn"'), "previous curve-station control missing");
+assert(html.includes('id="curveNextBtn"'), "next curve-station control missing");
+assert(html.includes('id="curveStationPosition"'), "curve-station position indicator missing");
+assert(renderer.includes('bind(el.curveStationInput, "change"'), "curve-station select must trigger a preview");
+assert(renderer.includes('["ArrowLeft", "ArrowRight"]'), "curve-station arrow-key navigation missing");
+assert(renderer.includes("requestRevision === state.preview.revision"), "stale preview revision guard missing");
+assert(renderer.includes("expectedPlotType !== state.plotType"), "stale preview plot-type guard missing");
+assert(css.includes(".curve-station-nav"), "curve-station navigation styling missing");
 
 console.log("UI workbench tests passed");

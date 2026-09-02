@@ -14,10 +14,11 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.2.2`（本次接手资料整理版本）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 和 `v1.2.1` 两个尚未发布到 GitHub 的功能/修复提交。
+- 当前本地源码版本：`v1.2.3`（MT 专项绘图修复版本）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.2.3` 四个尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 本机常用 App 副本：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，核对时版本为 `1.2.1`。
+- 本次已验证安装的 `1.2.3` App：`/Users/cwn/Applications/MT点位图制作工具—GMT.app`；包内版本、ASAR 完整性、严格签名、真实启动、GMT 识别和曲线测点导航均已核对。
+- `/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app` 仍是正在运行的 `1.2.1` 旧副本。本次为避免中断用户工作，没有退出或覆盖它；准备切换时应先正常退出旧副本，再启动上面的 `1.2.3`。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
 - 本次只整理本地项目和建立本地 Git 回滚点，不会自动推送 GitHub。
@@ -26,13 +27,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.2.2` |
+| 本地源码版本 | `1.2.3` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0`、`v1.2.1`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.2.3`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | `1.2.1`，不包含本次仅文档性质的 `1.2.2` 更新 |
+| 本机 App | `/Users/cwn/Applications/MT点位图制作工具—GMT.app`，已验证 `1.2.3`；桌面“实用app”旧副本仍为 `1.2.1` |
 
 版本号必须同步维护：
 
@@ -61,7 +62,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 ### 图件类型
 
 - 点位图 / Station map
-- 阻抗张量走向或电性主轴图 / Strike map
+- 相位张量主轴或广义电性走向图 / Strike map
 - 相位张量椭圆图 / Phase tensor map
 - Parkinson/Wiese 感应矢量图 / Tipper map
 - 单点视电阻率和相位曲线 / MT response curve
@@ -331,21 +332,25 @@ npx electron-builder --win nsis portable --arm64
 
 `npm start` 是否能真正出图取决于本机 GMT。应用会检查 PATH、Homebrew/MacPorts、`/Applications/GMT-*.app` 和常见 Windows 安装目录。
 
+2026-09-02 本机 `electron-builder` 在 `Documents` 的 FileProvider/扩展属性冷扫描阶段极慢；本次 macOS 验证包改用现有 Electron 35.7.5 App 骨架重打 ASAR，并在非 FileProvider 路径清理扩展属性后进行 ad-hoc 深度签名。最终安装包通过 `codesign --verify --deep --strict`，Info.plist 与 ASAR 内版本均为 `1.2.3`，`ElectronAsarIntegrity` SHA-256 与实际 ASAR 完全一致。该应急打包方式只用于本机验证，正式 DMG/公开 Release 仍应恢复并验证标准 `electron-builder` 流程。
+
 ## 11. 测试说明 / Tests
 
 | 测试 | 覆盖内容 |
 | --- | --- |
 | `parser_edi.test.js` | EDI 坐标、文件名站点名、0/0 拒绝 |
+| `mt_math.test.js` | 相位张量 `X^-1Y`、alpha/beta、主值、走向、阻抗相位和 Tipper 方位约定 |
+| `mt_plots.test.js` | 走向线、相位张量椭圆、GMT 投影感应矢量和响应曲线脚本 |
 | `fault_legend.test.js` | 构造线、图例、分组点位、互换轴、地形转置、原生位置 |
 | `import_worker.test.js` | 表格、字段映射、EDI 递归/批量解析和 worker IPC |
 | `gmt_worker.test.js` | 2500 点 worker 绘图、输出文件，使用 mock GMT |
 | `srtm_worker.test.js` | SRTM worker、缓存 HGT、网格/阴影交接，使用 mock GMT |
-| `ui_workbench.test.js` | DOM ID、数据入口、右栏默认关闭/滚动、macOS/Windows CSS |
+| `ui_workbench.test.js` | DOM ID、数据入口、曲线测点按钮/方向键导航、预览修订隔离、右栏默认关闭/滚动、macOS/Windows CSS |
 | `test_data_and_gmt.py` | Python 原型点位解析和 GMT 脚本 |
 
 2026-09-02 的基线结果：
 
-- `npm run test:node`：6 组全部通过。
+- `npm run test:node`：8 组全部通过。
 - `PYTHONPATH=. python3.12 -m pytest -q tests/test_data_and_gmt.py`：`2 passed`。
 - 默认 `/usr/bin/python3` 没有 pytest，必须使用装有 pytest 的 Python 3.12 或先建立独立虚拟环境。
 - 当前 shell 直接执行 `gmt` 会提示找不到，但应用路径检测能找到 GMT 6.5.0 App。worker 测试使用 mock GMT；本次另用应用的真实检测与执行路径成功生成 PNG（18,560 bytes）和 PDF（9,125 bytes）小样。正式发布前仍需从实际 Electron UI 再做一次人工预览/导出检查。

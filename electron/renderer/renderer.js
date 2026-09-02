@@ -34,6 +34,7 @@ const state = {
     rendering: false,
     queuedAuto: false,
     autoTimer: null,
+    revision: 0,
     selectionStart: null,
     selectionEnd: null,
     dragStart: null,
@@ -148,7 +149,7 @@ const ids = [
   "previewStatus", "cancelRenderBtn", "legendDragHandle", "scaleDragHandle", "northDragHandle",
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
-  "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
+  "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "curvePreviousBtn", "curveNextBtn", "curveStationPosition", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
@@ -236,6 +237,13 @@ function wireEvents() {
   bind(el.sidebarLoadSampleBtn, "click", loadSampleData);
   bind(el.tableHelpBtn, "click", showTableHelp);
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
+  bind(el.curveStationInput, "change", () => {
+    renderCurveNavigation();
+    scheduleAutoPreview("曲线测点已切换，正在自动绘制预览...", { delay: 90 });
+  });
+  bind(el.curvePreviousBtn, "click", () => navigateCurveStation(-1));
+  bind(el.curveNextBtn, "click", () => navigateCurveStation(1));
+  document.addEventListener("keydown", handleCurveNavigationKeydown);
   bind(el.closeTableHelpBtn, "click", () => el.tableHelpDialog.close());
   bind(el.applyMappingBtn, "click", () => applyMapping({ autoPreview: true }));
   bind(el.exportSkippedEdiBtn, "click", exportSkippedEdiList);
@@ -577,7 +585,7 @@ function setPlotType(plotType) {
   document.body.dataset.plotType = state.plotType;
   const labels = {
     stationMap: ["绘图参数", "点位图模式"],
-    strikeMap: ["电性主轴 / 阻抗张量走向", "按选定周期叠加走向线段"],
+    strikeMap: ["相位张量主轴 / 广义电性走向", "按选定周期叠加 alpha - beta 主轴线段"],
     phaseTensorMap: ["相位张量椭圆", "按选定周期叠加相位张量椭圆"],
     tipperMap: ["感应矢量 / Tipper", "按选定周期叠加实部或虚部箭头"],
     responseCurve: ["视电阻率和相位曲线", "选择单个测点绘制 rho/phase 曲线"]
@@ -588,6 +596,7 @@ function setPlotType(plotType) {
   syncLegendLabelDefaults();
   el.outputNameInput.value = defaultOutputNameForPlot(state.plotType);
   renderPlaceholder();
+  renderCurveNavigation();
   renderQuickInspector();
   scheduleAutoPreview("图件类型已切换，正在自动绘制预览...", { delay: 120 });
 }
@@ -849,6 +858,7 @@ function applyConfigToUI(config) {
     setColorControlValue("legendBorderColor", config.legend.borderColor || "gray50");
     setInputValue(el.legendBorderWidthInput, config.legend.borderWidth);
   }
+  renderCurveNavigation();
   renderQuickInspector();
 }
 
@@ -1572,13 +1582,15 @@ async function exportMap(formats, showAlert, options = {}) {
     return false;
   }
   state.preview.rendering = true;
+  const requestRevision = state.preview.revision;
+  const requestPlotType = state.plotType;
   el.cancelRenderBtn.classList.remove("hidden");
   const isPreviewRender = !showAlert;
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
   try {
-    if (!validatePlotReadiness(config)) return false;
+    if (!validatePlotReadiness(config, { auto: Boolean(options.auto) })) return false;
     if (showAlert && formats.includes("png")) {
       const dpi = await requestPngDpi(config.pngDpi);
       if (!dpi) return false;
@@ -1610,11 +1622,13 @@ async function exportMap(formats, showAlert, options = {}) {
     }
     state.outputDirectory = result.outputDirectory;
     renderOutputDirectory();
+    const isCurrentRequest = requestRevision === state.preview.revision && requestPlotType === state.plotType;
     if (formats.includes("png")) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
-      if (png) await renderPreview(png);
+      if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType);
     }
-    setRuntimeStatus(showAlert ? `导出完成：${result.files.length} 个文件` : "预览已更新", "ready");
+    if (showAlert) setRuntimeStatus(`导出完成：${result.files.length} 个文件`, "ready");
+    else if (isCurrentRequest) setRuntimeStatus("预览已更新", "ready");
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
   } finally {
@@ -2070,19 +2084,89 @@ async function saveScript() {
   if (saved) notify(`GMT 脚本已保存：${saved}`);
 }
 
-function validatePlotReadiness(config) {
+function validatePlotReadiness(config, options = {}) {
+  const issue = plotReadinessIssue(config);
+  if (!issue) return true;
+  if (options.auto) {
+    clearPreviewImage();
+    el.previewPlaceholder.hidden = false;
+    el.previewPlaceholder.textContent = issue;
+    setPreviewStatus(issue, "error");
+  } else {
+    notify(issue);
+  }
+  return false;
+}
+
+function plotReadinessIssue(config) {
   if (["strikeMap", "phaseTensorMap", "tipperMap", "responseCurve"].includes(config.plotType)) {
     const hasMT = state.records.some((record) => record.mtResponses?.length);
     if (!hasMT) {
-      notify("当前数据只有点位坐标，没有可用于走向、相位张量、Tipper 或曲线图的 MT 响应数据。请导入 EDI 文件夹，或在表格中提供周期/频率与阻抗张量列。");
-      return false;
+      return "当前数据只有点位坐标，没有可用于走向、相位张量、Tipper 或曲线图的 MT 响应数据。请导入 EDI 文件夹，或在表格中提供周期/频率与阻抗张量列。";
     }
   }
-  if (config.plotType === "responseCurve" && !config.curveStation) {
-    notify("请选择一个包含 MT 响应数据的测点。");
-    return false;
+  const selected = state.records
+    .map((record) => nearestResponseClient(record, config.mtPeriod))
+    .filter(Boolean);
+  if (config.plotType === "strikeMap" && !selected.some(responseHasStrike)) {
+    return "所选周期附近没有可计算的走向。走向图需要完整的 ZXX/ZXY/ZYX/ZYY 复阻抗张量，或显式 strike 字段。";
   }
-  return true;
+  if (config.plotType === "phaseTensorMap" && !selected.some(responseHasPhaseTensor)) {
+    return "所选周期附近没有可计算的相位张量。请确认 EDI 包含完整的 ZXX/ZXY/ZYX/ZYY 实部和虚部。";
+  }
+  if (config.plotType === "tipperMap") {
+    const part = config.tipperComponent === "imag" ? "im" : "re";
+    if (!selected.some((response) => responseHasTipper(response, part))) {
+      const label = part === "im" ? "虚部" : "实部";
+      return `当前 EDI 在所选周期附近不含非零且完整的 TX/TY ${label}，因此不能绘制感应矢量；软件不会用点位冒充箭头。`;
+    }
+  }
+  if (config.plotType === "responseCurve") {
+    if (!config.curveStation) return "请选择一个包含 MT 响应数据的测点。";
+    const station = state.records.find((record) => record.name === config.curveStation);
+    if (!station?.mtResponses?.some(responseHasCurveData)) return "所选测点没有可绘制的 ZXY/ZYX 视电阻率和相位响应。";
+  }
+  return "";
+}
+
+function nearestResponseClient(record, targetPeriod) {
+  const responses = (record?.mtResponses || []).filter((response) => Number.isFinite(response.period) && response.period > 0);
+  if (!responses.length) return null;
+  const target = Number(targetPeriod);
+  if (!Number.isFinite(target) || target <= 0) return responses[0];
+  return responses.reduce((best, response) => {
+    const currentDistance = Math.abs(Math.log10(response.period) - Math.log10(target));
+    const bestDistance = Math.abs(Math.log10(best.period) - Math.log10(target));
+    return currentDistance < bestDistance ? response : best;
+  }, responses[0]);
+}
+
+function responseHasStrike(response) {
+  return Number.isFinite(response?.provided?.strike) || responseHasPhaseTensor(response);
+}
+
+function responseHasPhaseTensor(response) {
+  const provided = response?.provided || {};
+  if ([provided.ptAzimuth, provided.ptMax, provided.ptMin].every(Number.isFinite)) return true;
+  const z = response?.z || {};
+  if (![z.xx, z.xy, z.yx, z.yy].every(complexPairIsFinite)) return false;
+  const determinant = z.xx.re * z.yy.re - z.xy.re * z.yx.re;
+  return Number.isFinite(determinant) && Math.abs(determinant) >= 1e-12;
+}
+
+function responseHasTipper(response, part) {
+  const tx = response?.tipper?.x?.[part];
+  const ty = response?.tipper?.y?.[part];
+  return Number.isFinite(tx) && Number.isFinite(ty) && Math.hypot(tx, ty) > 0;
+}
+
+function responseHasCurveData(response) {
+  if (!Number.isFinite(response?.period) || response.period <= 0) return false;
+  return complexPairIsFinite(response?.z?.xy) || complexPairIsFinite(response?.z?.yx);
+}
+
+function complexPairIsFinite(value) {
+  return Number.isFinite(value?.re) && Number.isFinite(value?.im);
 }
 
 function populateColorControls() {
@@ -2171,6 +2255,8 @@ function renderStationRows() {
 }
 
 function populateMTControls() {
+  const previousPeriod = el.mtPeriodInput.value;
+  const previousCurveStation = el.curveStationInput.value;
   const periods = availablePeriodsClient();
   el.mtPeriodInput.innerHTML = "";
   if (!periods.length) {
@@ -2179,11 +2265,51 @@ function populateMTControls() {
     for (const period of periods) {
       el.mtPeriodInput.append(new Option(`${formatPeriod(period)} s`, String(period)));
     }
-    el.mtPeriodInput.value = String(periods[Math.floor(periods.length / 2)] || periods[0]);
+    const previousStillExists = periods.some((period) => String(period) === previousPeriod);
+    el.mtPeriodInput.value = previousStillExists
+      ? previousPeriod
+      : String(periods[Math.floor(periods.length / 2)] || periods[0]);
   }
   el.curveStationInput.innerHTML = "";
   const curveRecords = state.records.filter((record) => record.mtResponses?.length);
   for (const record of curveRecords) el.curveStationInput.append(new Option(record.name, record.name));
+  if (curveRecords.some((record) => record.name === previousCurveStation)) {
+    el.curveStationInput.value = previousCurveStation;
+  }
+  renderCurveNavigation();
+}
+
+function renderCurveNavigation() {
+  const count = el.curveStationInput?.options?.length || 0;
+  const index = count ? Math.max(0, el.curveStationInput.selectedIndex) : -1;
+  if (el.curveStationPosition) el.curveStationPosition.textContent = count ? `${index + 1} / ${count}` : "0 / 0";
+  if (el.curvePreviousBtn) el.curvePreviousBtn.disabled = count <= 1;
+  if (el.curveNextBtn) el.curveNextBtn.disabled = count <= 1;
+  if (el.curveStationInput) el.curveStationInput.disabled = count === 0;
+}
+
+function navigateCurveStation(delta) {
+  const count = el.curveStationInput?.options?.length || 0;
+  if (!count) return false;
+  const current = Math.max(0, el.curveStationInput.selectedIndex);
+  const next = ((current + Number(delta || 0)) % count + count) % count;
+  if (next === current) return false;
+  el.curveStationInput.selectedIndex = next;
+  renderCurveNavigation();
+  scheduleAutoPreview(`已切换到测点 ${el.curveStationInput.value}，正在自动绘制曲线...`, { delay: 90 });
+  return true;
+}
+
+function handleCurveNavigationKeydown(event) {
+  if (state.plotType !== "responseCurve" || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (document.querySelector("dialog[open]") || isEditableTarget(event.target)) return;
+  if (navigateCurveStation(event.key === "ArrowLeft" ? -1 : 1)) event.preventDefault();
+}
+
+function isEditableTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("input, select, textarea, [contenteditable='true']"));
 }
 
 function availablePeriodsClient() {
@@ -2202,10 +2328,11 @@ function formatPeriod(period) {
   return period.toExponential(2);
 }
 
-async function renderPreview(filePath) {
+async function renderPreview(filePath, expectedRevision = null, expectedPlotType = "") {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
     const dimensions = await imageDimensions(url);
+    if (expectedRevision !== null && (expectedRevision !== state.preview.revision || expectedPlotType !== state.plotType)) return false;
     state.preview.imageWidth = dimensions.width;
     state.preview.imageHeight = dimensions.height;
     el.previewImageLayer.style.backgroundImage = `url(${url})`;
@@ -2216,10 +2343,13 @@ async function renderPreview(filePath) {
     el.previewBox.setAttribute("aria-label", "GMT 点位图预览");
     state.preview.hasImage = true;
     resetPreviewView();
+    return true;
   } catch (error) {
+    if (expectedRevision !== null && (expectedRevision !== state.preview.revision || expectedPlotType !== state.plotType)) return false;
     clearPreviewImage();
     el.previewPlaceholder.hidden = false;
     el.previewPlaceholder.textContent = `预览图读取失败：${error.message || String(error)}`;
+    return false;
   }
 }
 
@@ -2258,6 +2388,7 @@ function renderPlaceholder() {
     tipperMap: "导入 MT 数据并选择周期后自动绘制感应矢量图",
     responseCurve: "导入 MT 数据并选择测点后自动绘制视电阻率和相位曲线"
   };
+  state.preview.revision += 1;
   clearPreviewImage();
   el.previewPlaceholder.hidden = false;
   el.previewPlaceholder.textContent = labels[state.plotType] || labels.stationMap;
@@ -2270,6 +2401,7 @@ function markPreviewStale(message) {
 
 function scheduleAutoPreview(message, options = {}) {
   if (state.preview.autoTimer) clearTimeout(state.preview.autoTimer);
+  state.preview.revision += 1;
   renderLegendDragHandle();
   if (!state.records.length) return;
   setPreviewStatus(message || "设置已更改，正在自动更新预览...", "pending");

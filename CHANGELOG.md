@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.2.3 - 2026-09-02
+
+- Prevented completed renders for an older plot type or parameter state from replacing the current preview during rapid plot switching.
+- Corrected phase-tensor calculations to use the Caldwell alpha-minus-beta orientation and principal tensor values for ellipse axes, and used that axis for computed strike maps.
+- Corrected EDI Tipper component orientation, Parkinson/Wiese reversal, projection-aware GMT arrow rendering, and physical scaling for narrow or elongated survey layouts.
+- Added plot-specific data checks so EDI files without complete TX/TY data report that no induction vector can be drawn instead of showing a station-only result.
+- Added previous/next response-curve station controls, left/right keyboard navigation, automatic redraw on station selection, period-oriented curve axes, connected curves, and conventional XY/YX phase display.
+- Added focused MT-math, plot-isolation, Tipper-direction, curve-convention, UI-navigation, and stale-preview regression coverage, plus real-GMT checks with EDI data.
+
 ## v1.2.2 - 2026-09-02
 
 - Added a complete bilingual project handoff guide covering architecture, modules, data flows, UI constraints, testing, packaging, releases, local/remote version state, and known technical debt.

@@ -562,9 +562,15 @@ function mtOverlayScriptParts(records, config, outputDirectory, regionText, regi
   }
   if (plotType === "tipperMap") {
     const fileName = "mt_tipper_arrows.tsv";
-    const rows = buildTipperArrows(records, config, region);
+    const rows = buildTipperVectors(records, config);
     fs.writeFileSync(path.join(outputDirectory, fileName), rows, "utf8");
-    return { commands: rows.trim() ? [`${prefix}gmt plot ${quote(scriptPath(fileName))} -R${regionText} -J${config.projection} -W${Number(config.tipperWidth || 1).toFixed(2)}p,${config.tipperColor || "purple"}`] : [] };
+    const vectorSymbol = config.swapAxes ? "-Sv" : "-SV";
+    const color = config.tipperColor || "purple";
+    return {
+      commands: rows.trim()
+        ? [`${prefix}gmt plot ${quote(scriptPath(fileName))} -R${regionText} -J${config.projection} ${vectorSymbol}0.18c+e+a30+h0.5 -G${color} -W${Number(config.tipperWidth || 1).toFixed(2)}p,${color}`]
+        : []
+    };
   }
   const fileName = "mt_phase_tensor_ellipses.tsv";
   const rows = buildPhaseTensorEllipses(records, config, region);
@@ -573,7 +579,8 @@ function mtOverlayScriptParts(records, config, outputDirectory, regionText, regi
 }
 
 function buildStrikeSegments(records, config, region) {
-  const length = mapLengthDegrees(region, Number(config.strikeLength || 0.025));
+  const geographicRegion = parseRegion(config.region) || region;
+  const length = mapLengthDegrees(geographicRegion, Number(config.strikeLength || 0.025));
   const period = Number(config.mtPeriod);
   const lines = [];
   for (const record of records) {
@@ -581,13 +588,13 @@ function buildStrikeSegments(records, config, region) {
     const angle = Number.isFinite(metrics?.impedance?.strike) ? metrics.impedance.strike : Number(metrics?.phaseTensor?.azimuth);
     if (!Number.isFinite(angle)) continue;
     const [a, b] = segmentEndpoints(record.lon, record.lat, angle, length);
-    lines.push(">", `${a.lon.toFixed(8)}\t${a.lat.toFixed(8)}`, `${b.lon.toFixed(8)}\t${b.lat.toFixed(8)}`);
+    lines.push(">", mapPointRow(a, config), mapPointRow(b, config));
   }
   return lines.join("\n") + (lines.length ? "\n" : "");
 }
 
-function buildTipperArrows(records, config, region) {
-  const base = mapLengthDegrees(region, Number(config.tipperScale || 0.04));
+function buildTipperVectors(records, config) {
+  const baseCm = projectionWidthCm(config.projection) * Math.max(0.002, Number(config.tipperScale || 0.04)) * 3;
   const period = Number(config.mtPeriod);
   const component = config.tipperComponent || "real";
   const convention = config.tipperConvention || "parkinson";
@@ -596,43 +603,40 @@ function buildTipperArrows(records, config, region) {
     const metrics = metricsForResponse(nearestResponse(record, period));
     const vector = metrics?.tipper?.[component];
     if (!vector || !Number.isFinite(vector.magnitude) || vector.magnitude <= 0) continue;
-    const sign = convention === "wiese" ? 1 : -1;
-    const dx = sign * vector.x * base;
-    const dy = sign * vector.y * base;
-    appendArrow(lines, record.lon, record.lat, record.lon + dx / Math.max(Math.cos(toRadians(record.lat)), 0.2), record.lat + dy);
+    const azimuth = normalizeAzimuth(vector.azimuth + (convention === "wiese" ? 0 : 180));
+    const lengthCm = vector.magnitude * baseCm;
+    const origin = config.swapAxes ? [record.lat, record.lon] : [record.lon, record.lat];
+    lines.push(`${Number(origin[0]).toFixed(8)}\t${Number(origin[1]).toFixed(8)}\t${azimuth.toFixed(6)}\t${lengthCm.toFixed(4)}c`);
   }
   return lines.join("\n") + (lines.length ? "\n" : "");
 }
 
 function buildPhaseTensorEllipses(records, config, region) {
-  const base = mapLengthDegrees(region, Number(config.tensorScale || 0.022));
+  const geographicRegion = parseRegion(config.region) || region;
+  const base = mapLengthDegrees(geographicRegion, Number(config.tensorScale || 0.022));
   const period = Number(config.mtPeriod);
   const lines = [];
   for (const record of records) {
     const metrics = metricsForResponse(nearestResponse(record, period));
     const tensor = metrics?.phaseTensor;
     if (!tensor || !Number.isFinite(tensor.phiMax) || !Number.isFinite(tensor.phiMin) || tensor.phiMax <= 0) continue;
-    const major = base;
-    const minor = base * Math.max(0.12, Math.min(1, Math.abs(tensor.phiMin / tensor.phiMax)));
+    const major = base / 2;
+    const minor = major * Math.max(0.12, Math.min(1, Math.abs(tensor.phiMin / tensor.phiMax)));
     const color = tensorColor(tensor.beta);
     lines.push(`> -G${color} -W${Number(config.tensorPenWidth || 0.35).toFixed(2)}p,${config.tensorPenColor || "black"}`);
     for (let index = 0; index <= 48; index += 1) {
       const t = (Math.PI * 2 * index) / 48;
       const point = ellipsePoint(record.lon, record.lat, tensor.azimuth, major, minor, t);
-      lines.push(`${point.lon.toFixed(8)}\t${point.lat.toFixed(8)}`);
+      lines.push(mapPointRow(point, config));
     }
   }
   return lines.join("\n") + (lines.length ? "\n" : "");
 }
 
-function appendArrow(lines, lon1, lat1, lon2, lat2) {
-  lines.push(">", `${lon1.toFixed(8)}\t${lat1.toFixed(8)}`, `${lon2.toFixed(8)}\t${lat2.toFixed(8)}`);
-  const angle = Math.atan2(lat2 - lat1, (lon2 - lon1) * Math.max(Math.cos(toRadians((lat1 + lat2) / 2)), 0.2));
-  const head = Math.hypot(lat2 - lat1, lon2 - lon1) * 0.22;
-  for (const turn of [2.55, -2.55]) {
-    const a = angle + turn;
-    lines.push(">", `${lon2.toFixed(8)}\t${lat2.toFixed(8)}`, `${(lon2 + head * Math.cos(a)).toFixed(8)}\t${(lat2 + head * Math.sin(a)).toFixed(8)}`);
-  }
+function mapPointRow(point, config = {}) {
+  const x = config.swapAxes ? point.lat : point.lon;
+  const y = config.swapAxes ? point.lon : point.lat;
+  return `${Number(x).toFixed(8)}\t${Number(y).toFixed(8)}`;
 }
 
 function ellipsePoint(lon, lat, azimuth, major, minor, t) {
@@ -657,8 +661,24 @@ function segmentEndpoints(lon, lat, azimuth, length) {
 
 function mapLengthDegrees(region, fraction) {
   const width = Math.max(0.001, region.east - region.west);
-  const height = Math.max(0.001, region.north - region.south);
-  return Math.min(width, height) * Math.max(0.002, fraction);
+  const midLatitude = (region.south + region.north) / 2;
+  return width * Math.max(Math.cos(toRadians(midLatitude)), 0.2) * Math.max(0.002, fraction);
+}
+
+function projectionWidthCm(projection) {
+  const text = String(projection || "");
+  const match = /(?:^|[^0-9.])([0-9]+(?:\.[0-9]+)?)(c|i|p)(?:\/|$)/i.exec(text);
+  if (!match) return 16;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) return 16;
+  const unit = match[2].toLowerCase();
+  if (unit === "i") return value * 2.54;
+  if (unit === "p") return value * 2.54 / 72;
+  return value;
+}
+
+function normalizeAzimuth(value) {
+  return ((Number(value) % 360) + 360) % 360;
 }
 
 function tensorColor(beta) {
@@ -683,22 +703,26 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const f = (name) => shell === "bat" ? name : path.join(outputDirectory, name);
   const p = shell === "bat" ? "" : "  ";
   const topRegion = `${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax}`;
-  const bottomRegion = `${curve.xMin}/${curve.xMax}/-180/180`;
-  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya1f0.5g1+l${q("log10 rho_s (Ohm m)")} -BWSen+t${q(`${station.name} site: sounding curve`)}`;
-  const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 frequency (Hz)")} -Bya45f15g45+l${q("phase (degree)")} -BWSen`;
+  const bottomRegion = `${curve.xMin}/${curve.xMax}/0/180`;
+  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya1f0.5g1+l${q("log10 rho_a (Ohm m)")} -BWSen+t${q(`${station.name} MT response (XY red, YX green)`)}`;
+  const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya30f10g30+l${q("phase (degree)")} -BWSen`;
   const plotWidth = "16c";
   const plotHeight = "5.0c";
   const topOffset = "7.0c";
   const pointSize = "0.16c";
   const commands = [
-    `${p}gmt basemap -R${bottomRegion} -JX-${plotWidth}/${plotHeight} ${bottomFrame} -X1.6c -Y1.5c`,
+    `${p}gmt basemap -R${bottomRegion} -JX${plotWidth}/${plotHeight} ${bottomFrame} -X1.6c -Y1.5c`,
     curve.hasPhaseXYError ? `${p}gmt plot ${q(f("curve_phase_xy_err.tsv"))} -W0.7p,black` : "",
     curve.hasPhaseYXError ? `${p}gmt plot ${q(f("curve_phase_yx_err.tsv"))} -W0.7p,black` : "",
+    curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -W1.1p,red` : "",
+    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -W1.1p,limegreen` : "",
     curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
     curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : "",
-    `${p}gmt basemap -R${topRegion} -JX-${plotWidth}/${plotHeight} ${topFrame} -Y${topOffset}`,
+    `${p}gmt basemap -R${topRegion} -JX${plotWidth}/${plotHeight} ${topFrame} -Y${topOffset}`,
     curve.hasRhoXYError ? `${p}gmt plot ${q(f("curve_rho_xy_err.tsv"))} -W0.7p,black` : "",
     curve.hasRhoYXError ? `${p}gmt plot ${q(f("curve_rho_yx_err.tsv"))} -W0.7p,black` : "",
+    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -W1.1p,red` : "",
+    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -W1.1p,limegreen` : "",
     curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
     curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : ""
   ].filter(Boolean);
@@ -731,7 +755,7 @@ function buildCurveFiles(station, outputDirectory) {
     phaseYXError: []
   };
   for (const item of rows) {
-    const x = Math.log10(item.response.frequency);
+    const x = Math.log10(item.response.period);
     const impedance = item.metrics.impedance;
     const xyError = impedanceErrors(item.response.z?.xy, item.response.variance?.xy, item.response.period, impedance.rhoXY);
     const yxError = impedanceErrors(item.response.z?.yx, item.response.variance?.yx, item.response.period, impedance.rhoYX);
@@ -745,13 +769,13 @@ function buildCurveFiles(station, outputDirectory) {
       series.rhoYX.push([x, value]);
       if (yxError.logRho) series.rhoYXError.push([x, value, yxError.logRho]);
     }
-    if (Number.isFinite(impedance.phaseXY)) {
-      series.phaseXY.push([x, impedance.phaseXY]);
-      if (xyError.phase) series.phaseXYError.push([x, impedance.phaseXY, xyError.phase]);
+    if (Number.isFinite(x) && Number.isFinite(impedance.phaseXYPlot)) {
+      series.phaseXY.push([x, impedance.phaseXYPlot]);
+      if (xyError.phase) series.phaseXYError.push([x, impedance.phaseXYPlot, xyError.phase]);
     }
-    if (Number.isFinite(impedance.phaseYX)) {
-      series.phaseYX.push([x, impedance.phaseYX]);
-      if (yxError.phase) series.phaseYXError.push([x, impedance.phaseYX, yxError.phase]);
+    if (Number.isFinite(x) && Number.isFinite(impedance.phaseYXPlot)) {
+      series.phaseYX.push([x, impedance.phaseYXPlot]);
+      if (yxError.phase) series.phaseYXError.push([x, impedance.phaseYXPlot, yxError.phase]);
     }
   }
   writeXY(path.join(outputDirectory, "curve_rho_xy.tsv"), series.rhoXY);

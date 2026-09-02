@@ -25,7 +25,7 @@ function metricsForResponse(response) {
   if (!response) return null;
   const phaseTensor = computePhaseTensor(response);
   const tipper = computeTipper(response);
-  const impedance = computeImpedance(response);
+  const impedance = computeImpedance(response, phaseTensor);
   return {
     period: response.period,
     frequency: response.frequency,
@@ -36,7 +36,7 @@ function metricsForResponse(response) {
   };
 }
 
-function computeImpedance(response) {
+function computeImpedance(response, phaseTensor = computePhaseTensor(response)) {
   const z = response.z || {};
   const zxy = z.xy || {};
   const zyx = z.yx || {};
@@ -45,8 +45,18 @@ function computeImpedance(response) {
   const rhoYX = apparentResistivity(zyx, period);
   const phaseXY = phaseDegrees(zxy);
   const phaseYX = phaseDegrees(zyx);
-  const strike = Number.isFinite(response.provided?.strike) ? response.provided.strike : impedanceStrike(response);
-  return { rhoXY, rhoYX, phaseXY, phaseYX, strike };
+  const strike = Number.isFinite(response.provided?.strike)
+    ? normalizeAngle180(response.provided.strike)
+    : Number(phaseTensor?.azimuth);
+  return {
+    rhoXY,
+    rhoYX,
+    phaseXY,
+    phaseYX,
+    phaseXYPlot: normalizePhase180(phaseXY),
+    phaseYXPlot: normalizePhase180(phaseYX + 180),
+    strike
+  };
 }
 
 function apparentResistivity(z, period) {
@@ -59,24 +69,21 @@ function phaseDegrees(z) {
   return toDegrees(Math.atan2(z.im, z.re));
 }
 
-function impedanceStrike(response) {
-  const x = realMatrix(response);
-  if (!x) return NaN;
-  const a = x[0][0] ** 2 + x[1][0] ** 2;
-  const b = x[0][0] * x[0][1] + x[1][0] * x[1][1];
-  const d = x[0][1] ** 2 + x[1][1] ** 2;
-  return normalizeAngle180(0.5 * toDegrees(Math.atan2(2 * b, a - d)));
-}
-
 function computePhaseTensor(response) {
   const provided = response.provided || {};
   const providedUsable = [provided.ptAzimuth, provided.ptMax, provided.ptMin].every(Number.isFinite);
   if (providedUsable) {
+    const principalMax = Math.abs(provided.ptMax);
+    const principalMin = Math.abs(provided.ptMin);
     return {
       azimuth: normalizeAngle180(provided.ptAzimuth),
-      phiMax: Math.abs(provided.ptMax),
-      phiMin: Math.abs(provided.ptMin),
+      phiMax: principalMax,
+      phiMin: principalMin,
+      phaseMax: toDegrees(Math.atan(principalMax)),
+      phaseMin: toDegrees(Math.atan(principalMin)),
       beta: Number.isFinite(provided.beta) ? provided.beta : NaN,
+      principalMax,
+      principalMin,
       matrix: null
     };
   }
@@ -90,13 +97,22 @@ function computePhaseTensor(response) {
     [-x[1][0] / det, x[0][0] / det]
   ];
   const phi = multiply2(inv, y);
-  const svd = svd2(phi);
+  const alpha = 0.5 * toDegrees(Math.atan2(phi[0][1] + phi[1][0], phi[0][0] - phi[1][1]));
   const beta = 0.5 * toDegrees(Math.atan2(phi[0][1] - phi[1][0], phi[0][0] + phi[1][1]));
+  const pi1 = 0.5 * Math.hypot(phi[0][0] - phi[1][1], phi[0][1] + phi[1][0]);
+  const pi2 = 0.5 * Math.hypot(phi[0][0] + phi[1][1], phi[0][1] - phi[1][0]);
+  const principalMax = pi2 + pi1;
+  const principalMin = pi2 - pi1;
   return {
-    azimuth: normalizeAngle180(svd.angle),
-    phiMax: svd.s1,
-    phiMin: svd.s2,
+    azimuth: normalizeAngle180(alpha - beta),
+    phiMax: principalMax,
+    phiMin: principalMin,
+    phaseMax: toDegrees(Math.atan(principalMax)),
+    phaseMin: toDegrees(Math.atan(principalMin)),
+    alpha,
     beta,
+    principalMax,
+    principalMin,
     matrix: phi
   };
 }
@@ -108,13 +124,15 @@ function computeTipper(response) {
   return { real, imag };
 }
 
-function vectorMetric(x, y) {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+function vectorMetric(north, east) {
+  if (!Number.isFinite(north) || !Number.isFinite(east)) return null;
   return {
-    x,
-    y,
-    magnitude: Math.hypot(x, y),
-    azimuth: normalizeAngle360(toDegrees(Math.atan2(x, y)))
+    x: north,
+    y: east,
+    north,
+    east,
+    magnitude: Math.hypot(north, east),
+    azimuth: normalizeAngle360(toDegrees(Math.atan2(east, north)))
   };
 }
 
@@ -143,31 +161,16 @@ function multiply2(a, b) {
   ];
 }
 
-function svd2(matrix) {
-  const a = matrix[0][0];
-  const b = matrix[0][1];
-  const c = matrix[1][0];
-  const d = matrix[1][1];
-  const sxx = a * a + c * c;
-  const sxy = a * b + c * d;
-  const syy = b * b + d * d;
-  const trace = sxx + syy;
-  const delta = Math.sqrt(Math.max(0, (sxx - syy) ** 2 + 4 * sxy ** 2));
-  const l1 = Math.max(0, (trace + delta) / 2);
-  const l2 = Math.max(0, (trace - delta) / 2);
-  const angle = 0.5 * toDegrees(Math.atan2(2 * sxy, sxx - syy));
-  return {
-    s1: Math.sqrt(l1),
-    s2: Math.sqrt(l2),
-    angle: normalizeAngle180(angle)
-  };
-}
-
 function normalizeAngle180(value) {
   if (!Number.isFinite(value)) return NaN;
   let angle = ((value + 180) % 180 + 180) % 180;
   if (angle >= 90) angle -= 180;
   return angle;
+}
+
+function normalizePhase180(value) {
+  if (!Number.isFinite(value)) return NaN;
+  return ((value % 180) + 180) % 180;
 }
 
 function normalizeAngle360(value) {
