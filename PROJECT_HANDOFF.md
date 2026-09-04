@@ -17,8 +17,8 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 当前本地源码版本：`v1.2.3`（MT 专项绘图修复版本）
 - 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.2.3` 四个尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 本次已验证安装的 `1.2.3` App：`/Users/cwn/Applications/MT点位图制作工具—GMT.app`；包内版本、ASAR 完整性、严格签名、真实启动、GMT 识别和曲线测点导航均已核对。
-- `/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app` 仍是正在运行的 `1.2.1` 旧副本。本次为避免中断用户工作，没有退出或覆盖它；准备切换时应先正常退出旧副本，再启动上面的 `1.2.3`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.2.3`。2026-09-04 已核对包内版本、ASAR 完整性、深度签名和真实启动路径；“实用app”内只有这一个 GMT 绘图应用。
+- 原 `1.1.3`、三个 `1.2.0`、`1.2.1` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.2.3` 来源副本，但日常应从“实用app”路径打开。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
 - 本次只整理本地项目和建立本地 Git 回滚点，不会自动推送 GitHub。
@@ -33,7 +33,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
 | 本地功能标签 | `v1.2.0` 至 `v1.2.3`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | `/Users/cwn/Applications/MT点位图制作工具—GMT.app`，已验证 `1.2.3`；桌面“实用app”旧副本仍为 `1.2.1` |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已验证 `1.2.3` 并从该路径运行 |
 
 版本号必须同步维护：
 
