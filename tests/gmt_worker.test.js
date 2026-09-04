@@ -115,6 +115,42 @@ function runTask(payload) {
     const stationLines = fs.readFileSync(path.join(outputDirectory, "stations_points.tsv"), "utf8").trim().split(/\n/);
     assert.strictEqual(stationLines.length, records.length);
 
+    const hiddenTitleDirectory = path.join(tmp, "hidden-title-out");
+    const hiddenTitleResult = await runTask({
+      mode: "export",
+      records: records.slice(0, 1),
+      formats: ["png"],
+      outputDirectory: hiddenTitleDirectory,
+      config: {
+        showTitle: false,
+        title: "不应触发原生标题",
+        plotType: "stationMap",
+        region: "100.9/101.4/34.9/35.2",
+        projection: "M16c",
+        frame: "af",
+        showGrid: false,
+        showLabels: false,
+        showScale: false,
+        showNorthArrow: false,
+        pointSymbol: "c",
+        pointSize: 0.18,
+        pointFill: "#2f6f8f",
+        pointPenWidth: 0.45,
+        pointPenColor: "#263238",
+        labelFontSize: 7.5,
+        labelColor: "#263238",
+        labelDX: 0.07,
+        labelDY: 0.07,
+        showTerrain: false,
+        outputName: "hidden_native_title",
+        pngDpi: 300,
+        faultLayers: [],
+        legend: { show: false }
+      }
+    });
+    assert.strictEqual(hiddenTitleResult.ok, true);
+    assert.strictEqual(hiddenTitleResult.needsNativeDecorations, false, "hidden Chinese titles must not invoke native decoration rendering");
+
     console.log("GMT worker smoke test passed");
   } finally {
     cleanup();

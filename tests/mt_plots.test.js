@@ -149,6 +149,13 @@ try {
   assert(curveScript.includes("log10 period (s)"));
   assert(curveScript.includes("-JX16c/5.0c"));
   assert(curveScript.includes("curve_phase_xy.tsv -W1.1p,red"));
+  assert(curveScript.includes("MT plot test"), "response curve must accept the user-defined title");
+  const hiddenCurveScript = buildScript([curveStation], config("responseCurve", "curve_hidden", {
+    showTitle: false,
+    title: "HIDDEN CURVE TITLE"
+  }), path.join(tmp, "curve-hidden"), ["png"]);
+  assert(!hiddenCurveScript.includes("HIDDEN CURVE TITLE"), "showTitle=false must suppress response-curve titles");
+  assert(!hiddenCurveScript.includes("-BWSen+t"), "hidden response-curve titles must not leave an empty GMT title option");
 
   console.log("MT plot tests passed");
 } finally {

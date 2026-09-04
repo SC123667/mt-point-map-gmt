@@ -316,13 +316,13 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const gridPrefix = config.showGrid ? "g" : "";
   const frameOption = config.swapAxes
     ? `${axisFrameOption("x", config.xAxisLabel || "Latitude (N)", gridPrefix, shell)} ${axisFrameOption("y", config.yAxisLabel || "Longitude (E)", gridPrefix, shell)} -BWSen`
-    : `-B${gridPrefix}${config.frame}`;
-  const title = (config.title || "").trim();
+    : `-B${config.frame}${gridPrefix}`;
+  const title = config.showTitle === false ? "" : (config.title || "").trim();
   const titleOption = title && (!needsNativeTextRendering(title) || config.forceGMTTitle) ? ` -B+t${quote(title)}` : "";
   const outputPrefix = shell === "bat" ? config.outputName || "mt_point_map" : path.join(outputDirectory, config.outputName || "mt_point_map");
   const pointsPathForScript = shell === "bat" ? "stations_points.tsv" : pointsPath;
   const labelsPathForScript = shell === "bat" ? "stations_labels.tsv" : labelsPath;
-  const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}`;
+  const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}=~0.65p,white`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
   const scale = scaleForRegion(regionValues);
   const gmt = resolveGMT();
@@ -332,9 +332,15 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
   const stationPlots = stationPlotScriptParts(records, config, outputDirectory, region, shell);
   const legend = legendScriptPart(config, outputDirectory, region, shell);
-  const backgroundCommand = terrain.imageCommand || (config.swapAxes
-    ? ""
-    : `${shell === "bat" ? "" : "  "}gmt coast -R${region} -J${config.projection} -Di -Ggray95 -Swhite -W0.25p,gray45`);
+  const prefix = shell === "bat" ? "" : "  ";
+  const mapStyleCommand = `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 12p,Helvetica-Bold,gray15 FONT_ANNOT_PRIMARY 8.5p,Helvetica,gray25 FONT_LABEL 9p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mm:ssF MAP_FRAME_PEN 0.70p,gray25 MAP_TICK_PEN_PRIMARY 0.55p,gray35 MAP_GRID_PEN_PRIMARY 0.20p,gray82,- MAP_TITLE_OFFSET 0.14c`;
+  const backgroundCommands = [];
+  if (terrain.imageCommand) {
+    backgroundCommands.push(terrain.imageCommand);
+    if (!config.swapAxes) backgroundCommands.push(`${prefix}gmt coast -R${region} -J${config.projection} -Di -W0.35p,gray45`);
+  } else if (!config.swapAxes) {
+    backgroundCommands.push(`${prefix}gmt coast -R${region} -J${config.projection} -Di -Ggray97 -Swhite -W0.35p,gray50`);
+  }
   if (shell === "bat") {
     return [
       "@echo off",
@@ -342,10 +348,10 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       "cd /d \"%~dp0\"",
       ...environmentLines,
       gmtBeginCommand(outputPrefix, formats, config),
-      "gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
+      mapStyleCommand,
       ...terrain.preCommands,
+      ...backgroundCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-      backgroundCommand,
       ...faultOverlay.commands,
       ...stationPlots.commands,
       ...mtOverlay.commands,
@@ -363,10 +369,10 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     ...environmentLines,
     "",
     `  ${gmtBeginCommand(outputPrefix, formats, config)}`,
-    "  gmt set MAP_FRAME_TYPE plain FONT_ANNOT_PRIMARY 9p FONT_LABEL 10p FORMAT_GEO_MAP ddd:mm:ssF",
+    mapStyleCommand,
     ...terrain.preCommands,
+    ...backgroundCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
-    backgroundCommand,
     ...faultOverlay.commands,
     ...stationPlots.commands,
     ...mtOverlay.commands,
@@ -459,10 +465,10 @@ function normalizeStationGroups(groups) {
       id: String(group.id || `group-${index + 1}`),
       label: String(group.label || group.id || `Group ${index + 1}`),
       symbol: new Set(["c", "t", "s", "d"]).has(group.symbol) ? group.symbol : "c",
-      size: clampNumber(group.size, 0.03, 2, 0.22),
-      fill: safePlotColor(group.fill, "#d7191c"),
-      penWidth: clampNumber(group.penWidth, 0, 5, 0.35),
-      penColor: safePlotColor(group.penColor, "black")
+      size: clampNumber(group.size, 0.03, 2, 0.20),
+      fill: safePlotColor(group.fill, "#2f6f8f"),
+      penWidth: clampNumber(group.penWidth, 0, 5, 0.45),
+      penColor: safePlotColor(group.penColor, "#263238")
     }));
 }
 
@@ -704,7 +710,12 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const p = shell === "bat" ? "" : "  ";
   const topRegion = `${curve.xMin}/${curve.xMax}/${curve.rhoMin}/${curve.rhoMax}`;
   const bottomRegion = `${curve.xMin}/${curve.xMax}/0/180`;
-  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya1f0.5g1+l${q("log10 rho_a (Ohm m)")} -BWSen+t${q(`${station.name} MT response (XY red, YX green)`)}`;
+  const configuredTitle = String(config.title || "").trim();
+  const curveTitle = configuredTitle && configuredTitle !== "MT Survey Stations"
+    ? configuredTitle
+    : `${station.name} MT response (XY red, YX green)`;
+  const curveTitleOption = config.showTitle !== false && (!needsNativeTextRendering(curveTitle) || config.forceGMTTitle) ? `+t${q(curveTitle)}` : "";
+  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya1f0.5g1+l${q("log10 rho_a (Ohm m)")} -BWSen${curveTitleOption}`;
   const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya30f10g30+l${q("phase (degree)")} -BWSen`;
   const plotWidth = "16c";
   const plotHeight = "5.0c";

@@ -16,6 +16,18 @@ const missingIds = Array.from(referencedIds).filter((id) => !ids.includes(id) &&
 assert.deepStrictEqual(missingIds, [], `renderer.js references missing HTML IDs: ${missingIds.join(", ")}`);
 
 assert(html.includes('id="quickInspectorToggle"'), "quick-inspector toggle missing");
+assert(html.includes('id="showTitleInput"'), "title visibility control missing");
+assert(html.includes('id="quickTitleToggle"'), "quick title visibility control missing");
+assert(html.includes('id="quickLegendToggle"'), "quick legend visibility control missing");
+assert(renderer.includes("showTitle: el.showTitleInput.checked"), "title visibility must be saved in map config");
+assert(renderer.includes('bind(el.quickTitleToggle, "click"'), "quick title toggle wiring missing");
+assert(renderer.includes('bind(el.quickLegendToggle, "click"'), "quick legend toggle wiring missing");
+assert(renderer.includes('syncQuickSwitch(el.quickTitleToggle'), "quick title toggle state sync missing");
+assert(renderer.includes('syncQuickSwitch(el.quickLegendToggle'), "quick legend toggle state sync missing");
+assert(html.includes('data-preset="paperMono" type="button">论文点位图</button>'), "publication station-map preset missing");
+assert(html.includes('id="pointSizeInput" type="number" min="0.05" max="1.5" step="0.01" value="0.20"'), "publication point-size default missing");
+assert(html.includes('id="pointFillPicker" class="color-picker" type="color" value="#2f6f8f"'), "publication point-color default missing");
+assert(!html.includes('id="showLabelsInput" type="checkbox" checked'), "station labels should be opt-in for publication maps");
 assert(html.includes('id="sidebarImportFileBtn"'), "sidebar table import action missing");
 assert(html.includes('id="sidebarImportEdiBtn"'), "sidebar EDI import action missing");
 assert(html.includes('id="sidebarLoadSampleBtn"'), "sidebar sample-data action missing");

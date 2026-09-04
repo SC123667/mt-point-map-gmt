@@ -43,18 +43,18 @@ function buildStationLegendEntries(config = {}) {
       label: group.label || group.id || `Group ${index + 1}`,
       symbol: "point",
       gmtSymbol: safePointSymbol(group.symbol || config.pointSymbol),
-      fill: group.fill || config.pointFill || "#d7191c",
-      pen: `${Number(group.penWidth ?? config.pointPenWidth ?? 0.35).toFixed(2)}p,${group.penColor || config.pointPenColor || "black"}`,
-      size: `${Number(group.size ?? config.pointSize ?? 0.22).toFixed(2)}c`
+      fill: group.fill || config.pointFill || "#2f6f8f",
+      pen: `${Number(group.penWidth ?? config.pointPenWidth ?? 0.45).toFixed(2)}p,${group.penColor || config.pointPenColor || "#263238"}`,
+      size: `${Number(group.size ?? config.pointSize ?? 0.20).toFixed(2)}c`
     }));
   }
   return [{
     label: config.legend?.stationLabel || "Station",
     symbol: "point",
     gmtSymbol: safePointSymbol(config.pointSymbol),
-    fill: config.pointFill || "#d7191c",
-    pen: `${Number(config.pointPenWidth || 0.35).toFixed(2)}p,${config.pointPenColor || "black"}`,
-    size: `${Number(config.pointSize || 0.22).toFixed(2)}c`
+    fill: config.pointFill || "#2f6f8f",
+    pen: `${Number(config.pointPenWidth || 0.45).toFixed(2)}p,${config.pointPenColor || "#263238"}`,
+    size: `${Number(config.pointSize || 0.20).toFixed(2)}c`
   }];
 }
 
@@ -68,7 +68,7 @@ function buildLegendSpec(entries, config = {}) {
     const label = String(entry.label || "").trim();
     if (!label) continue;
     if (entry.symbol === "point") {
-      lines.push(`S 0.14c ${entry.gmtSymbol || "c"} ${entry.size || "0.22c"} ${entry.fill || "#d7191c"} ${entry.pen || "0.35p,black"} 0.45c ${label}`);
+      lines.push(`S 0.14c ${entry.gmtSymbol || "c"} ${entry.size || "0.20c"} ${entry.fill || "#2f6f8f"} ${entry.pen || "0.45p,#263238"} 0.45c ${label}`);
     } else {
       lines.push(`S 0.14c - 0.42c - ${entry.pen || "0.8p,black"} 0.45c ${label}`);
     }

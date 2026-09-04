@@ -14,11 +14,11 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.2.3`（MT 专项绘图修复版本）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.2.3` 四个尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.3.0`（标题/图例可见性与论文点位图样式版本）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.3.0` 五个尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.2.3`。2026-09-04 已核对包内版本、ASAR 完整性、深度签名和真实启动路径；“实用app”内只有这一个 GMT 绘图应用。
-- 原 `1.1.3`、三个 `1.2.0`、`1.2.1` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.2.3` 来源副本，但日常应从“实用app”路径打开。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.3.0`。2026-09-04 已核对包内版本、ASAR 完整性、深度签名和真实启动路径；“实用app”内只有这一个 GMT 绘图应用。
+- 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
 - 本次只整理本地项目和建立本地 Git 回滚点，不会自动推送 GitHub。
@@ -27,13 +27,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.2.3` |
+| 本地源码版本 | `1.3.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.2.3`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.3.0`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已验证 `1.2.3` 并从该路径运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已验证 `1.3.0` 并从该路径运行 |
 
 版本号必须同步维护：
 
@@ -44,7 +44,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - `README.md` 和 `DISTRIBUTION.md` 中的开发版/公开版说明
 - 本接手文档中的状态表
 
-不要直接在 `main` 上假定已包含 `v1.2.x`。正式发布前，应先审阅当前分支相对 `main` 的差异，再根据用户授权合并或推送。
+不要直接在 `main` 上假定已包含 `v1.2.x–v1.3.x`。正式发布前，应先审阅当前分支相对 `main` 的差异，再根据用户授权合并或推送。
 
 ## 3. 产品定位与当前能力 / Product Scope
 
@@ -80,7 +80,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 筛选：测线、测点名前缀、当前图幅范围、是否有 MT 响应。
 - 预览交互：滚轮缩放、Shift 框选放大、拖拽平移、适配窗口。
 
-### `v1.2.x` 本地分支新增能力
+### `v1.2.x–v1.3.x` 本地分支新增能力
 
 - `stationGroups`：按测点名、测点名前缀、测线名或测线前缀分组，为不同勘探方法设置独立颜色、符号、大小和图例项。
 - `swapAxes`：横版笛卡尔图中以纬度为 X、经度为 Y，不修改原始测点坐标。
@@ -89,6 +89,8 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 互换轴地图使用专用比例尺和方向罗盘；北向右、东向上。
 - 互换轴地图的地形网格和光照网格通过派生转置文件绘制，不改动源文件。
 - 比例尺和指北针的预览拖动位置会传入最终 PNG/PDF。
+- `showTitle`：标题与图例可分别显示/隐藏，快捷参数和完整设置均有入口，并保存到 `.mtgmt` 工程。
+- `论文点位图` 预设与新建工程默认样式：论文蓝测点、深色细边框、选择性标签、弱化图框/网格，并默认关闭重复图内标题、单类图例和指北针。
 
 注意：`stationGroups`、`swapAxes`、`labelNames` 目前主要由 `.mtgmt` 工程文件中的 `config` 注入和恢复，UI 中还没有完整的通用编辑器。不要把它们描述为所有用户都能在界面里直接配置的成熟入口。
 
@@ -334,23 +336,30 @@ npx electron-builder --win nsis portable --arm64
 
 2026-09-02 本机 `electron-builder` 在 `Documents` 的 FileProvider/扩展属性冷扫描阶段极慢；本次 macOS 验证包改用现有 Electron 35.7.5 App 骨架重打 ASAR，并在非 FileProvider 路径清理扩展属性后进行 ad-hoc 深度签名。最终安装包通过 `codesign --verify --deep --strict`，Info.plist 与 ASAR 内版本均为 `1.2.3`，`ElectronAsarIntegrity` SHA-256 与实际 ASAR 完全一致。该应急打包方式只用于本机验证，正式 DMG/公开 Release 仍应恢复并验证标准 `electron-builder` 流程。
 
+2026-09-04 构建 `1.3.0` 时标准 `electron-builder --mac dir` 再次在同一冷扫描阶段无 CPU、无产物进展，因此停止该进程并沿用上述已验证路径。候选包在 `/tmp` 中重打 ASAR，更新 Info.plist 和 `ElectronAsarIntegrity`，清理扩展属性并重新深度签名。候选包与 `/Users/cwn/Applications` 来源副本通过严格深度验签；“实用app”目标包通过普通深度验签，包内版本为 `1.3.0`，ASAR SHA-256 为 `76d7bbeef4f235fbf7ba25e9b15e6d6fb0edb093080318ceebcafd02b389df14`，并已从目标路径真实启动。该 FileProvider 目标路径在复制后会附加 Finder 信息，因而 `codesign --strict` 报 `resource fork, Finder information, or similar detritus not allowed`；来源副本的严格验签和目标包未变化的 ASAR 完整性共同用于区分扩展属性告警与代码损坏。
+
 ## 11. 测试说明 / Tests
 
 | 测试 | 覆盖内容 |
 | --- | --- |
 | `parser_edi.test.js` | EDI 坐标、文件名站点名、0/0 拒绝 |
 | `mt_math.test.js` | 相位张量 `X^-1Y`、alpha/beta、主值、走向、阻抗相位和 Tipper 方位约定 |
-| `mt_plots.test.js` | 走向线、相位张量椭圆、GMT 投影感应矢量和响应曲线脚本 |
-| `fault_legend.test.js` | 构造线、图例、分组点位、互换轴、地形转置、原生位置 |
+| `mt_plots.test.js` | 走向线、相位张量椭圆、GMT 投影感应矢量、响应曲线与曲线标题可见性 |
+| `fault_legend.test.js` | 构造线、图例、分组点位、互换轴、地形转置、原生位置、地图标题与论文样式层级 |
 | `import_worker.test.js` | 表格、字段映射、EDI 递归/批量解析和 worker IPC |
-| `gmt_worker.test.js` | 2500 点 worker 绘图、输出文件，使用 mock GMT |
+| `gmt_worker.test.js` | 2500 点 worker 绘图、输出文件和隐藏中文标题不触发原生叠加，使用 mock GMT |
 | `srtm_worker.test.js` | SRTM worker、缓存 HGT、网格/阴影交接，使用 mock GMT |
-| `ui_workbench.test.js` | DOM ID、数据入口、曲线测点按钮/方向键导航、预览修订隔离、右栏默认关闭/滚动、macOS/Windows CSS |
+| `ui_workbench.test.js` | DOM ID、数据入口、标题/图例快捷开关、论文默认值、曲线测点按钮/方向键导航、预览修订隔离、右栏默认关闭/滚动、macOS/Windows CSS |
 | `test_data_and_gmt.py` | Python 原型点位解析和 GMT 脚本 |
 
 2026-09-02 的基线结果：
 
 - `npm run test:node`：8 组全部通过。
+
+2026-09-04 的 `v1.3.0` 结果：
+
+- `npm run test:node`：8 组全部通过。
+- 真实 GMT 6.5.0 + 9 个大同 EDI：默认论文样式、标题/图例/选择性标签/网格重新开启组合均成功生成 PNG。
 - `PYTHONPATH=. python3.12 -m pytest -q tests/test_data_and_gmt.py`：`2 passed`。
 - 默认 `/usr/bin/python3` 没有 pytest，必须使用装有 pytest 的 Python 3.12 或先建立独立虚拟环境。
 - 当前 shell 直接执行 `gmt` 会提示找不到，但应用路径检测能找到 GMT 6.5.0 App。worker 测试使用 mock GMT；本次另用应用的真实检测与执行路径成功生成 PNG（18,560 bytes）和 PDF（9,125 bytes）小样。正式发布前仍需从实际 Electron UI 再做一次人工预览/导出检查。
@@ -434,7 +443,7 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 
 1. **主窗口安全配置需要迁移。** 当前主 BrowserWindow 使用 `contextIsolation: false`、`nodeIntegration: true`、`sandbox: false`，并由 `main.js` 把 CSS、桥接代码和 renderer 拼进 `data:` URL。`electron/preload.js` 虽存在，但主窗口并未加载它。当前内容是本地可信 UI，风险相对受限，但后续应迁移到真正的 preload + `contextIsolation: true`，并缩小 IPC API；迁移时必须完整回归全部菜单、导入、预览和窗口控制。
 2. **`main.js` 和 `renderer.js` 体积较大。** 新增独立能力时优先拆成模块，不要继续把数据算法、窗口逻辑和 UI 状态混在一起。
-3. **`v1.2.x` 尚未公开。** 当前本地分支比远端 main 超前；不得向接手人宣称 GitHub 已经有分组点位和互换轴能力。
+3. **`v1.2.x–v1.3.x` 尚未公开。** 当前本地分支比远端 main 超前；不得向接手人宣称 GitHub 已经有分组点位、互换轴、标题/图例快捷开关和论文点位图预设。
 4. **高级 `v1.2.x` 配置缺少 UI 编辑器。** `stationGroups`、`labelNames`、`swapAxes` 主要从工程 JSON 恢复；要产品化需放进紧凑的独立设置窗口。
 5. **原生中文叠加主要覆盖 PNG/PDF。** EPS 仍依赖纯 GMT/PostScript；包含中文图名、中文图例或互换轴原生元素时，EPS 可能缺少这些叠加。发布说明必须如实标注，或后续实现独立矢量叠加方案。
 6. **工程外部资源使用绝对路径。** 跨机器移动 `.mtgmt` 后，本地地形、构造线和输出目录可能失效。
@@ -468,13 +477,13 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 ## 16. 推荐后续顺序 / Recommended Next Work
 
 1. 先审阅 `codex/method-colored-stations` 相对 `main` 的两个功能提交和本次文档提交。
-2. 用真实 GMT 对 `v1.2.x` 做点位图、互换轴地形、中文图例、PNG/PDF/EPS 的对比导出。
+2. 继续用真实 GMT 对 `v1.2.x–v1.3.x` 做互换轴地形、中文图例、PNG/PDF/EPS 的对比导出；点位图的默认/元素开关路径已用 9 个真实 EDI 验证。
 3. 为 station groups、轴互换和指定标签增加独立紧凑设置窗口，避免要求用户手改工程 JSON。
 4. 为 `.mtgmt` 增加 schema 验证、版本迁移和外部资源丢失提示。
 5. 将内联 bridge 迁移到 `electron/preload.js`，开启 `contextIsolation` 并关闭 renderer Node 集成。
 6. 增加自动化跨平台构建/测试；至少让 Node 测试在 macOS 和 Windows 都运行。
 7. 补 Apple Developer ID 签名和 notarization，再扩大 macOS 公共分发。
-8. 完成上述验证后，再决定把 `v1.2.x` 合并到 main 并创建新 GitHub Release。
+8. 完成上述验证后，再决定把 `v1.2.x–v1.3.x` 合并到 main 并创建新 GitHub Release。
 
 ## 17. 接手检查清单 / Handoff Checklist
 
@@ -491,4 +500,4 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 - [ ] 发布前同步版本、双语文档、截图、校验文件和本机 App。
 - [ ] 没有用户明确授权时，不推送 GitHub、不创建远端 Release。
 
-如果只记住三条：**Electron 是正式产品；worker 边界不能破坏；本地 `v1.2.x` 尚未进入公开 `main`。**
+如果只记住三条：**Electron 是正式产品；worker 边界不能破坏；本地 `v1.2.x–v1.3.x` 尚未进入公开 `main`。**

@@ -297,6 +297,7 @@ function copyIfExists(source, target) {
 }
 
 function shouldOverlayTitle(config) {
+  if (config?.showTitle === false) return false;
   const title = String(config?.title || "").trim();
   return title && needsNativeTextRendering(title);
 }

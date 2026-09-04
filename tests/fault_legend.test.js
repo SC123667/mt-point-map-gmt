@@ -121,6 +121,11 @@ try {
   assert(script.includes("gmt begin"));
   assert(script.includes("png E300"));
   assert(script.includes("gmt plot"));
+  assert(script.includes("FONT_TITLE 12p,Helvetica-Bold,gray15"));
+  assert(script.includes("-Bafg"), "grid modifier must follow the frame setting");
+  assert(script.includes("MT Survey Stations"), "legacy projects without showTitle must retain their title");
+  assert(script.includes("=~0.65p,white"), "station labels must use a white readability halo");
+  assert(script.indexOf("gmt coast") < script.indexOf("gmt basemap"), "basemap frame and grid must render above the map background");
   assert(script.includes("-LjBL"));
   assert(script.includes("-TdjTL"));
   assert(script.includes("gmt legend"));
@@ -129,6 +134,36 @@ try {
   assert(fs.existsSync(path.join(scriptDir, "fault_overlays.tsv")));
   assert(fs.existsSync(path.join(scriptDir, "map_legend.txt")));
   assert(fs.readFileSync(path.join(scriptDir, "map_legend.txt"), "utf8").includes("0.45c Site"));
+
+  const hiddenTitleScript = buildScript([
+    { name: "A01", lon: 101.0, lat: 35.0 }
+  ], {
+    showTitle: false,
+    title: "THIS TITLE MUST STAY HIDDEN",
+    plotType: "stationMap",
+    region: "100.9/101.3/34.9/35.2",
+    projection: "M16c",
+    frame: "af",
+    showGrid: false,
+    showLabels: false,
+    showScale: false,
+    showNorthArrow: false,
+    pointSymbol: "c",
+    pointSize: 0.18,
+    pointFill: "#2f6f8f",
+    pointPenWidth: 0.45,
+    pointPenColor: "#263238",
+    labelFontSize: 7.5,
+    labelColor: "#263238",
+    labelDX: 0.07,
+    labelDY: 0.07,
+    showTerrain: false,
+    outputName: "hidden_title",
+    faultLayers: [],
+    legend: { show: false }
+  }, path.join(tmp, "hidden-title-output"), ["png"]);
+  assert(!hiddenTitleScript.includes("THIS TITLE MUST STAY HIDDEN"), "showTitle=false must suppress GMT titles");
+  assert(hiddenTitleScript.includes("-Baf"));
 
   const groupedScriptDir = path.join(tmp, "grouped-landscape-output");
   const groupedScript = buildScript([

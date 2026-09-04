@@ -97,6 +97,8 @@ const ELEMENT_POSITION_DEFAULTS = {
   BR: { x: 0.92, y: 0.08, justify: "BR" }
 };
 const COLOR_OPTIONS = [
+  ["#2f6f8f", "论文蓝 #2f6f8f"],
+  ["#263238", "炭黑 #263238"],
   ["#d7191c", "红色 #d7191c"],
   ["#2b83ba", "蓝色 #2b83ba"],
   ["#1a9641", "绿色 #1a9641"],
@@ -156,7 +158,7 @@ const ids = [
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
   "pngDpiDialog", "pngDpiDialogInput", "pngDpiCancelBtn", "pngDpiDialogCancelBtn", "pngDpiConfirmBtn",
   "windowControls", "exitFullscreenBtn", "minimizeWindowBtn", "closeWindowBtn",
-  "installPlanText", "outputPath", "chooseOutputBtn", "titleInput", "regionInput", "projectionInput", "frameInput",
+  "installPlanText", "outputPath", "chooseOutputBtn", "showTitleInput", "titleInput", "regionInput", "projectionInput", "frameInput",
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
 	  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
@@ -180,7 +182,7 @@ const ids = [
   "sidebarImportFileBtn", "sidebarImportEdiBtn", "sidebarLoadSampleBtn",
   "quickInspector", "quickInspectorToggle", "quickInspectorClose", "quickInspectorTitle", "quickStationCount", "quickLineCount",
   "quickValidCount", "quickQualityButton", "quickQualityTitle", "quickQualityHint", "quickPointSizeInput", "quickPointFillInput",
-  "quickLabelsToggle", "quickTerrainToggle", "quickTerrainHint", "quickFaultSummary", "quickStationLayer", "quickApplyButton",
+  "quickLabelsToggle", "quickTerrainToggle", "quickTerrainHint", "quickTitleToggle", "quickLegendToggle", "quickFaultSummary", "quickStationLayer", "quickApplyButton",
   "canvasPlotTitle", "canvasDataMeta"
 ];
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
@@ -260,6 +262,10 @@ function wireEvents() {
     if (!state.records.length) return notify("请先导入点位文件。");
     el.regionInput.value = autoRegionClient(state.records);
     scheduleAutoPreview("图幅范围已更新，正在自动绘制预览...", { delay: 100 });
+  });
+  bind(el.showTitleInput, "change", () => {
+    renderQuickInspector();
+    scheduleAutoPreview("标题显示状态已更改，正在自动更新预览...", { delay: 100 });
   });
   bind(el.previewBtn, "click", () => exportMap(["png"], false));
   bind(el.cancelRenderBtn, "click", cancelCurrentRender);
@@ -439,11 +445,21 @@ function wireQuickInspector() {
     renderQuickInspector();
     scheduleAutoPreview("地形底图显示状态已更改，正在自动更新预览...", { delay: 100 });
   });
+  bind(el.quickTitleToggle, "click", () => {
+    el.showTitleInput.checked = !el.showTitleInput.checked;
+    el.showTitleInput.dispatchEvent(new Event("change", { bubbles: true }));
+    renderQuickInspector();
+  });
+  bind(el.quickLegendToggle, "click", () => {
+    el.showLegendInput.checked = !el.showLegendInput.checked;
+    el.showLegendInput.dispatchEvent(new Event("change", { bubbles: true }));
+    renderQuickInspector();
+  });
   bind(el.quickApplyButton, "click", () => {
     scheduleAutoPreview("快捷参数已应用，正在自动更新预览...", { delay: 80 });
     setRuntimeStatus("快捷参数已应用", "ready");
   });
-  [el.symbolInput, el.pointSizeInput, el.pointFillInput, el.pointFillPicker, el.showLabelsInput, el.showTerrainInput, el.terrainResolutionInput]
+  [el.symbolInput, el.pointSizeInput, el.pointFillInput, el.pointFillPicker, el.showLabelsInput, el.showTerrainInput, el.terrainResolutionInput, el.showTitleInput, el.showLegendInput]
     .forEach((control) => {
       bind(control, "input", renderQuickInspector);
       bind(control, "change", renderQuickInspector);
@@ -492,10 +508,12 @@ function renderQuickInspector() {
   document.querySelectorAll("[data-quick-symbol]").forEach((button) => {
     button.classList.toggle("active", button.dataset.quickSymbol === el.symbolInput?.value);
   });
-  if (el.quickPointSizeInput && document.activeElement !== el.quickPointSizeInput) el.quickPointSizeInput.value = el.pointSizeInput?.value || "0.22";
+  if (el.quickPointSizeInput && document.activeElement !== el.quickPointSizeInput) el.quickPointSizeInput.value = el.pointSizeInput?.value || "0.20";
   if (el.quickPointFillInput) el.quickPointFillInput.value = colorToHex(readColor("pointFill"));
   syncQuickSwitch(el.quickLabelsToggle, Boolean(el.showLabelsInput?.checked));
   syncQuickSwitch(el.quickTerrainToggle, Boolean(el.showTerrainInput?.checked));
+  syncQuickSwitch(el.quickTitleToggle, Boolean(el.showTitleInput?.checked));
+  syncQuickSwitch(el.quickLegendToggle, Boolean(el.showLegendInput?.checked));
   if (el.quickTerrainHint) {
     const local = state.terrain.localGridPath ? `本地 · ${baseName(state.terrain.localGridPath)}` : `SRTM · ${el.terrainResolutionInput?.value || "06m"}`;
     el.quickTerrainHint.textContent = local;
@@ -539,7 +557,10 @@ function wireLegendControls() {
     renderLegendDragHandle();
     scheduleAutoPreview(message);
   };
-  el.showLegendInput.addEventListener("change", () => queueLegendPreview("图例显示状态已更改，正在自动更新预览..."));
+  el.showLegendInput.addEventListener("change", () => {
+    renderQuickInspector();
+    queueLegendPreview("图例显示状态已更改，正在自动更新预览...");
+  });
   el.legendIncludeFaultsInput.addEventListener("change", () => queueLegendPreview("图例内容已更改，正在自动更新预览..."));
   el.legendOrderInput.addEventListener("change", () => queueLegendPreview("图例顺序已更改，正在自动更新预览..."));
   el.legendTitleInput.addEventListener("input", () => queueLegendPreview("图例标题已更改，正在自动更新预览..."));
@@ -797,6 +818,7 @@ function applyConfigToUI(config) {
     yAxisLabel: String(config.yAxisLabel || "Longitude (E)")
   };
   if (config.plotType) setPlotType(config.plotType);
+  setChecked(el.showTitleInput, typeof config.showTitle === "boolean" ? config.showTitle : Boolean(String(config.title || "").trim()));
   setInputValue(el.titleInput, config.title);
   setInputValue(el.regionInput, config.region);
   setInputValue(el.projectionInput, config.projection);
@@ -812,11 +834,11 @@ function applyConfigToUI(config) {
   setElementPositionFromConfig("north", config.northPosition);
   setInputValue(el.symbolInput, config.pointSymbol);
   setInputValue(el.pointSizeInput, config.pointSize);
-  setColorControlValue("pointFill", config.pointFill || "#d7191c");
+  setColorControlValue("pointFill", config.pointFill || "#2f6f8f");
   setInputValue(el.penWidthInput, config.pointPenWidth);
-  setColorControlValue("penColor", config.pointPenColor || "black");
+  setColorControlValue("penColor", config.pointPenColor || "#263238");
   setInputValue(el.labelSizeInput, config.labelFontSize);
-  setColorControlValue("labelColor", config.labelColor || "black");
+  setColorControlValue("labelColor", config.labelColor || "#263238");
   setInputValue(el.labelDXInput, config.labelDX);
   setInputValue(el.labelDYInput, config.labelDY);
   setChecked(el.showTerrainInput, config.showTerrain);
@@ -1359,6 +1381,7 @@ function readMTMapping() {
 
 function readConfig() {
   const config = {
+    showTitle: el.showTitleInput.checked,
     title: el.titleInput.value,
     plotType: state.plotType,
     mtPeriod: Number(el.mtPeriodInput.value),
@@ -1992,16 +2015,21 @@ function applyPlotPreset(preset) {
   const presets = {
     paperMono: () => {
       setChecked(el.showTerrainInput, false);
-      setColorControlValue("pointFill", "white");
-      setColorControlValue("penColor", "black");
-      setInputValue(el.penWidthInput, 0.55);
-      setColorControlValue("labelColor", "black");
-      setChecked(el.showGridInput, true);
+      setChecked(el.showTitleInput, false);
+      setChecked(el.showLabelsInput, false);
+      setInputValue(el.pointSizeInput, 0.20);
+      setColorControlValue("pointFill", "#2f6f8f");
+      setColorControlValue("penColor", "#263238");
+      setInputValue(el.penWidthInput, 0.45);
+      setInputValue(el.labelSizeInput, 7.5);
+      setColorControlValue("labelColor", "#263238");
+      setChecked(el.showGridInput, false);
       setChecked(el.showScaleInput, true);
-      setChecked(el.showNorthInput, true);
-      setChecked(el.showLegendInput, true);
+      setChecked(el.showNorthInput, false);
+      setChecked(el.showLegendInput, state.stationGroups.length > 1 || state.faultLayers.length > 0);
       setColorControlValue("legendBackground", "white");
-      setInputValue(el.legendBackgroundAlphaInput, 0);
+      setInputValue(el.legendBackgroundAlphaInput, 8);
+      setInputValue(el.pngDpiInput, 450);
     },
     fieldQuick: () => {
       setChecked(el.showTerrainInput, false);
@@ -2170,13 +2198,13 @@ function complexPairIsFinite(value) {
 }
 
 function populateColorControls() {
-  setupColorControl("pointFill", "#d7191c", () => {
+  setupColorControl("pointFill", "#2f6f8f", () => {
     scheduleAutoPreview("点位颜色已更改，正在自动更新预览...");
   });
-  setupColorControl("penColor", "black", () => {
+  setupColorControl("penColor", "#263238", () => {
     scheduleAutoPreview("点位边框色已更改，正在自动更新预览...");
   });
-  setupColorControl("labelColor", "black");
+  setupColorControl("labelColor", "#263238");
   setupColorControl("legendTextColor", "black", () => {
     renderLegendDragHandle();
     scheduleAutoPreview("图例文字色已更改，正在自动更新预览...");

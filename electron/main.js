@@ -726,9 +726,9 @@ async function renderDecoratedMap(pngPath, config = {}) {
   const image = nativeImage.createFromPath(pngPath);
   const size = image.getSize();
   if (!size.width || !size.height) throw new Error("中文图名/图例叠加失败：无法读取 GMT PNG 尺寸。");
-  const title = String(config.title || "").trim();
-  const titleHeight = title ? Math.max(72, Math.round(size.height * 0.085)) : 0;
-  const titleSize = Math.max(26, Math.min(54, Math.round(size.width * 0.032)));
+  const title = config.showTitle === false ? "" : String(config.title || "").trim();
+  const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
+  const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
   const imageUrl = image.toDataURL();
   const legend = nativeLegendMarkup(config, size);
@@ -936,7 +936,7 @@ function nativeLegendMarkup(config, imageSize) {
 
 function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
   const penColor = String(entry.pen || "").split(",").pop() || "black";
-  const fill = entry.fill || "#d7191c";
+  const fill = entry.fill || "#2f6f8f";
   let symbol;
   if (entry.symbol === "line") {
     symbol = `<span class="native-legend-line" style="width:${Math.round(symbolBox * 0.78)}px;border-top:${Math.max(2, Math.round(symbolBox * 0.08))}px solid ${escapeHTML(penColor)}"></span>`;

@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.2.3-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.3.0-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -14,9 +14,9 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.2.3**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.3.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.2.3**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.3.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 软件界面 / Interface Preview
 
@@ -70,6 +70,8 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Import structural or fault-line files as GMT overlays, with optional compact legends.
 - 支持可编辑图例、比例尺、指北针位置和图件元素。
 - Support editable legend content plus draggable legend, scale-bar, north-arrow, and map-element placement.
+- 标题和图例可分别显示/隐藏；内置“论文点位图”预设会减少重复标题、无信息量图例和密集全标签。
+- Toggle title and legend independently; the publication station-map preset removes repeated titles, uninformative legends, and dense all-site labeling.
 - 绘制相位张量主轴（alpha - beta）/ 广义电性走向图。
 - Draw phase-tensor principal-axis (alpha minus beta) / generalized electric-strike maps.
 - 绘制相位张量椭圆图。
@@ -88,14 +90,14 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
 - Build distributable macOS and Windows desktop packages.
-- 本地 v1.2.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注和原生中文图例；这些功能尚未进入公开 `main`。
-- The local v1.2.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, and native Chinese legends; these features are not yet on public `main`.
+- 本地 v1.2.x–v1.3.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注、原生中文图例、标题/图例独立开关和论文点位图样式；这些功能尚未进入公开 `main`。
+- The local v1.2.x–v1.3.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, native Chinese legends, independent title/legend visibility, and a publication station-map style; these features are not yet on public `main`.
 
 ## 正式版下载 / Stable Release
 
-当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.2.3**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
+当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.3.0**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
 
-GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.2.3** and has not been published; end users should use the stable GitHub Release.
+GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.3.0** and has not been published; end users should use the stable GitHub Release.
 
 [打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 

@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.3.0 - 2026-09-04
+
+- Added independent title and legend visibility controls in both the full settings and quick inspector, with project-file persistence and backward-compatible restoration for older projects.
+- Made response-curve titles respect the same visibility control and accept a user-defined title.
+- Reworked the default and `论文点位图` preset around common MT-journal figure conventions: restrained blue station symbols, dark keylines, opt-in station labels, no redundant single-category legend, no repeated in-figure title, and fewer decorative map elements.
+- Refined GMT map typography, frame/grid hierarchy, background ordering, coastline weight, title scale, and white label halos for clearer output over both plain and terrain backgrounds.
+- Added title-visibility, quick-control, publication-default, worker-decoration, response-curve, label-halo, and layer-ordering regression coverage, plus real-GMT visual checks with nine EDI stations.
+
 ## v1.2.3 - 2026-09-02
 
 - Prevented completed renders for an older plot type or parameter state from replacing the current preview during rapid plot switching.
