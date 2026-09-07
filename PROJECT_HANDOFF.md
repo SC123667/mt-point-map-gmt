@@ -17,7 +17,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 当前本地源码版本：`v1.4.1`（高精度地形 USTC / AWS 下载源修复）
 - 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.4.1` 七个尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.4.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`adc02bdc391b648ddc2ef8f688cc8bad0227d46d5b6c9f30fe3a62f4910638b8`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.4.1`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`51f43536f6a168775fd7b3d9b8754832b5af1974a04c123bcbab9ef3c530e703`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
@@ -33,7 +33,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
 | 本地功能标签 | `v1.2.0` 至 `v1.4.1`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.4.0`，从该路径验证运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.4.1`，从该路径验证运行 |
 
 版本号必须同步维护：
 
@@ -297,7 +297,7 @@ flowchart LR
 - 解码校验有符号 16 位、单波段和尺寸，保留负高程与 -32768 无数据值；使用临时文件后重命名避免损坏缓存。GMT App 缺少 JP2 驱动的问题由内置解码绕过。
 - 修正整数边界多下载一排/列瓦片，跨日期变更线采用标准瓦片经度命名。
 - 11 组 Node 回归通过。真实 N28E087 JP2 的 12,967,201 个样本与独立原生 OpenJPEG 解码结果一致；真实 Electron + GMT 6.5.0 完成 USTC 下载、预览、PDF/EPS 导出和工程保存恢复。Windows 仅做 DOM 平台样式检查，未做实机运行。
-- 当前“实用app”仍为 v1.4.0，保持用户正在运行的任务。v1.4.1 候选 App 在 `release/local-1.4.1/mac-arm64/`，已从该路径用隔离配置完成真实 USTC 下载和 GMT 出图。来源包严格深度验签通过，项目目录候选包普通深度验签通过，19 个 Electron 文件与源码一致；ASAR SHA-256：`51f43536f6a168775fd7b3d9b8754832b5af1974a04c123bcbab9ef3c530e703`。替换运行中的 App 前须确认工程已保存和下载可中断。GitHub 未推送。
+- 2026-09-07 已按用户要求将“实用app”内唯一 GMT App 更新并重启为 v1.4.1；目标包普通深度验签、ASAR 哈希通过，并从实际安装路径使用隔离配置完成 USTC 下载、预览、PDF/EPS 导出和工程恢复测试，随后正常启动。旧 v1.4.0 App 备份：`/Users/cwn/Applications/MT-GMT-Backups/v1.4.0-20260907-191105/MT点位图制作工具—GMT.app`，不得未经授权清理。来源包严格深度验签通过；19 个 Electron 文件与源码一致。ASAR SHA-256：`51f43536f6a168775fd7b3d9b8754832b5af1974a04c123bcbab9ef3c530e703`。本地功能提交 `710fca1`、标签 `v1.4.1`；GitHub 未推送。
 - 核验材料：`outputs/v1.4.1-validation/`（忽略目录），含真实 DEM、独立解码参考、UI 脚本和验证记录。
 
 ## 8.1 v1.4.0 接手增量（2026-09-07）
