@@ -1,3 +1,4 @@
+const { srtmSource } = require("./srtm-source");
 const { geographicRegionIssue } = require("./map-region");
 const fs = require("fs");
 const https = require("https");
@@ -1025,6 +1026,7 @@ function loadRenderer(win) {
     const { ipcRenderer } = require("electron");
     window.mtApp = {
       geographicRegionIssue: ${geographicRegionIssue.toString()},
+      srtmSource: ${srtmSource.toString()},
       status: () => ipcRenderer.invoke("app:status"),
       openFile: () => ipcRenderer.invoke("file:open"),
       openEdiDirectory: () => ipcRenderer.invoke("edi:openDirectory"),

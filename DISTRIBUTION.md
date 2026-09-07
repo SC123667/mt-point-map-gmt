@@ -1,8 +1,8 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.4.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.4.1`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.4.0`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.4.1`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 
@@ -81,3 +81,9 @@ GMT is not bundled inside this app. This avoids shipping large cross-platform GM
 无需测点即可按经纬度范围出图。PDF 可在 Illustrator 中打开并编辑；中文标题/图例通过 PDF 页面合成保留底图矢量。地形晕渲仍是栅格影像，EPS 仍不包含原生中文叠加。
 
 Region-only maps require no station import. PDF composition preserves vector paths beneath native Chinese decorations. Shaded relief remains raster; EPS omits native Chinese overlays. `pdf-lib` is a bundled pure-JavaScript runtime dependency used by the GMT worker.
+
+## v1.4.1 地形下载 / Terrain Downloads
+
+新增 `@cornerstonejs/codec-openjpeg@1.3.5`（JS + WASM，约 2 MB 包文件）生产依赖，随 App 打包并由 SRTM worker 读取；无需本机 GDAL 的 JPEG2000 驱动，也不在运行时从 CDN 加载解码器。许可证见 `electron/THIRD_PARTY_NOTICES.txt`。USTC 与 AWS 下载格式不同，解码后复用现有 HGT 缓存与 GMT 流程。
+
+The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local package bytes, including inside ASAR. Packaging must retain both its JS and WASM files. Validate a real USTC download from the packaged App, not only source execution. Windows runtime validation remains separate from macOS validation.

@@ -4,6 +4,15 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.4.1 - 2026-09-07
+
+- Fixed the high-resolution terrain source selector: 1m/30s/15s/3s/1s SRTM preparation now offers USTC (recommended) and AWS, independently of the lower-resolution GMT server selector.
+- Bundled an OpenJPEG WebAssembly decoder inside the SRTM worker so USTC JP2 tiles work even when installed GDAL lacks JPEG2000 support; preserved signed 16-bit elevations and void values.
+- Persisted the source in project files, displayed the actual download source, and retained reuse of completed HGT caches across source changes. Missing/corrupt downloads fail explicitly without silently switching servers.
+- Preserved pause/resume/cancel across download and decode stages; incomplete downloads and decoded files never become valid tile caches.
+- Corrected extra tile downloads at integer east/north boundaries and wrapped longitude tile names across the date line.
+- Added offline source/control/cache/error regression tests, signed-elevation fixtures, and real USTC/GMT/Electron export validation.
+
 ## v1.4.0 - 2026-09-07
 
 - Added a region-only basemap workflow with explicit west/east/south/north inputs, coordinate validation, automatic preview, and PNG/PDF/EPS/GMT-script export without importing stations.

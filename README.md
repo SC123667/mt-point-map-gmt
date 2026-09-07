@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.4.0-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.4.1-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -14,9 +14,17 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.4.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.4.1**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.4.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.4.1**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+
+## 高精度地形下载 / High-resolution terrain
+
+在“地形底图”选择 1 分、30 秒、15 秒、3 秒或 1 秒时，使用“高精度下载源”：**USTC 中国镜像（推荐）**或 **AWS 全球源**。USTC 通过 App 内置解码器处理，不需要额外安装 JP2/GDAL 插件；更低分辨率使用独立的 GMT 下载源。
+
+切换源前先取消当前任务，再点击“下载/准备底图”。已完成的高程瓦片可复用，未完成瓦片需重新下载；工程文件保存下载源选择。降低输出分辨率主要减少计算量，这些 SRTM 选项仍下载完整原始瓦片。缓存优先：更换源不会强制重下已经准备好的底图。
+
+For 1m through 1s terrain, select USTC or AWS in the high-resolution source selector. USTC JP2 decoding is bundled and runs in the SRTM worker. Cancel an active task before changing sources; completed HGT tiles remain reusable. Lower output resolution reduces processing rather than the original tile download size. Lower-resolution terrain retains its separate GMT server selector.
 
 ## 软件界面 / Interface Preview
 
@@ -95,9 +103,9 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 
 ## 正式版下载 / Stable Release
 
-当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.4.0**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
+当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.4.1**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
 
-GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.4.0** and has not been published; end users should use the stable GitHub Release.
+GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.4.1** and has not been published; end users should use the stable GitHub Release.
 
 [打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 

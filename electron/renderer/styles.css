@@ -942,6 +942,7 @@ select:hover {
   display: none;
 }
 
+.terrain-source-row.hidden,
 .terrain-custom-row.hidden {
   display: none;
 }

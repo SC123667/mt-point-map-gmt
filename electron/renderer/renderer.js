@@ -163,6 +163,7 @@ const ids = [
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
 	  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
+	  "terrainSrtmSourceInput", "terrainSrtmSourceRow", "terrainDataServerRow", "terrainSourceHint",
 	  "terrainAllowDownloadInput", "terrainDataServerInput", "terrainDataServerCustomRow", "terrainDataServerCustomInput",
     "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
 	  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
@@ -319,7 +320,7 @@ function wireEvents() {
   bind(el.chooseLocalTerrainBtn, "click", chooseLocalTerrainGrid);
   bind(el.clearLocalTerrainBtn, "click", clearLocalTerrainGrid);
   bind(el.terrainDocsBtn, "click", () => window.mtApp.openExternal("https://docs.generic-mapping-tools.org/6.6/datasets/remote-data.html"));
-  [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput, el.terrainDataServerInput, el.terrainDataServerCustomInput].forEach((control) => {
+  [el.showTerrainInput, el.terrainResolutionInput, el.terrainIntensityInput, el.regionInput, el.terrainDataServerInput, el.terrainDataServerCustomInput, el.terrainSrtmSourceInput].forEach((control) => {
     bind(control, "input", updateTerrainEstimate);
     bind(control, "change", updateTerrainEstimate);
   });
@@ -869,6 +870,8 @@ function applyConfigToUI(config) {
   setInputValue(el.terrainIntensityInput, config.terrainIntensity);
   setChecked(el.terrainAllowDownloadInput, config.terrainAllowDownload);
   setTerrainDataServerValue(config.terrainDataServer);
+  setInputValue(el.terrainSrtmSourceInput, window.mtApp.srtmSource(config));
+  renderTerrainDataServerCustom();
   setInputValue(el.outputNameInput, config.outputName);
   setInputValue(el.pngDpiInput, config.pngDpi);
   setInputValue(el.mtPeriodInput, config.mtPeriod);
@@ -1449,6 +1452,7 @@ function readConfig() {
     terrainIntensity: Number(el.terrainIntensityInput.value),
     terrainAllowDownload: el.terrainAllowDownloadInput.checked,
     terrainDataServer: readTerrainDataServer(),
+    terrainSrtmSource: el.terrainSrtmSourceInput.value,
     localTerrainGridPath: state.terrain.localGridPath,
     terrainGridPath: state.terrain.localGridPath || state.terrain.gridPath,
     terrainShadePath: state.terrain.shadePath,
@@ -1834,6 +1838,7 @@ function renderTerrainProgress(status) {
 }
 
 async function updateTerrainEstimate() {
+  renderTerrainDataServerCustom();
   if (state.terrain.localGridPath) {
     el.terrainEstimateText.textContent = "将使用本地 GRD 地形图，不需要联网下载。";
     el.prepareTerrainBtn.disabled = true;
@@ -1864,9 +1869,9 @@ function estimateTerrainClient(region, resolution) {
   const safety = terrainSafetyClient(values, resolution, cells);
   if (info.source === "srtm") {
     const westTile = Math.floor(values[0]);
-    const eastTile = Math.floor(values[1] - Number.EPSILON);
+    const eastTile = Math.ceil(values[1]) - 1;
     const southTile = Math.floor(values[2]);
-    const northTile = Math.floor(values[3] - Number.EPSILON);
+    const northTile = Math.ceil(values[3]) - 1;
     const tileCount = Math.max(1, eastTile - westTile + 1) * Math.max(1, northTile - southTile + 1);
     const baseLabel = `预计下载约 ${formatBytes(tileCount * 8 * 1024 * 1024)} SRTM 高程瓦片，解压缓存约 ${formatBytes(tileCount * 26 * 1024 * 1024)}，本地网格约 ${formatBytes(bytes)}`;
     return {
@@ -2109,8 +2114,14 @@ function readTerrainDataServer() {
 }
 
 function renderTerrainDataServerCustom() {
-  const isCustom = el.terrainDataServerInput.value === CUSTOM_TERRAIN_SERVER_VALUE;
+  const isSrtm = TERRAIN_RESOLUTIONS[el.terrainResolutionInput.value]?.source === "srtm";
+  const isCustom = !isSrtm && el.terrainDataServerInput.value === CUSTOM_TERRAIN_SERVER_VALUE;
+  el.terrainSrtmSourceRow.classList.toggle("hidden", !isSrtm);
+  el.terrainDataServerRow.classList.toggle("hidden", isSrtm);
   el.terrainDataServerCustomRow.classList.toggle("hidden", !isCustom);
+  el.terrainSourceHint.textContent = isSrtm
+    ? "1 分至 1 秒地形使用所选 SRTM 源，已完成瓦片可复用；切换源需先取消当前任务再准备。降低分辨率主要减少计算量，仍需下载原始瓦片。"
+    : "较低分辨率地形由 GMT 从所选服务器下载。";
 }
 
 async function saveScript() {

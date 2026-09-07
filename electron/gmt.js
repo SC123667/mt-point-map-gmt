@@ -1142,9 +1142,9 @@ function coarserRecommendedLabel(region, currentResolution) {
 
 function srtmTileCount(region) {
   const west = Math.floor(region.west);
-  const east = Math.floor(region.east - Number.EPSILON);
+  const east = Math.ceil(region.east) - 1;
   const south = Math.floor(region.south);
-  const north = Math.floor(region.north - Number.EPSILON);
+  const north = Math.ceil(region.north) - 1;
   return Math.max(1, east - west + 1) * Math.max(1, north - south + 1);
 }
 
