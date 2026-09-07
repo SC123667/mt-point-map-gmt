@@ -73,7 +73,7 @@ async function exportGMTMap(payload) {
   const nativeAnnotations = payload.config?.plotType !== "responseCurve" && (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel);
   const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
   const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations);
-  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...(nativeAnnotations ? ["eps"] : [])])];
+  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || payload.config?.interactiveMap) ? ["eps"] : [])])];
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
@@ -86,12 +86,17 @@ async function exportGMTMap(payload) {
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
-  if (result.ok && nativeAnnotations && fs.existsSync(path.join(gmtWorkspace.directory,"map_label_styles.json"))) result.annotationLayout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName);
+  if (result.ok && (nativeAnnotations || payload.config?.interactiveMap)) {
+    const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName);
+    result.mapFrame = {width:layout.width,height:layout.height,ox:layout.ox,oy:layout.oy};
+    if(layout.labels.length) result.annotationLayout = layout;
+  }
   finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
     result.outputDirectory = outputDirectory;
     result.needsNativeDecorations = needsNativeDecorations;
+    result.nativeLegend = nativeLegend;
     result.generatedFormats = gmtFormats;
   }
   sendProgress(result.ok ? "completed" : "failed", result.ok ? 100 : 90, result.ok ? "GMT 绘图完成。" : (result.message || "GMT 绘图失败。"));

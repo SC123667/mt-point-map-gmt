@@ -1,5 +1,6 @@
 // Portable, pure map-feature model. GeoJSON coordinates always remain lon/lat.
 const crypto = require('crypto');
+const names = require('./map-names');
 const DEFAULT_STYLE = Object.freeze({ color:'#62494a', width:0.8, dash:'solid', fill:'#cfb8ab', opacity:35, symbol:'c', size:0.14, showLabel:true, labelColor:'#263238', font:'sans-serif', fontSize:9, halo:true, position:'right', dx:2, dy:0, rotation:0, labelMode:'name' });
 const DEFAULT_CONTOURS = Object.freeze({ show:false, interval:500, major:2000, color:'#666666', width:0.25, majorWidth:0.65, labels:true, fontSize:8, minLength:0.4, labelSpacing:1.2 });
 const num=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):fallback;
@@ -23,7 +24,7 @@ function feature(f,index=0,source={}) {
   const p=f.properties||{},g=geometry(f.geometry);
   const name=String(f.name??p.name??p.Name??p.NAME??p.fz_name??p.PlateName??`未命名 ${index+1}`).slice(0,200);
   const category=String(f.category||p.category||source.category||(g.type.includes('Polygon')?'构造区域':g.type.includes('Point')?'地点':'断层')).slice(0,60);
-  return {id:String(f.id||crypto.createHash('sha1').update(JSON.stringify([source.id,name,g])).digest('hex').slice(0,20)),name,abbreviation:String(f.abbreviation||p.abbreviation||'').slice(0,100),label:String(f.label||p.label||'').slice(0,500),category,visible:f.visible!==false,geometry:g,style:{...(f.style||p.style||{})},labelAnchor:f.labelAnchor?coordinate(f.labelAnchor):null,properties:p,source:{...source,...p.source,...f.source}};
+  return names.enrich({id:String(f.id||crypto.createHash('sha1').update(JSON.stringify([source.id,name,g])).digest('hex').slice(0,20)),name,originalName:f.originalName??p.originalName,nameZh:f.nameZh??p.nameZh,nameEn:f.nameEn??p.nameEn,abbreviation:String(f.abbreviation||p.abbreviation||'').slice(0,100),label:String(f.label||p.label||'').slice(0,500),category,visible:f.visible!==false,geometry:g,style:{...(f.style||p.style||{})},labelAnchor:(f.labelAnchor||p.labelAnchor)?coordinate(f.labelAnchor||p.labelAnchor):null,properties:p,source:{...source,...p.source,...f.source}});
 }
 function collection(data,source={}) {
   if(data.crs && !/4326|CRS:*84|WGS.?84/i.test(JSON.stringify(data.crs)))throw new Error('数据不是 WGS84 经纬度，请先重投影为 EPSG:4326。');
@@ -63,13 +64,13 @@ function anchor(f,region) {
   return [(Math.max(w,bounds[0])+Math.min(e,bounds[1]))/2,(Math.max(s,bounds[2])+Math.min(n,bounds[3]))/2];
 }
 function effectiveStyle(f,c={}){return style({...c.categoryStyles?.[f.category],...f.style});}
-function labelText(f,s){return (s.labelMode==='custom'?f.label:s.labelMode==='abbreviation'?f.abbreviation:f.name)||f.name;}
-function normalize(value={}) {return {features:(value.features||[]).map((f,i)=>feature(f,i)),categoryStyles:{...(value.categoryStyles||{})},contours:contours(value.contours)};}
+function labelText(f,s,c={}){return names.label(f,s,c);}
+function normalize(value={}) {return {...names.settings(value),categoryNames:{...(value.categoryNames||{})},features:(value.features||[]).map((f,i)=>feature(f,i)),categoryStyles:{...(value.categoryStyles||{})},contours:contours(value.contours)};}
 function parsePaste(text,type='Point',name='自定义构造',category='地点') {
   const rows=String(text).trim().split(/\r?\n/).filter(x=>x.trim()).map(x=>x.trim().split(/[\t,，;；]|\s{2,}/).map(s=>s.trim()));
   if(type==='Point')return rows.map((r,i)=>{if(r.length<3)throw new Error(`第 ${i+1} 行需要：名称、经度、纬度，可附类别。`);return feature({name:r[0],category:r[3]||category,geometry:{type:'Point',coordinates:[r[1],r[2]]}},i);});
   const coords=rows.map((r,i)=>{if(r.length!==2){r=r.join(' ').split(/\s+/);}if(r.length!==2)throw new Error(`第 ${i+1} 行需要经度和纬度。`);return coordinate(r);});
   return [feature({name,category,geometry:{type,coordinates:type==='Polygon'?[coords]:coords}})];
 }
-function geoJSON(features){return {type:'FeatureCollection',features:features.map(f=>({type:'Feature',id:f.id,geometry:f.geometry,properties:{...f.properties,name:f.name,category:f.category,abbreviation:f.abbreviation,label:f.label,source:f.source,style:f.style}}))};}
+function geoJSON(features){return {type:'FeatureCollection',features:features.map(f=>({type:'Feature',id:f.id,geometry:f.geometry,properties:{...f.properties,name:f.name,originalName:f.originalName,nameZh:f.nameZh,nameEn:f.nameEn,category:f.category,abbreviation:f.abbreviation,label:f.label,labelAnchor:f.labelAnchor,source:f.source,style:f.style}}))};}
 module.exports={DEFAULT_STYLE,DEFAULT_CONTOURS,style,contours,geometry,feature,collection,vertices,inRegion,anchor,effectiveStyle,labelText,normalize,parsePaste,geoJSON};

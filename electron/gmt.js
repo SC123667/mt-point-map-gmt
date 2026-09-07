@@ -299,6 +299,7 @@ function autoRegion(records) {
 }
 
 function buildScript(records, config, outputDirectory, formats = ["png"]) {
+  config = require("./map-names").plotConfig(config);
   if (config.plotType === "baseMap") {
     const issue = geographicRegionIssue(config.region, config.projection);
     if (issue) throw new Error(issue);

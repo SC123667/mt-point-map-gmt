@@ -3,12 +3,15 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const {SOURCES}=require('./geodata-sources'),model=require('./cartography');
 const {workspaceDirectory}=require('./workspace');
 const {safeName,placeName,regionLabel}=require('./terrain-cache');
+const names=require('./map-names');
+const dictionaryPath=()=>path.join(workspaceDirectory('名称词典'),'用户中英文名称.json');
+function dictionary(){const f=dictionaryPath();return fs.existsSync(f)?JSON.parse(fs.readFileSync(f,'utf8')):{};}
 const controller=new AbortController();
 const progress=message=>process.connected&&process.send({type:'progress',progress:{message}});
 async function download(url) {
  const parsed=new URL(url);if(!['https:','http:'].includes(parsed.protocol))throw new Error('请输入 HTTP 或 HTTPS 数据地址。');
  const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(90000)]);
- const response=await fetch(parsed,{signal,headers:{'User-Agent':'MT-GMT/1.6.0 (desktop geoscience mapping)'}});
+ const response=await fetch(parsed,{signal,headers:{'User-Agent':'MT-GMT/1.7.0 (desktop geoscience mapping)'}});
  if(!response.ok)throw new Error(`数据服务返回 HTTP ${response.status}`);
  const reader=response.body.getReader(),chunks=[];let count=0;const total=Number(response.headers.get('content-length'));
  while(true){const {done,value}=await reader.read();if(done)break;count+=value.byteLength;if(count>150*1024*1024){await reader.cancel();throw new Error('单次下载超过 150 MB，请缩小区域或下载后从本地导入。');}chunks.push(Buffer.from(value));progress(`下载 ${(count/1048576).toFixed(1)} MB${total?' / '+(total/1048576).toFixed(1)+' MB':''}`);}
@@ -26,9 +29,9 @@ async function sourceData(id,refresh=false) {
  saveAtomic(file,r.bytes);saveAtomic(meta,JSON.stringify(source,null,2));
  return {data,source};
 }
-function search(features,query,region){const q=String(query||'').trim().toLowerCase();const aliases={'雅鲁藏布':'yarlung','班公':'bangong','怒江':'nujiang','喜马拉雅':'himalay','拉萨':'lhasa','日喀则':'xigaze','林芝':'nyingchi'};const qs=[q,...Object.entries(aliases).filter(([a])=>q.includes(a)).map(([,b])=>b)];return features.filter(f=>model.inRegion(f,region)&&(!q||qs.some(x=>[f.name,f.category,f.properties.Name,f.properties.name,f.properties.fz_name].join(' ').toLowerCase().includes(x))));}
+function search(features,query,region){const qs=names.queryAliases(query);return features.filter(f=>model.inRegion(f,region)&&(!String(query||'').trim()||qs.some(q=>names.key([f.name,f.originalName,f.nameZh,f.nameEn,f.abbreviation,f.category,f.properties?.Name,f.properties?.fz_name].join(' ')).includes(q))));}
 function results(features,p,source,issues=[]) {
- const selected=search(features,p.query,p.region),limit=Math.max(1,Math.min(Number(p.limit)||1000,20000));
+ const dict=dictionary();features=features.map(f=>names.applyDictionary(f,dict));const selected=search(features,p.query,p.region).filter(f=>!p.geometryKind||p.geometryKind==='all'||(p.geometryKind==='structures'?!f.geometry.type.includes('Point'):f.geometry.type.includes('Point'))),limit=Math.max(1,Math.min(Number(p.limit)||1000,20000));
  return {features:selected.slice(0,limit),total:selected.length,source,issues,truncated:selected.length>limit};
 }
 async function importFile(file,source={}) {
@@ -53,6 +56,14 @@ async function importFile(file,source={}) {
 }
 function wfsURL(p,request){const u=new URL(p.url);for(const k of [...u.searchParams.keys()])if(['service','request','version','typename','typenames','srsname','bbox','outputformat','count','maxfeatures','startindex'].includes(k.toLowerCase()))u.searchParams.delete(k);u.searchParams.set('service','WFS');u.searchParams.set('version',p.version||'2.0.0');u.searchParams.set('request',request);return u;}
 async function handle(p){
+ if(p.mode==='rememberNames'){const f=model.feature(p.feature),d=dictionary();d[names.identity(f)]={nameZh:f.nameZh,nameEn:f.nameEn,abbreviation:f.abbreviation};saveAtomic(dictionaryPath(),JSON.stringify(d,null,2));return {file:dictionaryPath()};}
+ if(p.mode==='structures'){
+  const features=[],issues=[];
+  for(const s of SOURCES.filter(s=>s.url&&(!p.sourceIds||p.sourceIds.includes(s.id)))){try{const r=await sourceData(s.id,p.refresh),c=model.collection(r.data,{...r.source,category:s.category});features.push(...c.features.filter(f=>!f.geometry.type.includes('Point')));issues.push(...c.issues);}catch(e){issues.push(s.name+'：'+e.message);}}
+  for(const f of features)f.style.showLabel=false;
+  return results(features,{...p,geometryKind:'structures'}, {name:'公开构造矢量联合查询'},issues);
+ }
+
  if(p.mode==='export'){const c=model.normalize(p.cartography),area=p.region?`${safeName(placeName(p.region))}__${regionLabel(p.region)}`:'自定义图层';const file=path.join(workspaceDirectory('导出图件'),area,'自定义构造与地点.geojson');saveAtomic(file,JSON.stringify(model.geoJSON(c.features),null,2));saveAtomic(file+'.样式.json',JSON.stringify(c,null,2));return {file};}
  if(p.mode==='catalog')return SOURCES.map(s=>({...s,cached:!!s.url&&fs.existsSync(path.join(cacheSource(s),safeName(s.name)+'_完整数据.geojson'))}));
  if(p.mode==='paste')return {features:model.parsePaste(p.text,p.type,p.name,p.category),issues:[]};

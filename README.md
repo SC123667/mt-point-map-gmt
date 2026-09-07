@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.6.0-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.7.0-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -12,7 +12,15 @@
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
 
-## 地点、构造数据与等高线（本地 v1.6.0）
+## 构造节点编辑与统一中英文（v1.7.0）
+
+打开“图层 → 地点与构造”：点击“在地图上画构造线”或“在地图上画构造区域”，依次点击地图，完成后填写名称。已有对象可“拖动当前对象节点”，在线段附近点击插入节点，也可删除节点、撤销。多段线和带孔区域保留原来的组成关系；手工调整会记录来源信息。编辑前需先生成地图预览。
+
+面板顶部可选择“统一中文 / 统一英文”和“完整名称 / 简称 / 完整名称 + 简称”。软件按原始双语字段和内置常用名称表整理名称；缺少可靠译名时保留构造几何、暂不显示该名称，并列入待补全。用户可以编辑双语名称（支持换行）、类别图例名称，并将修订保存到全局 `名称词典/用户中英文名称.json`，下次导入同一对象复用。旧工程保留原始名称模式，避免改变已有出图。
+
+“查询构造 / 城市数据”新增公开构造联合查询与点/线/区域筛选，IYZS 等已知简称可匹配真实构造线。数据源没有提供某条构造时，需要导入其他可靠矢量或手工描绘；软件不会根据单个名称点猜测边界。
+
+## 地点、构造数据与等高线（本地 v1.7.0）
 
 先选择“区域底图”并设置经纬度范围，然后打开左侧“图层”：
 
@@ -26,9 +34,9 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.6.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.7.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.6.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.7.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 高精度地形下载 / High-resolution terrain
 

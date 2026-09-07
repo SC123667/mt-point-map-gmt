@@ -22,7 +22,7 @@ function scriptParts(config,outputDirectory,region,shell,quote){
    const key=rank(f)+'|'+options;
    if(!groups.has(key))groups.set(key,{options,parts:[]});groups.get(key).parts.push(text);
   }
-  const a=m.anchor(f,config.region);if(s.showLabel&&a&&m.inRegion({geometry:{type:'Point',coordinates:a}},config.region))labels.push({id:f.id,name:m.labelText(f,s),anchor:a,style:s});
+  const label=m.labelText(f,s,c),a=m.anchor(f,config.region);if(label&&s.showLabel&&a&&m.inRegion({geometry:{type:'Point',coordinates:a}},config.region))labels.push({id:f.id,name:label,anchor:a,style:s});
  });
  for(const [i,group] of [...groups.values()].entries()){
   const p=file(`map_features_${String(i+1).padStart(3,'0')}.gmt`,group.parts.join('\n')+'\n');
@@ -44,7 +44,7 @@ function contourCommand(config,grid,region,quote,prefix='  '){const c=m.contours
 
 }
 function readLayout(directory,outputName){
- const labelFile=path.join(directory,'map_label_styles.json');if(!fs.existsSync(labelFile))return null;
+ const labelFile=path.join(directory,'map_label_styles.json');
  const eps=fs.readFileSync(path.join(directory,outputName+'.eps'),'utf8');
  // GMT's EPS crop translation is in PostScript points; PSL drawing coordinates
  // are converted by the page-setup scale. Read both, never guess image margins.
@@ -56,9 +56,10 @@ function readLayout(directory,outputName){
  const ox=Number(origin[1])*Number(scale[1])+Number(trans?.[1]||0)-Number(bb[1]);
  const oy=Number(origin[2])*Number(scale[2])+Number(trans?.[2]||0)-Number(bb[2]);
  const width=Number(bb[3])-Number(bb[1]),height=Number(bb[4])-Number(bb[2]);
+ if(!fs.existsSync(labelFile))return {width,height,ox,oy,labels:[]};
  const projected=fs.readFileSync(path.join(directory,'map_label_projected.tsv'),'utf8').trim().split(/\r?\n/).map(x=>x.trim().split(/\s+/).map(Number));
  const labels=JSON.parse(fs.readFileSync(labelFile,'utf8')).map((l,i)=>({...l,x:ox+(projected[i]?.[0]??NaN)*72/2.54,y:height-oy-(projected[i]?.[1]??NaN)*72/2.54})).filter(l=>Number.isFinite(l.x)&&Number.isFinite(l.y));
- return {width,height,labels};
+ return {width,height,ox,oy,labels};
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 function labelSVG(layout){if(!layout)return '';const texts=layout.labels.map(l=>{const s=l.style,lines=l.name.split(/\n|\\n/),fs=s.fontSize,em=fs*1.22;

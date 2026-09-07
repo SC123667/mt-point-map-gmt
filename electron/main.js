@@ -460,6 +460,7 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
 });
 
 ipcMain.handle("gmt:export", async (event, payload) => {
+  payload={...payload,config:require("./map-names").plotConfig(payload.config)};
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
   const formats = payload.formats || ["png"];
@@ -591,6 +592,7 @@ ipcMain.handle("gmt:recheck", () => ({
   gmtAvailable: gmtAvailable(),
   installPlan: installPlan()
 }));
+ipcMain.handle("map:project", (_event, payload) => runForkWorker("map-project-worker.js", payload));
 const geodataTasks = new Map();
 ipcMain.handle("geodata:task", async (event, payload) => {
   if (geodataTasks.has(event.sender.id)) throw new Error("地理数据任务正在进行，请等待或取消。");
@@ -724,7 +726,8 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
   const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
-  const rendered = await renderDecoratedMap(pngPath, {...config, annotationLayout: result.annotationLayout}, needsPDF);
+  const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, annotationLayout: result.annotationLayout}, needsPDF);
+  if (result.mapFrame && rendered.titleHeight) result.mapFrame.height *= (rendered.imageSize.height + rendered.titleHeight) / rendered.imageSize.height;
   if (result.annotationLayout) fs.writeFileSync(path.join(result.outputDirectory,"自定义标注.svg"),require("./cartography-gmt").labelSVG(result.annotationLayout));
   let vectorPDF;
   if (needsPDF) {
@@ -971,11 +974,11 @@ function nativeLegendMarkup(config, imageSize) {
 }
 
 function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
-  const penColor = String(entry.pen || "").split(",").pop() || "black";
+  const penColor = String(entry.pen || "").split(",")[1] || "black";
   const fill = entry.fill || "#2f6f8f";
   let symbol;
   if (entry.symbol === "line") {
-    symbol = `<span class="native-legend-line" style="width:${Math.round(symbolBox * 0.78)}px;border-top:${Math.max(2, Math.round(symbolBox * 0.08))}px solid ${escapeHTML(penColor)}"></span>`;
+    symbol = `<span class="native-legend-line" style="width:${Math.round(symbolBox * 0.78)}px;border-top:${Math.max(2, Math.round(symbolBox * 0.08))}px ${String(entry.pen).endsWith(",-")?"dashed":String(entry.pen).endsWith(",.")?"dotted":"solid"} ${escapeHTML(penColor)}"></span>`;
   } else {
     const gmtSymbol = entry.gmtSymbol || "c";
     const size = Math.round(symbolBox * 0.48);
@@ -1042,6 +1045,7 @@ function loadRenderer(win) {
   const jsPath = path.join(rendererDir, "renderer.js");
   const bridge = `
     const { ipcRenderer } = require("electron");
+    window.MapNames = require(${JSON.stringify(path.join(__dirname,"map-names.js"))});
     window.mtApp = {
       geographicRegionIssue: ${geographicRegionIssue.toString()},
       previewConfig: ${makePreviewConfig.toString()},
@@ -1057,6 +1061,7 @@ function loadRenderer(win) {
       buildScript: (payload) => ipcRenderer.invoke("gmt:buildScript", payload),
       saveScript: (payload) => ipcRenderer.invoke("gmt:saveScript", payload),
       exportMap: (payload) => ipcRenderer.invoke("gmt:export", payload),
+      projectMap: (payload) => ipcRenderer.invoke("map:project", payload),
       chooseOutputDirectory: (currentDirectory) => ipcRenderer.invoke("output:chooseDirectory", currentDirectory),
       deleteCurrentOutputs: (payload) => ipcRenderer.invoke("output:deleteCurrent", payload),
       estimateTerrain: (payload) => ipcRenderer.invoke("terrain:estimate", payload),
@@ -1117,7 +1122,7 @@ function loadRenderer(win) {
 
   let html = fs.readFileSync(htmlPath, "utf8");
   const css = fs.readFileSync(cssPath, "utf8");
-  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8");
   html = html
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);

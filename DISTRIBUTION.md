@@ -1,8 +1,8 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.6.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.7.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.6.0`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.7.0`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 
@@ -99,3 +99,7 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 新增 `shpjs`（SHP 重投影）和 `fast-xml-parser`（WFS 能力文档），需随生产依赖打包。`cartography-ui.js` 由主进程内嵌加载；`geodata-worker.js` 负责后台下载和解析。公共构造数据不打入 ASAR，首次下载后存入全局目录，数据许可与应用 MIT 许可分别处理。
 
 本轮验证 macOS App、GMT 6.5.0 和 Windows 布局/ASCII 工作区代码路径；未在 Windows 实机执行。GitHub main/Release 仍为 v1.1.3，不自动上传。
+
+## v1.7.0 构造编辑与名称
+
+新增 `map-names.js`、`map-project-worker.js` 和 `renderer/map-drawing-ui.js`，必须随 Electron 目录打包。投影转换在独立 worker 中执行，不改变 GMT/SRTM/导入边界。名称词典为运行数据，保存在全局目录下的 `名称词典`，不打入 ASAR；旧工程语言默认 original，新工程默认中文。

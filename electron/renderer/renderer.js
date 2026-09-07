@@ -43,7 +43,7 @@ const state = {
     dragPanStart: null
   },
   terrainWaiter: null,
-  cartography: {features:[],categoryStyles:{},contours:{}},
+  cartography: {language:"zh",nameFormat:"name",features:[],categoryStyles:{},contours:{}},
   faultLayers: [],
   stationGroups: [],
   labelNames: [],
@@ -1642,6 +1642,7 @@ function formatsDialogAvailable() {
 }
 
 async function exportMap(formats, showAlert, options = {}) {
+  if (typeof mapDraw !== "undefined" && mapDraw.active) { if(showAlert) notify("请先完成或取消当前构造绘制，再导出图件。"); return false; }
   if (!state.records.length && state.plotType !== "baseMap") return notify("请先导入点位数据，或选择区域底图按范围绘图。");
   if (!options.auto && state.preview.autoTimer) {
     clearTimeout(state.preview.autoTimer);
@@ -1660,6 +1661,7 @@ async function exportMap(formats, showAlert, options = {}) {
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
+  config.interactiveMap = config.plotType !== "responseCurve";
   if (isPreviewRender && config.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
     setRuntimeStatus(`快速预览地形 ${config.terrainResolution}；正式导出保持 ${baseConfig.terrainResolution}`, "busy");
   }
@@ -1699,7 +1701,7 @@ async function exportMap(formats, showAlert, options = {}) {
     const isCurrentRequest = requestRevision === state.preview.revision && requestPlotType === state.plotType;
     if (formats.includes("png")) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
-      if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType);
+      if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType, {frame:result.mapFrame, config:JSON.parse(JSON.stringify(config))});
     }
     if (showAlert) setRuntimeStatus(`导出完成：${result.files.length} 个文件`, "ready");
     else if (isCurrentRequest) setRuntimeStatus("预览已更新", "ready");
@@ -2414,11 +2416,12 @@ function formatPeriod(period) {
   return period.toExponential(2);
 }
 
-async function renderPreview(filePath, expectedRevision = null, expectedPlotType = "") {
+async function renderPreview(filePath, expectedRevision = null, expectedPlotType = "", mapContext = null) {
   try {
     const url = await window.mtApp.imageDataUrl(filePath);
     const dimensions = await imageDimensions(url);
     if (expectedRevision !== null && (expectedRevision !== state.preview.revision || expectedPlotType !== state.plotType)) return false;
+    state.preview.mapContext = mapContext;
     state.preview.imageWidth = dimensions.width;
     state.preview.imageHeight = dimensions.height;
     el.previewImageLayer.style.backgroundImage = `url(${url})`;
@@ -2441,6 +2444,7 @@ async function renderPreview(filePath, expectedRevision = null, expectedPlotType
 
 function clearPreviewImage() {
   state.preview.hasImage = false;
+  state.preview.mapContext = null;
   state.preview.imageWidth = 0;
   state.preview.imageHeight = 0;
   state.preview.zoom = 1;
@@ -2818,6 +2822,7 @@ function resetPreviewView() {
 }
 
 function updatePreviewTransform() {
+  if (typeof renderMapDrawing === "function") requestAnimationFrame(renderMapDrawing);
   el.previewImageLayer.style.transform = `translate(${state.preview.panX.toFixed(2)}px, ${state.preview.panY.toFixed(2)}px) scale(${state.preview.zoom.toFixed(4)})`;
   el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
   el.previewBox.classList.toggle("is-zoomed", state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001);
@@ -2836,6 +2841,7 @@ function handlePreviewWheel(event) {
 }
 
 function handlePreviewPointerDown(event) {
+  if (typeof mapDraw !== "undefined" && mapDraw.active) return;
   if (!state.preview.hasImage || event.button !== 0 || event.target.closest(".preview-zoom-controls") || event.target.closest(".legend-drag-handle, .element-drag-handle")) return;
   event.preventDefault();
   el.previewBox.focus({ preventScroll: true });

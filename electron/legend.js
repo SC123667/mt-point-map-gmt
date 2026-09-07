@@ -33,7 +33,13 @@ function buildLegendEntries(config) {
       });
     }
   }
-  return config.legend?.order === "overlay-first" ? [...overlayEntries, ...stationEntries] : [...stationEntries, ...overlayEntries];
+  const names = require('./map-names'), cart = require('./cartography');
+  const categories = new Map();
+  for(const f of config.cartography?.features||[])if(f.visible!==false&&cart.inRegion(f,config.region)&&!categories.has(f.category))categories.set(f.category,f);
+  for(const [category,f] of categories){const style=cart.effectiveStyle(f,config.cartography);overlayEntries.push({label:category,category,symbol:f.geometry.type.includes('Point')?'point':'line',gmtSymbol:style.symbol==='none'?'c':style.symbol,fill:style.fill,size:`${style.size}c`,pen:`${style.width}p,${style.color}${style.dash==='dash'?',-':style.dash==='dot'?',.':''}`});}
+  const language=config.cartography?.language;
+  for(const entry of [...stationEntries,...overlayEntries])entry.label=entry.category?names.categoryLabel(entry.category,config.cartography):names.translated(entry.label,language);
+  return (config.legend?.order === "overlay-first" ? [...overlayEntries, ...stationEntries] : [...stationEntries, ...overlayEntries]).filter(e=>e.label);
 }
 
 function buildStationLegendEntries(config = {}) {

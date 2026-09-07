@@ -14,10 +14,10 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.6.0`（构造数据、地点标注和等高线）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.6.0` 尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.7.0`（地图构造节点编辑与统一中英文）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.7.0` 尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.6.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`913e281afc9d24649653b69c018b12cde26898a1cceb5ded8beab3c63fe9311e`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.7.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`43d31b377c49742d28e349ff357f1f7e07937f4246385c55c68a03976747495d`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
@@ -27,13 +27,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.6.0` |
+| 本地源码版本 | `1.7.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.6.0`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.7.0`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.6.0`，从该路径验证运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.7.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
@@ -573,3 +573,30 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 - PDF 检查：纯等高线构造图和交换轴图没有栅格图像，地形组合图仅有一个地形影像；中文名称及 IYZS 文本可提取。
 - 旧 v1.5.0 App 保留在 `版本备份/v1.5.0-20260907-升级v1.6.0/`，升级前用户工程已保存为全局 `工程文件/升级v1.6.0前_当前工程.mtgmt`（86/96/28/32、0 测点、地形 01s）。
 - 实装验收后按普通启动方式打开“实用app”路径并恢复上述工程。GitHub 没有推送或创建 Release，公开版仍为 v1.1.3。
+
+
+## 2026-09-07 v1.7.0 构造节点编辑与双语维护
+
+- 新增 `map-names.js`：离线名称匹配、原名/双语/简称、统一语言和名称形式、类别图例与待补全。新工程默认中文；旧工程缺少 language 时保留原始名称，不能默默修改旧图件。
+- `config.cartography` 新增 language、nameFormat、categoryNames；feature 新增 originalName、nameZh、nameEn。工程内保存完整信息，GeoJSON 保留对象双语名称与 geometry，配套样式 JSON 保存工程级显示设置。
+- `名称词典/用户中英文名称.json` 位于全局目录，按 source.id + feature.id 记录用户修订。再次导入相同对象优先应用；不会改写其坐标，也不会自动覆盖已经保存的历史工程。
+- 新增 `map-project-worker.js` 与 `renderer/map-drawing-ui.js`：使用实际 GMT 投影与 EPS 裁切原点换算画布/经纬度，支持缩放、平移、交换轴与原生中文标题增加的顶部高度。Windows 投影使用全局目录的 ASCII 路径入口。
+- 地图绘制支持 LineString/Polygon；导入多段线、多面及带孔面可拖动原有节点、在线段附近插入、删除和撤销，完成时保留闭环。地图编辑具有会话标识，取消后的异步投影结果不能进入下一次编辑；编辑期间暂停自动预览和导出。
+- 公开构造联合查询：六组数据均有本地缓存时，IYZS 在 86/96/28/32 内找到两条真实 LineString，实测后台查询约 259 ms，无数据源错误。该时间不代表首次下载耗时。
+- 自动构造类别图例统一语言，支持用户填写类别中英文；修复英文 GMT 图例和原生标注同时处理造成的重复图例，以及虚线图例颜色解析。
+- 名称整理不承诺任意地名机器翻译。没有可靠译名时保留几何、隐藏该标签并提示补全。SNM、某论文特定 Jurassic Arc 几何仍需来源数据或有明确说明的手工描绘，不根据名称锚点编造边界。
+- 14 组 `npm run test:node` 全部通过，新增 map_editing 测试；真实应用完成画线、画面、缩放后拖点、撤销、IYZS 数据查询、译名重导入复用、双语 PDF/EPS 和工程恢复。
+- 源码回归使用真实青藏 30 秒高程与缝合带/城市/等高线；本轮未改变 MT 数学，也未宣称进行新的 EDI 算法验证。Windows 仅做界面布局和跨平台逻辑验证，未进行实机测试。
+
+### v1.7.0 安装包
+
+- 候选包：全局 `安装包/v1.7.0/mac-arm64/MT点位图制作工具—GMT.app`，严格深度验签通过；32 个 Electron 文件及 VERSION、README、CHANGELOG 与源码逐项匹配。
+- 实装：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 1.7.0，深度验签通过，ASAR SHA-256 `43d31b377c49742d28e349ff357f1f7e07937f4246385c55c68a03976747495d`。
+- 旧版完整保留于全局 `版本备份/v1.6.0-20260907-升级v1.7.0/MT点位图制作工具—GMT.app`，深度验签通过。本轮检查时，激活旧版后显示为空白无数据工程；保存命令提示需先导入或设置区域，因此本轮未伪称保存了新工程。
+- 之前的真实用户工程仍保存在 `工程文件/升级v1.6.0前_当前工程.mtgmt`，86/96/28/32、0 测点、地形 01s；不删除或覆盖。
+- 候选和实装的隔离验证输出分别在全局 `验证/v1.7.0/candidate` 与 `验证/v1.7.0/installed`。测试项目与用户真实工程分离。
+- 没有推送分支/标签或创建 GitHub Release；公开版本仍按此前核对记录为 v1.1.3，本轮没有远端发布操作。
+
+- 实装路径的严格验签仍受 FileProvider 附加 Finder 元数据影响（GPU Helper 提示 resource fork）；来源包严格验签通过，实装普通深度验签和 ASAR 一致性通过。这与既有维护边界一致。
+- 最终实装测试 `验证/v1.7.0/installed/verified.json` 通过；对应 `PDF验证.json` 确认两种语言图件均无栅格图像、图例只出现一次，英文图件无中文标签。
+- 正常用户环境已从“实用app”启动，验证 PID 28465；通过原生打开工程对话框恢复 `升级v1.6.0前_当前工程.mtgmt`，预览 `region_basemap.png` 于 2026-09-07 21:17:33 更新，未停留在测试环境。
