@@ -1,3 +1,5 @@
+const { workspaceRoot, workspaceDirectory, areaOutputDirectory, workspaceFile } = require("./workspace");
+const { safeName, cacheRoot, initializeArea, gmtCacheEnv, previewConfig: makePreviewConfig } = require("./terrain-cache");
 const { srtmSource } = require("./srtm-source");
 const { geographicRegionIssue } = require("./map-region");
 const fs = require("fs");
@@ -28,6 +30,18 @@ const {
 } = require("./gmt");
 
 const APP_TITLE = "MT点位图制作工具—GMT";
+try {
+  app.setPath("userData", workspaceDirectory("运行数据/Electron"));
+  app.setPath("sessionData", workspaceDirectory("运行数据/Electron"));
+  app.setPath("temp", workspaceDirectory("临时文件"));
+  app.setPath("logs", workspaceDirectory("运行日志"));
+  app.setPath("crashDumps", workspaceDirectory("运行日志/崩溃记录"));
+  process.env.TMPDIR = process.env.TEMP = process.env.TMP = workspaceDirectory("临时文件");
+} catch (error) {
+  dialog.showErrorBox("全局工作目录不可用", error.message);
+  app.exit(1);
+}
+
 let currentInstallerDownload = null;
 let currentTerrainTask = null;
 let currentGMTRenderTask = null;
@@ -187,7 +201,7 @@ function configureMenu(win) {
             },
             { type: "separator" },
             {
-              label: "选择导出目录...",
+              label: "打开全局工作目录...",
               click: () => sendMenuAction(win, "menu:chooseOutputDirectory")
             },
             {
@@ -318,6 +332,8 @@ ipcMain.handle("app:status", () => ({
   gmtAvailable: gmtAvailable(),
   installPlan: installPlan(),
   outputDirectory: savedOutputDirectory(),
+  workspaceDirectory: workspaceRoot(),
+  terrainCacheDirectory: workspaceDirectory("地形缓存"),
   version: app.getVersion()
 }));
 
@@ -376,7 +392,7 @@ ipcMain.handle("project:saveAs", async (_event, payload) => {
   const suggested = String(payload?.suggestedName || "mt_gmt_project").replace(/[\\/:*?"<>|]+/g, "_");
   const result = await dialog.showSaveDialog({
     title: "保存 MT-GMT 工程",
-    defaultPath: `${suggested}.mtgmt`,
+    defaultPath: path.join(workspaceDirectory("工程文件"), `${suggested}.mtgmt`),
     filters: [
       { name: "MT-GMT 工程", extensions: ["mtgmt"] },
       { name: "JSON", extensions: ["json"] },
@@ -384,7 +400,7 @@ ipcMain.handle("project:saveAs", async (_event, payload) => {
     ]
   });
   if (result.canceled || !result.filePath) return null;
-  fs.writeFileSync(result.filePath, JSON.stringify(payload.project, null, 2), "utf8");
+  fs.writeFileSync(workspaceFile(result.filePath), JSON.stringify(payload.project, null, 2), "utf8");
   return result.filePath;
 });
 
@@ -407,25 +423,25 @@ ipcMain.handle("file:saveText", async (_event, payload) => {
   const defaultPath = String(payload?.defaultPath || "mt_gmt_export.txt").replace(/[\\/:*?"<>|]+/g, "_");
   const result = await dialog.showSaveDialog({
     title: payload?.title || "保存文本文件",
-    defaultPath,
+    defaultPath: path.join(workspaceDirectory("导出表格"), defaultPath),
     filters: payload?.filters || [
       { name: "文本文件", extensions: ["txt", "tsv", "csv"] },
       { name: "所有文件", extensions: ["*"] }
     ]
   });
   if (result.canceled || !result.filePath) return null;
-  fs.writeFileSync(result.filePath, String(payload?.content || ""), "utf8");
+  fs.writeFileSync(workspaceFile(result.filePath), String(payload?.content || ""), "utf8");
   return result.filePath;
 });
 
 ipcMain.handle("gmt:buildScript", (_event, payload) => {
-  return buildScript(payload.records, payload.config, outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
+  return buildScript(payload.records, normalizeTerrainConfig(payload), outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
 });
 
 ipcMain.handle("gmt:saveScript", async (event, payload) => {
   const result = await dialog.showSaveDialog({
     title: "保存 GMT 脚本",
-    defaultPath: path.join(outputDirectoryFromPayload(payload), `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`),
+    defaultPath: path.join(workspaceDirectory("导出脚本"), `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`),
     filters: [
       { name: "GMT 脚本", extensions: [process.platform === "win32" ? "bat" : "gmt"] },
       { name: "所有文件", extensions: ["*"] }
@@ -435,10 +451,10 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
   await runGMTWorker(event.sender, {
     mode: "saveScript",
     records: payload.records,
-    config: payload.config,
+    config: normalizeTerrainConfig(payload),
     outputDirectory: path.dirname(result.filePath),
     formats: payload.formats || ["png", "pdf", "eps"],
-    scriptPath: result.filePath
+    scriptPath: workspaceFile(result.filePath)
   });
   return result.filePath;
 });
@@ -447,11 +463,11 @@ ipcMain.handle("gmt:export", async (event, payload) => {
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
   const formats = payload.formats || ["png"];
-  const outputName = payload.config?.outputName || "mt_point_map";
+  const outputName = safeName(payload.config?.outputName || "mt_point_map");
   const result = await runGMTWorker(event.sender, {
     mode: "export",
     records: payload.records,
-    config: payload.config,
+    config: normalizeTerrainConfig(payload),
     formats,
     outputDirectory
   });
@@ -461,20 +477,14 @@ ipcMain.handle("gmt:export", async (event, payload) => {
   return result;
 });
 
-ipcMain.handle("output:chooseDirectory", async (_event, currentDirectory) => {
-  const result = await dialog.showOpenDialog({
-    title: "选择导出目录",
-    defaultPath: currentDirectory || defaultOutputDirectory(app),
-    properties: ["openDirectory", "createDirectory"]
-  });
-  if (result.canceled || !result.filePaths[0]) return null;
-  saveOutputDirectory(result.filePaths[0]);
-  return result.filePaths[0];
+ipcMain.handle("output:chooseDirectory", async () => {
+  await shell.openPath(workspaceRoot());
+  return workspaceDirectory("导出图件");
 });
 
 ipcMain.handle("output:deleteCurrent", (_event, payload) => {
   const outputDirectory = outputDirectoryFromPayload(payload);
-  const outputName = String(payload?.outputName || "mt_point_map").trim() || "mt_point_map";
+  const outputName = safeName(payload?.outputName || "mt_point_map");
   return deleteCurrentOutputs(outputDirectory, outputName);
 });
 
@@ -533,10 +543,10 @@ ipcMain.handle("terrain:cancel", () => {
   return { ok: true };
 });
 ipcMain.handle("terrain:deleteLocal", (_event, payload) => {
+  assertTerrainIdle();
   const outputDirectory = outputDirectoryFromPayload(payload);
-  const directory = path.join(outputDirectory, "terrain_cache");
-  fs.rmSync(directory, { recursive: true, force: true });
-  return { ok: true, message: `已删除本地地形底图：${directory}`, directory };
+  const directory = workspaceDirectory("地形缓存");
+  return deleteCurrentTerrainCache(outputDirectory, payload);
 });
 ipcMain.handle("terrain:clearCache", () => clearTerrainCache());
 ipcMain.handle("terrain:cacheSummary", (_event, payload) => terrainCacheSummary(outputDirectoryFromPayload(payload)));
@@ -668,20 +678,10 @@ function previewPathFromUrl(rawUrl) {
 }
 
 function outputDirectoryFromPayload(payload) {
-  const candidate = String(payload?.outputDirectory || "").trim();
-  return candidate || savedOutputDirectory();
+  return areaOutputDirectory(payload?.config || {});
 }
-
-function savedOutputDirectory() {
-  const settings = readSettings();
-  return settings.outputDirectory || defaultOutputDirectory(app);
-}
-
-function saveOutputDirectory(outputDirectory) {
-  const directory = String(outputDirectory || "").trim();
-  if (!directory) return;
-  writeSettings({ ...readSettings(), outputDirectory: directory });
-}
+function savedOutputDirectory() { return workspaceDirectory("导出图件"); }
+function saveOutputDirectory() { /* Output paths are derived from the global workspace. */ }
 
 function settingsFilePath() {
   return path.join(app.getPath("userData"), "settings.json");
@@ -1026,6 +1026,7 @@ function loadRenderer(win) {
     const { ipcRenderer } = require("electron");
     window.mtApp = {
       geographicRegionIssue: ${geographicRegionIssue.toString()},
+      previewConfig: ${makePreviewConfig.toString()},
       srtmSource: ${srtmSource.toString()},
       status: () => ipcRenderer.invoke("app:status"),
       openFile: () => ipcRenderer.invoke("file:open"),
@@ -1106,6 +1107,8 @@ function normalizeTerrainConfig(payload) {
   if (!String(config.region || "").trim() && Array.isArray(payload?.records) && payload.records.length) {
     config.region = autoRegion(payload.records);
   }
+  config.outputName = safeName(config.outputName || "mt_point_map");
+  config.terrainCacheDirectory = workspaceDirectory("地形缓存");
   config.terrainResolution = config.terrainResolution || "06m";
   config.terrainIntensity = terrainIntensity(config.terrainIntensity);
   config.terrainDataServer = terrainDataServer(config.terrainDataServer);
@@ -1135,7 +1138,7 @@ function deleteCurrentOutputs(outputDirectory, outputName) {
 }
 
 function terrainCacheSummary(outputDirectory) {
-  const directory = path.join(outputDirectory, "terrain_cache");
+  const directory = workspaceDirectory("地形缓存");
   const files = [];
   collectCacheFiles(directory, files);
   const groups = new Map();
@@ -1157,7 +1160,12 @@ function terrainCacheSummary(outputDirectory) {
   };
 }
 
+function assertTerrainIdle() {
+  if ((currentTerrainTask && !currentTerrainTask.done) || currentGMTRenderTask) throw new Error("请先完成或取消绘图和地形任务，再删除共享缓存。");
+}
+
 function deleteCurrentTerrainCache(outputDirectory, payload) {
+  assertTerrainIdle();
   const config = normalizeTerrainConfig(payload);
   const paths = terrainPaths(outputDirectory, config);
   const targets = [paths.gridPath, paths.shadePath];
@@ -1185,9 +1193,10 @@ function deleteCurrentTerrainCache(outputDirectory, payload) {
 }
 
 function deleteTerrainCacheResolution(outputDirectory, resolution) {
+  assertTerrainIdle();
   const targetResolution = String(resolution || "").trim();
   if (!targetResolution) return { ok: false, message: "请选择要删除的地形缓存分辨率。" };
-  const directory = path.join(outputDirectory, "terrain_cache");
+  const directory = workspaceDirectory("地形缓存");
   const files = [];
   collectCacheFiles(directory, files);
   const targets = files.filter((file) => terrainCacheResolution(file.path) === targetResolution);
@@ -1230,9 +1239,9 @@ function collectCacheFiles(directory, files) {
 
 function terrainCacheResolution(filePath) {
   const name = path.basename(filePath);
-  const relief = /^earth_relief_([0-9]{2}[ms])_/i.exec(name);
+  const relief = /^(?:预览_)?earth_relief_([0-9]{2}[ms])_/i.exec(name);
   if (relief) return relief[1];
-  if (/\.hgt$|\.hgt\.gz$/i.test(name)) return "srtm";
+  if (/\.hgt$|\.hgt\.gz$|\.jp2$/i.test(name)) return "srtm";
   if (/srtm_points_([0-9]{2}[ms])_/i.test(name)) return RegExp.$1;
   return "";
 }
@@ -1301,6 +1310,7 @@ function startTerrainTask(webContents, payload) {
 }
 
 function clearTerrainCache() {
+  assertTerrainIdle();
   const gmtInfo = resolveGMT();
   if (!gmtInfo.available) return { ok: false, message: "未找到 GMT，无法清理地形缓存。" };
   return new Promise((resolve) => {
@@ -1329,6 +1339,7 @@ function clearTerrainCache() {
 function gmtChildEnv(gmtInfo, config = {}) {
   const env = {
     ...process.env,
+    ...gmtCacheEnv(savedOutputDirectory(), { ...config, terrainCacheDirectory: workspaceDirectory("地形缓存") }),
     PATH: `${gmtInfo.binDir}${path.delimiter}${process.env.PATH || ""}`,
     GMT_DATA_SERVER: terrainDataServer(config.terrainDataServer || process.env.GMT_DATA_SERVER)
   };
@@ -1350,7 +1361,7 @@ function startInstallerDownload(webContents) {
     return { ok: false, message: plan.message, status: null };
   }
 
-  const targetDir = app.getPath("downloads");
+  const targetDir = workspaceDirectory("安装包");
   const targetPath = path.join(targetDir, plan.download.fileName);
   currentInstallerDownload = new InstallerDownloadTask(plan.download, targetPath, webContents, () => {
     currentInstallerDownload = null;
@@ -1367,6 +1378,8 @@ class TerrainPrepareTask {
     this.webContents = webContents;
     this.onDone = onDone;
     this.paths = terrainPaths(outputDirectory, config);
+    this.gridTempPath = this.paths.gridPath.replace(/\.nc$/, "_处理中.nc");
+    this.shadeTempPath = this.paths.shadePath.replace(/\.nc$/, "_处理中.nc");
     this.estimate = terrainEstimate(config.region, config.terrainResolution);
     this.child = null;
     this.currentStep = "starting";
@@ -1383,7 +1396,7 @@ class TerrainPrepareTask {
   }
 
   start() {
-    fs.mkdirSync(this.paths.directory, { recursive: true });
+    initializeArea(this.paths, this.config);
     if (this.estimate.blocked) {
       this.fail(this.estimate.warning);
       return;
@@ -1406,14 +1419,14 @@ class TerrainPrepareTask {
       args: ["set", "GMT_DATA_UPDATE_INTERVAL", this.config.terrainAllowDownload ? "1d" : "off"],
       message: this.config.terrainAllowDownload ? "已允许 GMT 联网获取缺失地形数据。" : "已关闭 GMT 在线下载，只使用本地缓存。",
       basePercent: 5,
-      next: () => this.runCut()
+      next: () => fs.existsSync(this.paths.gridPath) ? this.runGradient() : this.runCut()
     });
   }
 
   runCut() {
     this.runGMTStep({
       step: "cut",
-      args: ["grdcut", terrainRemoteName(this.config.terrainResolution), `-R${this.config.region}`, `-G${this.paths.gridPath}`, "-V"],
+      args: ["grdcut", terrainRemoteName(this.config.terrainResolution), `-R${this.config.region}`, `-G${this.gridTempPath}`, "-V"],
       message: `正在获取并裁剪 ${terrainRemoteName(this.config.terrainResolution)}...`,
       basePercent: 12,
       next: () => this.runGradient()
@@ -1423,7 +1436,7 @@ class TerrainPrepareTask {
   runGradient() {
     this.runGMTStep({
       step: "gradient",
-      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.paths.shadePath}`],
+      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.shadeTempPath}`],
       message: "正在生成地形阴影...",
       basePercent: 80,
       next: () => this.complete()
@@ -1465,14 +1478,16 @@ class TerrainPrepareTask {
         return;
       }
       if (code === 0) {
-        if (step === "cut" && !fs.existsSync(this.paths.gridPath)) {
+        if (step === "cut" && !fs.existsSync(this.gridTempPath)) {
           this.fail("GMT 没有生成地形网格文件。请尝试更低分辨率，或检查 GMT 数据服务器/GDAL OpenJPEG 支持。");
           return;
         }
-        if (step === "gradient" && !fs.existsSync(this.paths.shadePath)) {
+        if (step === "gradient" && !fs.existsSync(this.shadeTempPath)) {
           this.fail("GMT 没有生成地形阴影文件。请尝试更低分辨率或重新准备底图。");
           return;
         }
+        if (step === "cut") fs.renameSync(this.gridTempPath, this.paths.gridPath);
+        if (step === "gradient") fs.renameSync(this.shadeTempPath, this.paths.shadePath);
         next();
       } else {
         this.fail(this.lastOutput || `GMT ${step} 执行失败：${signal || code}`);
@@ -1523,9 +1538,12 @@ class TerrainPrepareTask {
     this.done = true;
     this.state = "cancelled";
     this.message = "地形底图任务已取消。";
-    if (this.child) this.child.kill();
-    fs.rmSync(this.paths.gridPath, { force: true });
-    fs.rmSync(this.paths.shadePath, { force: true });
+    if (this.child) {
+      if (this.pausedBySignal && process.platform !== "win32") this.child.kill("SIGCONT");
+      this.child.kill();
+    }
+    fs.rmSync(this.gridTempPath, { force: true });
+    fs.rmSync(this.shadeTempPath, { force: true });
     this.emit();
     this.finishSoon();
   }
@@ -1613,7 +1631,7 @@ class SrtmTerrainWorkerTask {
   }
 
   start() {
-    fs.mkdirSync(this.paths.directory, { recursive: true });
+    initializeArea(this.paths, this.config);
     if (this.estimate.blocked) {
       this.fail(this.estimate.warning);
       return;

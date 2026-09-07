@@ -9,7 +9,7 @@ const { terrainEstimate } = require('../electron/gmt');
 const fixtures = path.join(__dirname, 'fixtures');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'srtm-sources-'));
 
-async function runWorker(source, mode, action, outputDirectory) {
+async function runWorker(source, mode, action, outputDirectory, region = '0/0.001/0.999/1') {
   const out = outputDirectory || fs.mkdtempSync(path.join(tmp, 'case-'));
   const requests = path.join(out, 'requests.txt');
   const mockGmt = path.join(tmp, 'mock-gmt.sh');
@@ -35,7 +35,7 @@ async function runWorker(source, mode, action, outputDirectory) {
       resumed = true;
       const pausedIndex = statuses.length;
       setTimeout(() => {
-        assert(!statuses.slice(pausedIndex).some(s => s.state === 'running' || s.state === 'completed'), 'paused job advanced to decoding');
+        assert(!statuses.slice(pausedIndex).some(s => s.state === 'running' || s.state === 'completed'), 'paused job advanced to decoding: '+JSON.stringify(statuses.map(({state,step})=>({state,step}))));
         worker.send({ type: 'resume' });
       }, 150);
     }
@@ -46,7 +46,7 @@ async function runWorker(source, mode, action, outputDirectory) {
     worker.on('error', reject);
   });
   worker.send({ type: 'start', payload: { gmtInfo: { path: mockGmt, binDir: tmp }, outputDirectory: out,
-    config: { region: '0/0.001/0.999/1', terrainResolution: '01s', terrainAllowDownload: mode !== 'offline', terrainSrtmSource: source }
+    config: { region, terrainResolution: region.includes('/4/') ? '30s' : '01s', terrainAllowDownload: mode !== 'offline', terrainSrtmSource: source }
   } });
   return result;
 }
@@ -86,7 +86,7 @@ async function runWorker(source, mode, action, outputDirectory) {
         assert(r.statuses.some(s => s.state === 'paused'));
         assert(r.statuses.some(s => s.message.includes(source === 'ustc' ? 'USTC' : 'AWS')));
         assert.strictEqual(fs.readFileSync(r.requests, 'utf8').trim().split('\n').length, 1);
-        const cache = path.join(r.out, 'terrain_cache/srtm_hgt/N00/N00E000.hgt');
+        const cache = srtmTilesForRegion('0/0.001/0.999/1',path.join(r.out,'terrain_cache'),source)[0].hgtPath;
         assert.strictEqual(fs.statSync(cache).size, 3601 * 3601 * 2);
         if (source === 'ustc') assert.deepStrictEqual([0, 1, 2, 3].map(i => fs.readFileSync(cache).readInt16BE(i * 2)), [-25, -32768, 32767, 100]);
         // Source switching must reuse completed tiles even with downloads disabled.
@@ -96,15 +96,20 @@ async function runWorker(source, mode, action, outputDirectory) {
         assert.strictEqual(reuse.statuses.at(-1).state, 'completed');
         assert(!fs.existsSync(reuse.requests));
       }
+      const parallel=await runWorker('ustc','success','pauseResume',undefined,'0/4/0.999/1');
+      assert.strictEqual(parallel.statuses.at(-1).state,'completed',parallel.stderr);
+      assert.strictEqual(fs.readFileSync(parallel.requests,'utf8').trim().split('\n').length,4);
+      const peak=Math.max(...fs.readFileSync(parallel.requests+'.active','utf8').trim().split('\n').map(Number));
+      assert.strictEqual(peak,3,'download concurrency must be bounded at three');
       for (const mode of ['http404', 'truncated', 'invalid', 'offline']) {
         const r = await runWorker('ustc', mode);
         assert.strictEqual(r.statuses.at(-1).state, 'failed', mode);
-        assert(!fs.existsSync(path.join(r.out, 'terrain_cache/srtm_hgt/N00/N00E000.hgt')));
-        assert(!fs.existsSync(path.join(r.out, 'terrain_cache/srtm_hgt/N00/N00E000.SRTMGL1.jp2.download')));
+        assert(!fs.existsSync(srtmTilesForRegion('0/0.001/0.999/1',path.join(r.out,'terrain_cache'))[0].hgtPath));
+        assert(!fs.existsSync(srtmTilesForRegion('0/0.001/0.999/1',path.join(r.out,'terrain_cache'))[0].downloadPath + '.download'));
       }
       const cancel = await runWorker('ustc', 'success', 'cancel');
       assert.strictEqual(cancel.statuses.at(-1).state, 'cancelled');
-      assert(!fs.existsSync(path.join(cancel.out, 'terrain_cache/srtm_hgt/N00/N00E000.hgt')));
+      assert(!fs.existsSync(srtmTilesForRegion('0/0.001/0.999/1',path.join(cancel.out,'terrain_cache'))[0].hgtPath));
     }
     console.log('SRTM source, JP2 elevation, download controls and cache tests passed');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

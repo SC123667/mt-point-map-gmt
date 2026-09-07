@@ -32,10 +32,11 @@ fs.writeFileSync(mockGmt, [
   ""
 ].join("\n"), { mode: 0o755 });
 
-const cache = path.join(tmp, "terrain_cache", "srtm_hgt", "N00");
+const tile = require("../electron/srtm-source").srtmTilesForRegion("0/0.001/0.999/1", path.join(tmp,"terrain_cache"))[0];
+const cache = path.dirname(tile.hgtPath);
 fs.mkdirSync(cache, { recursive: true });
-const hgt = path.join(cache, "N00E000.hgt");
-const buffer = Buffer.alloc(8);
+const hgt = tile.hgtPath;
+const buffer = Buffer.alloc(3601*3601*2);
 [100, 110, 120, 130].forEach((value, index) => buffer.writeInt16BE(value, index * 2));
 fs.writeFileSync(hgt, buffer);
 

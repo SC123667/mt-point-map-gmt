@@ -1,16 +1,16 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.4.1`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.5.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.4.1`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.5.0`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 
 - https://github.com/SC123667/mt-point-map-gmt
 
-公开用户可从 GitHub Releases 下载 `v1.1.3` 正式安装包；本地 `v1.2.x–v1.4.x` 分支必须完成真实 GMT 和跨平台验证后才能发布。
+公开用户可从 GitHub Releases 下载 `v1.1.3` 正式安装包；本地 `v1.2.x–v1.5.x` 分支必须完成真实 GMT 和跨平台验证后才能发布。
 
-Public users can download the `v1.1.3` GitHub Release. The local `v1.2.x–v1.4.x` branch must complete real-GMT and cross-platform validation before publication.
+Public users can download the `v1.1.3` GitHub Release. The local `v1.2.x–v1.5.x` branch must complete real-GMT and cross-platform validation before publication.
 
 ## macOS
 
@@ -87,3 +87,9 @@ Region-only maps require no station import. PDF composition preserves vector pat
 新增 `@cornerstonejs/codec-openjpeg@1.3.5`（JS + WASM，约 2 MB 包文件）生产依赖，随 App 打包并由 SRTM worker 读取；无需本机 GDAL 的 JPEG2000 驱动，也不在运行时从 CDN 加载解码器。许可证见 `electron/THIRD_PARTY_NOTICES.txt`。USTC 与 AWS 下载格式不同，解码后复用现有 HGT 缓存与 GMT 流程。
 
 The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local package bytes, including inside ASAR. Packaging must retain both its JS and WASM files. Validate a real USTC download from the packaged App, not only source execution. Windows runtime validation remains separate from macOS validation.
+
+## v1.5.0 本地安装版与全局目录
+
+本地源码升级到 1.5.0，公开版本仍为 1.1.3，未上传 GitHub。macOS 全局数据目录为 `/Volumes/MacBook Pro SSD/GMT-缓存`，运行前须连接该磁盘；自动化验证可用 `MT_GMT_WORKSPACE` 隔离数据。GeoNames 城镇数据与许可证随 `electron/data/` 打包。
+
+本次须分别核对源代码 12 组 Node 测试、真实 GMT 数值和速度、候选及实用app安装包、迁移 SHA-256 清单。实际交付结果见 PROJECT_HANDOFF.md 最新记录。

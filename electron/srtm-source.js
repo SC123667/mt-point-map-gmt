@@ -1,3 +1,4 @@
+const { tileCachePaths } = require("./terrain-cache");
 const path = require("path");
 
 const SOURCES = {
@@ -27,15 +28,15 @@ function srtmTilesForRegion(regionText, cacheRoot, source = "ustc") {
       const tileLon = ((lon + 180) % 360 + 360) % 360 - 180;
       const name = `${lat >= 0 ? "N" : "S"}${String(Math.abs(lat)).padStart(2, "0")}${tileLon >= 0 ? "E" : "W"}${String(Math.abs(tileLon)).padStart(3, "0")}`;
       const latBand = name.slice(0, 3);
-      const directory = path.join(cacheRoot, "srtm_hgt", latBand);
+      const cached = tileCachePaths(cacheRoot, lat, tileLon, name);
       const filename = source === "ustc" ? `${name}.SRTMGL1.jp2` : `${name}.hgt.gz`;
       tiles.push({
         name, lat, lon, source, sourceLabel: info.label, format: info.format,
         url: source === "ustc"
           ? `https://mirrors.ustc.edu.cn/gmtdata/server/earth/earth_relief/earth_relief_01s_g/${filename}`
           : `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${latBand}/${filename}`,
-        downloadPath: path.join(directory, filename),
-        hgtPath: path.join(directory, `${name}.hgt`),
+        downloadPath: source === "ustc" ? cached.jp2Path : cached.gzPath,
+        hgtPath: cached.hgtPath,
         estimatedGzipBytes: 8 * 1024 * 1024
       });
     }

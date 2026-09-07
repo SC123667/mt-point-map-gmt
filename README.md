@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.4.1-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.5.0-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -14,9 +14,9 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.4.1**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.5.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.4.1**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.5.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 高精度地形下载 / High-resolution terrain
 
@@ -266,3 +266,13 @@ Release artifacts are written to `release/`.
 ## 许可证 / License
 
 MIT License. See [LICENSE](LICENSE).
+
+### v1.5.0 全局工作目录与地形加速
+
+本机统一使用 `/Volumes/MacBook Pro SSD/GMT-缓存`。`导出图件`、`预览文件`、`工程文件`、`导出表格`、`导出脚本`、`地形缓存`、`安装包`、`运行数据`、`运行日志` 和 `临时文件` 各自分类。原始导入文件保持原位置。地形设置中可查看和打开全局目录，也可填写区域名称；自动命名使用随 App 附带的 GeoNames 城镇数据（CC BY 4.0），无须联网查询位置。
+
+同一区域的高程跨工程/导出目录共享，改变阴影强度只生成新阴影。1 秒原始瓦片最多 3 块并行下载，直接写二进制高程，避免几十 GB 文本中间文件。宽区域预览按屏幕大小选择较低分辨率，正式导出保持用户选择的地形源分辨率；PDF/EPS 中的地形晕渲按 DPI 嵌入影像，图框、文字和线条保留矢量。
+
+外接盘未连接或不可写时会提示，不会悄悄写回系统盘。其他机器可通过 `MT_GMT_WORKSPACE` 环境变量指定全局目录；Windows 默认 `Documents/GMT工作区`，GMT 的 ASCII 兼容入口通过目录联接指向该目录。Windows 修改尚需在 Windows 实机回归。
+
+迁移执行器：`node scripts/migrate-workspace.cjs --apply 已审核的计划.json`。每条计划含 `source` 和 `target`，复制后校验 SHA-256，并保留旧路径兼容链接；日志用于核对和恢复。不要未经授权清理旧数据或迁移记录。

@@ -4,8 +4,10 @@ const https = require('https');
 const zlib = require('zlib');
 const { Readable } = require('stream');
 const { EventEmitter } = require('events');
+let active=0;
 https.get = (url, options, callback) => {
   fs.appendFileSync(process.env.SRTM_TEST_REQUESTS, url + '\n');
+  active++;fs.appendFileSync(process.env.SRTM_TEST_REQUESTS+'.active', active+'\n');
   const mode = process.env.SRTM_TEST_MODE;
   let data = fs.readFileSync(process.env.SRTM_TEST_JP2);
   if (url.endsWith('.gz')) {
@@ -30,6 +32,7 @@ https.get = (url, options, callback) => {
       }, 20);
     }
   });
+  response.once('close',()=>{active--;});
   response.statusCode = mode === 'http404' ? 404 : 200;
   response.headers = { 'content-length': String(data.length) };
   const request = new EventEmitter();

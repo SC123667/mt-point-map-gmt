@@ -1,0 +1,6 @@
+Offline place labels derived from GeoNames cities15000, downloaded 2026-09-07.
+Source: https://download.geonames.org/export/dump/cities15000.zip
+GeoNames: https://www.geonames.org/
+License: Creative Commons Attribution 4.0 https://creativecommons.org/licenses/by/4.0/
+Fields retained: display name (Chinese alternate where available), longitude, latitude, population.
+Labels describe nearby populated places, not administrative boundaries.

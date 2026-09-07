@@ -253,8 +253,8 @@ try {
   }, swappedTerrainDir, ["png"]);
   assert(swappedTerrainScript.includes(`gmt grdedit ${terrainGrid} -Et`));
   assert(swappedTerrainScript.includes(`gmt grdedit ${terrainShade} -Et`));
-  assert(swappedTerrainScript.includes("_swapxy.nc -R40.02/40.06/113.6/113.64 -JX24c/12c"));
-  assert(swappedTerrainScript.includes("_swapxy_shade.nc -Cgeo"));
+  assert(/_swapxy\.nc['"]? -R40\.02\/40\.06\/113\.6\/113\.64 -JX24c\/12c/.test(swappedTerrainScript));
+  assert(/_swapxy_shade\.nc['"]? -Cgeo/.test(swappedTerrainScript));
 
   const customElementScript = buildScript([
     { name: "A01", lon: 101.0, lat: 35.0 }

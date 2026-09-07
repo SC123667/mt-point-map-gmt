@@ -1,3 +1,4 @@
+const { gmtCacheEnv } = require("./terrain-cache");
 const { buildLegendEntries } = require("./legend");
 const fs = require("fs");
 const os = require("os");
@@ -113,6 +114,7 @@ function runGMTAsync(script, outputDirectory, outputName, formats, config = {}) 
   const args = process.platform === "win32" ? ["/c", scriptPath] : [scriptPath];
   const env = {
     ...process.env,
+    ...gmtCacheEnv(outputDirectory, config),
     PATH: `${gmt.binDir}${path.delimiter}${process.env.PATH || ""}`
   };
   if (gmt.gsLib) env.GS_LIB = gmt.gsLib;
@@ -187,49 +189,21 @@ async function createGMTWorkspace(outputDirectory, config, cacheDirectory) {
   return {
     temporary: true,
     directory,
-    config: await cacheTerrainInputs(config, cacheDirectory || terrainInputCacheRoot())
+    config: {
+      ...await cacheTerrainInputs(config, cacheDirectory || terrainInputCacheRoot()),
+      terrainCacheDirectory: path.join(require('./workspace').asciiWorkspaceRoot(),'Runtime','GMT-cache')
+    }
   };
 }
 
 function createAsciiTempDirectory() {
-  const roots = [
-    process.env.PUBLIC ? path.join(process.env.PUBLIC, "MTPointMapGMT") : "",
-    process.env.ProgramData ? path.join(process.env.ProgramData, "MTPointMapGMT") : "",
-    path.join(os.tmpdir(), "MTPointMapGMT")
-  ].filter(Boolean);
-  for (const root of roots) {
-    if (!isAsciiPath(root)) continue;
-    try {
-      fs.mkdirSync(root, { recursive: true });
-      return fs.mkdtempSync(path.join(root, "run-"));
-    } catch {
-      // Try the next writable ASCII path.
-    }
-  }
-  const fallbackRoot = path.join(os.tmpdir(), "MTPointMapGMT");
-  fs.mkdirSync(fallbackRoot, { recursive: true });
-  return fs.mkdtempSync(path.join(fallbackRoot, "run-"));
+  const root=path.join(require('./workspace').asciiWorkspaceRoot(),'Runtime','GMT-runs');
+  fs.mkdirSync(root,{recursive:true});return fs.mkdtempSync(path.join(root,'run-'));
 }
 
 function terrainInputCacheRoot() {
-  const roots = [
-    process.env.PUBLIC ? path.join(process.env.PUBLIC, "MTPointMapGMT", "terrain-input-cache") : "",
-    process.env.ProgramData ? path.join(process.env.ProgramData, "MTPointMapGMT", "terrain-input-cache") : "",
-    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "MTPointMapGMT", "terrain-input-cache") : "",
-    path.join(os.tmpdir(), "MTPointMapGMT", "terrain-input-cache")
-  ].filter(Boolean);
-  for (const root of roots) {
-    if (!isAsciiPath(root)) continue;
-    try {
-      fs.mkdirSync(root, { recursive: true });
-      return root;
-    } catch {
-      // Try the next writable ASCII cache root.
-    }
-  }
-  const fallback = path.join(os.tmpdir(), "MTPointMapGMT", "terrain-input-cache");
-  fs.mkdirSync(fallback, { recursive: true });
-  return fallback;
+  const root=path.join(require('./workspace').asciiWorkspaceRoot(),'Runtime','Terrain-inputs');
+  fs.mkdirSync(root,{recursive:true});return root;
 }
 
 function isAsciiPath(targetPath) {

@@ -1,3 +1,6 @@
+const os = require("os");
+const { initializeArea, gmtCacheEnv } = require("./terrain-cache");
+const { gridLayout, writeSrtmRaster } = require("./srtm-grid");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -57,10 +60,14 @@ class SrtmWorkerTask {
     this.outputDirectory = outputDirectory || process.cwd();
     this.config = config || {};
     this.paths = terrainPaths(this.outputDirectory, this.config);
+    this.config.terrainCacheDirectory = this.paths.root;
     this.estimate = terrainEstimate(this.config.region, this.config.terrainResolution);
     this.source = srtmSource(this.config);
-    this.tiles = srtmTilesForRegion(this.config.region, this.paths.directory, this.source);
+    this.tiles = srtmTilesForRegion(gridLayout(this.config.region, terrainResolutionSeconds(this.config.terrainResolution)).region, this.paths.root, this.source);
     this.tileIndex = 0;
+    this.transfers = new Set();
+    this.finishedTiles = 0;
+    this.downloadFractions = new Map();
     this.request = null;
     this.response = null;
     this.file = null;
@@ -76,20 +83,24 @@ class SrtmWorkerTask {
     this.cancelled = false;
     this.paused = false;
     this.pausedBySignal = false;
-    this.pauseWaiter = null;
+    this.pauseWaiters = [];
     this.lastOutput = "";
     this.lastEmitAt = 0;
     this.currentTempPath = "";
     this.hgtTempPath = "";
-    this.xyzPath = path.join(this.paths.directory, `srtm_points_${this.config.terrainResolution}_${this.paths.key}.xyz`);
+    this.xyzPath = this.paths.gridPath.replace(/\.nc$/, "_高程.int16");
+    this.gridTempPath = this.paths.gridPath.replace(/\.nc$/, "_处理中.nc");
+    this.shadeTempPath = this.paths.shadePath.replace(/\.nc$/, "_处理中.nc");
+    this.layout = gridLayout(this.config.region, terrainResolutionSeconds(this.config.terrainResolution));
   }
 
   start() {
-    fs.mkdirSync(this.paths.directory, { recursive: true });
+    initializeArea(this.paths, this.config);
     if (fs.existsSync(this.paths.gridPath) && fs.existsSync(this.paths.shadePath)) {
       this.complete("SRTM 地形底图已存在，可直接绘图。");
       return;
     }
+    if (fs.existsSync(this.paths.gridPath)) { this.runGradient(); return; }
     if (!this.tiles.length) {
       this.fail("当前范围超出 SRTM 常用覆盖区，无法自动下载高分辨率地形。");
       return;
@@ -105,55 +116,67 @@ class SrtmWorkerTask {
   }
 
   async downloadNextTile() {
-    for (; this.tileIndex < this.tiles.length; this.tileIndex += 1) {
-      if (this.cancelled || this.done) return;
-      await this.waitIfPaused();
-      if (this.cancelled || this.done) return;
-      const tile = this.tiles[this.tileIndex];
-      if (fs.existsSync(tile.hgtPath)) continue;
-      this.currentStep = "download";
-      this.state = "running";
-      this.message = `正在从 ${tile.sourceLabel} 下载 SRTM 高程瓦片 ${tile.name}...`;
-      this.percent = Math.max(this.percent, 5 + (this.tileIndex / this.tiles.length) * 58);
-      this.emit();
-      if (!fs.existsSync(tile.downloadPath)) {
-        if (!this.config.terrainAllowDownload) throw new Error("已关闭联网下载，本地缺少 SRTM 瓦片。");
-        await this.downloadTile(tile, tile.url);
-      }
-      await this.waitIfPaused();
-      if (this.cancelled || this.done) return;
-      this.currentStep = "decode";
-      this.message = `正在解码 ${tile.sourceLabel} 高程瓦片 ${tile.name}...`;
-      this.emit();
-      await waitTurn();
-      await this.waitIfPaused();
-      if (this.cancelled || this.done) return;
-      try {
-        const compressed = fs.readFileSync(tile.downloadPath);
-        const hgt = tile.format === "jp2" ? await decodeSrtmJp2(compressed) : zlib.gunzipSync(compressed, { maxOutputLength: 3601 * 3601 * 2 });
-        if (hgt.length !== 3601 * 3601 * 2) throw new Error("不是 3601×3601 的 1 秒高程瓦片。");
-        await waitTurn();
+    let cursor = 0;
+    const consume = async () => {
+      while (cursor < this.tiles.length) {
+        if (this.cancelled || this.done) return;
         await this.waitIfPaused();
         if (this.cancelled || this.done) return;
-        this.hgtTempPath = `${tile.hgtPath}.decode`;
-        fs.writeFileSync(this.hgtTempPath, hgt);
-        fs.renameSync(this.hgtTempPath, tile.hgtPath);
-        this.hgtTempPath = "";
-      } catch (error) {
-        // Never leave a bad tile looking like a valid cache entry.
-        fs.rmSync(tile.downloadPath, { force: true });
-        throw new Error(`${tile.sourceLabel} 瓦片 ${tile.name} 解码失败：${error.message || error}。可重试或切换下载源。`);
+        const index = cursor++;
+        if (index >= this.tiles.length) return;
+        const tile = this.tiles[index];
+        await this.prepareTile(tile);
+        this.finishedTiles += 1;
+        this.downloadFractions.delete(tile.name);
       }
-    }
+    };
+    await Promise.all(Array.from({length: Math.min(3, this.tiles.length)}, consume));
     if (!this.cancelled && !this.done) await this.convertTiles();
   }
 
+  async prepareTile(tile) {
+    if (fs.existsSync(tile.hgtPath)) return;
+    this.currentStep = "download";
+    this.state = "running";
+    this.message = `正在从 ${tile.sourceLabel} 下载 ${tile.name}（最多 3 块并行）...`;
+    this.emit();
+    if (!fs.existsSync(tile.downloadPath)) {
+      if (!this.config.terrainAllowDownload) throw new Error("已关闭联网下载，本地缺少 SRTM 瓦片。");
+      await this.downloadTile(tile, tile.url);
+    }
+    await this.waitIfPaused();
+    if (this.cancelled || this.done) return;
+    this.currentStep = "decode";
+    this.message = `正在解码 ${tile.sourceLabel} 高程瓦片 ${tile.name}...`;
+    this.emit();
+    await waitTurn();
+    await this.waitIfPaused();
+    if (this.cancelled || this.done) return;
+    const temp = `${tile.hgtPath}.decode`;
+    try {
+      const compressed = fs.readFileSync(tile.downloadPath);
+      const hgt = tile.format === "jp2" ? await decodeSrtmJp2(compressed) : zlib.gunzipSync(compressed, { maxOutputLength: 3601 * 3601 * 2 });
+      if (hgt.length !== 3601 * 3601 * 2) throw new Error("不是 3601×3601 的 1 秒高程瓦片。");
+      await waitTurn();
+      await this.waitIfPaused();
+      if (this.cancelled || this.done) return;
+      fs.writeFileSync(temp, hgt);
+      fs.renameSync(temp, tile.hgtPath);
+    } catch (error) {
+      fs.rmSync(temp, { force: true });
+      fs.rmSync(tile.downloadPath, { force: true });
+      throw new Error(`${tile.sourceLabel} 瓦片 ${tile.name} 解码失败：${error.message || error}。可重试或切换下载源。`);
+    }
+  }
+
   downloadTile(tile, url, redirectCount = 0) {
+    const transfer = {};
+    this.transfers.add(transfer);
     return new Promise((resolve, reject) => {
       if (this.cancelled || this.done) return reject(new Error("下载已取消。"));
       if (redirectCount > 5 || new URL(url).protocol !== "https:") return reject(new Error("SRTM 下载重定向无效。"));
       fs.mkdirSync(path.dirname(tile.downloadPath), { recursive: true });
-      this.currentTempPath = `${tile.downloadPath}.download`;
+      transfer.currentTempPath = `${tile.downloadPath}.download`;
       const maxBytes = 64 * 1024 * 1024;
       let tileDownloaded = 0;
       const request = https.get(url, { headers: { "User-Agent": "MT-Point-Map-GMT" }, timeout: this.paused ? 0 : 30000 }, (response) => {
@@ -171,19 +194,19 @@ class SrtmWorkerTask {
           reject(new Error(`${tile.sourceLabel} 瓦片 ${tile.name} 下载失败：HTTP ${response.statusCode}。可重试或切换下载源。`));
           return;
         }
-        this.response = response;
+        transfer.response = response;
         const contentLength = Number(response.headers["content-length"] || 0);
         if (contentLength > maxBytes) { response.destroy(); reject(new Error("SRTM 瓦片文件过大。")); return; }
         const tileTotal = contentLength || tile.estimatedGzipBytes;
-        const file = fs.createWriteStream(this.currentTempPath);
-        this.file = file;
+        const file = fs.createWriteStream(transfer.currentTempPath);
+        transfer.file = file;
         response.on("data", (chunk) => {
           tileDownloaded += chunk.length;
           this.downloaded += chunk.length;
           if (tileDownloaded > maxBytes) { response.destroy(new Error("SRTM 瓦片文件过大。")); return; }
-          const tileBase = 5 + (this.tileIndex / this.tiles.length) * 58;
-          const tileShare = Math.min(1, tileDownloaded / Math.max(tileTotal, 1)) * (58 / this.tiles.length);
-          this.percent = Math.min(63, tileBase + tileShare);
+          this.downloadFractions.set(tile.name, Math.min(1, tileDownloaded / Math.max(tileTotal, 1)));
+          const total = this.finishedTiles + [...this.downloadFractions.values()].reduce((a,b)=>a+b,0);
+          this.percent = Math.max(this.percent, Math.min(63, 5 + total/this.tiles.length*58));
           if (!file.write(chunk)) {
             response.pause();
             file.once("drain", () => {
@@ -200,22 +223,26 @@ class SrtmWorkerTask {
         response.on("end", () => file.end());
         file.on("error", reject);
         file.on("finish", () => {
-          this.response = null;
-          this.file = null;
-          this.request = null;
+          transfer.response = null;
+          transfer.file = null;
+          transfer.request = null;
           if (this.cancelled || this.done) { reject(new Error("下载已取消。")); return; }
           if (!tileDownloaded || (contentLength && tileDownloaded !== contentLength)) { reject(new Error("SRTM 瓦片下载不完整。")); return; }
           try {
-            fs.renameSync(this.currentTempPath, tile.downloadPath);
-            this.currentTempPath = "";
+            fs.renameSync(transfer.currentTempPath, tile.downloadPath);
+            transfer.currentTempPath = "";
             resolve();
           } catch (error) { reject(error); }
         });
         if (this.paused) response.pause();
       });
-      this.request = request;
+      transfer.request = request;
       request.on("timeout", () => { if (!this.paused) request.destroy(new Error("SRTM 下载超时，请重试或切换下载源。")); });
       request.on("error", reject);
+    }).finally(() => {
+      transfer.request?.destroy(); transfer.response?.destroy(); transfer.file?.destroy();
+      if (transfer.currentTempPath) fs.rmSync(transfer.currentTempPath, { force:true });
+      this.transfers.delete(transfer);
     });
   }
 
@@ -223,20 +250,21 @@ class SrtmWorkerTask {
     if (this.cancelled || this.done) return;
     this.currentStep = "convert";
     this.state = "running";
-    this.message = "正在裁剪 SRTM 高程并流式生成 GMT 输入点...";
+    this.message = "正在直接拼接二进制高程网格...";
     this.percent = Math.max(this.percent, 68);
     this.emit();
     try {
-      await writeSrtmXYZ(this.tiles, this.config.region, terrainResolutionSeconds(this.config.terrainResolution), this.xyzPath, {
+      await writeSrtmRaster(this.tiles, this.config.region, terrainResolutionSeconds(this.config.terrainResolution), this.xyzPath, {
         shouldCancel: () => this.cancelled,
         waitIfPaused: () => this.waitIfPaused(),
-        onProgress: ({ tileIndex, totalTiles, points }) => {
-          this.message = `正在裁剪 SRTM 高程并流式生成 GMT 输入点... 已写入 ${formatCount(points)} 点`;
-          this.percent = Math.max(this.percent, Math.min(75, 68 + (tileIndex / Math.max(totalTiles, 1)) * 7));
+        onProgress: ({row,totalRows}) => {
+          this.message = `正在直接拼接二进制高程网格... ${row}/${totalRows} 行`;
+          this.percent = Math.max(this.percent, Math.min(75, 68 + row/totalRows*7));
           this.emitThrottled();
         }
       });
-      this.runXYZToGrid();
+      await this.waitIfPaused();
+      if (!this.done && !this.cancelled) this.runXYZToGrid();
     } catch (error) {
       if (!this.cancelled) this.fail(error.message || String(error));
     }
@@ -245,17 +273,17 @@ class SrtmWorkerTask {
   runXYZToGrid() {
     this.runGMTStep({
       step: "xyz2grd",
-      args: ["xyz2grd", this.xyzPath, `-R${this.config.region}`, `-I${terrainResolutionSeconds(this.config.terrainResolution)}s`, `-G${this.paths.gridPath}`, "-V"],
+      args: ["xyz2grd", this.xyzPath, `-R${this.layout.region}`, `-I${terrainResolutionSeconds(this.config.terrainResolution)}s`, `-G${this.gridTempPath}`, os.endianness() === "LE" ? "-ZTLhw" : "-ZTLh", "-di-32768", "-V"],
       message: "正在生成 GMT 地形网格...",
       basePercent: 76,
-      next: () => this.runGradient()
+      next: () => { fs.rmSync(this.xyzPath, { force: true }); this.runGradient(); }
     });
   }
 
   runGradient() {
     this.runGMTStep({
       step: "gradient",
-      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.paths.shadePath}`],
+      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.shadeTempPath}`],
       message: "正在生成地形阴影...",
       basePercent: 90,
       next: () => this.complete("SRTM 高分辨率地形底图准备完成。")
@@ -290,14 +318,16 @@ class SrtmWorkerTask {
       this.child = null;
       if (this.cancelled || this.done) return;
       if (code === 0) {
-        if (step === "xyz2grd" && !fs.existsSync(this.paths.gridPath)) {
+        if (step === "xyz2grd" && !fs.existsSync(this.gridTempPath)) {
           this.fail("GMT 没有生成 SRTM 地形网格文件。");
           return;
         }
-        if (step === "gradient" && !fs.existsSync(this.paths.shadePath)) {
+        if (step === "gradient" && !fs.existsSync(this.shadeTempPath)) {
           this.fail("GMT 没有生成 SRTM 地形阴影文件。");
           return;
         }
+        if (step === "xyz2grd") fs.renameSync(this.gridTempPath, this.paths.gridPath);
+        if (step === "gradient") fs.renameSync(this.shadeTempPath, this.paths.shadePath);
         next();
       } else {
         this.fail(this.lastOutput || `GMT ${step} 执行失败：${signal || code}`);
@@ -307,10 +337,9 @@ class SrtmWorkerTask {
 
   pause() {
     if (this.done || this.state !== "running") return;
-    if (this.currentStep === "download") {
+    if (this.transfers.size || this.currentStep === "download") {
       this.paused = true;
-      this.request?.setTimeout(0);
-      this.response?.pause();
+      for (const transfer of this.transfers) { transfer.request?.setTimeout(0); transfer.response?.pause(); }
       this.state = "paused";
       this.message = "SRTM 下载已暂停。";
       this.emit();
@@ -334,12 +363,12 @@ class SrtmWorkerTask {
 
   resume() {
     if (this.done || this.state !== "paused") return;
-    if (this.currentStep === "download") {
+    if (this.transfers.size || this.currentStep === "download") {
       this.paused = false;
-      if (this.pauseWaiter) { this.pauseWaiter(); this.pauseWaiter = null; }
-      this.request?.setTimeout(30000);
+      this.releasePause();
+      for (const transfer of this.transfers) { transfer.request?.setTimeout(30000); transfer.response?.resume(); }
       this.state = "running";
-      this.message = `继续从 ${this.tiles[this.tileIndex]?.sourceLabel || this.source} 下载 SRTM 高程瓦片...`;
+      this.message = `继续从 ${this.source.toUpperCase()} 下载 SRTM 高程瓦片...`;
       this.response?.resume();
       this.emit();
       return;
@@ -348,10 +377,7 @@ class SrtmWorkerTask {
       this.paused = false;
       this.state = "running";
       this.message = "继续裁剪 SRTM 高程...";
-      if (this.pauseWaiter) {
-        this.pauseWaiter();
-        this.pauseWaiter = null;
-      }
+      this.releasePause();
       this.emit();
       return;
     }
@@ -370,10 +396,8 @@ class SrtmWorkerTask {
     this.done = true;
     this.state = "cancelled";
     this.message = "SRTM 地形底图任务已取消。";
-    if (this.pauseWaiter) {
-      this.pauseWaiter();
-      this.pauseWaiter = null;
-    }
+    this.releasePause();
+    for (const transfer of this.transfers) { transfer.request?.destroy(); transfer.response?.destroy(); transfer.file?.destroy(); if(transfer.currentTempPath)fs.rmSync(transfer.currentTempPath,{force:true}); }
     if (this.request) this.request.destroy();
     if (this.response) this.response.destroy();
     if (this.file) this.file.destroy();
@@ -384,8 +408,8 @@ class SrtmWorkerTask {
     if (this.currentTempPath) fs.rmSync(this.currentTempPath, { force: true });
     if (this.hgtTempPath) fs.rmSync(this.hgtTempPath, { force: true });
     fs.rmSync(this.xyzPath, { force: true });
-    fs.rmSync(this.paths.gridPath, { force: true });
-    fs.rmSync(this.paths.shadePath, { force: true });
+    fs.rmSync(this.gridTempPath, { force: true });
+    fs.rmSync(this.shadeTempPath, { force: true });
     if (!options.silent) this.emit();
     setTimeout(() => process.exit(0), 50);
   }
@@ -404,6 +428,8 @@ class SrtmWorkerTask {
     this.state = "failed";
     this.message = `SRTM 地形底图准备失败：${message}`;
     this.done = true;
+    this.releasePause();
+    for (const transfer of this.transfers) { transfer.request?.destroy(); transfer.response?.destroy(); transfer.file?.destroy(); if(transfer.currentTempPath)fs.rmSync(transfer.currentTempPath,{force:true}); }
     if (this.request) this.request.destroy();
     if (this.response) this.response.destroy();
     if (this.child) {
@@ -413,6 +439,9 @@ class SrtmWorkerTask {
     if (this.file) this.file.destroy();
     if (this.currentTempPath) fs.rmSync(this.currentTempPath, { force: true });
     if (this.hgtTempPath) fs.rmSync(this.hgtTempPath, { force: true });
+    fs.rmSync(this.xyzPath, { force: true });
+    fs.rmSync(this.gridTempPath, { force: true });
+    fs.rmSync(this.shadeTempPath, { force: true });
     this.emit();
     setTimeout(() => process.exit(1), 50);
   }
@@ -448,81 +477,21 @@ class SrtmWorkerTask {
     this.emit();
   }
 
+  releasePause() { for (const resolve of this.pauseWaiters.splice(0)) resolve(); }
+
   async waitIfPaused() {
-    while (this.paused && !this.cancelled) {
+    while (this.paused && !this.cancelled && !this.done) {
       await new Promise((resolve) => {
-        this.pauseWaiter = resolve;
+        this.pauseWaiters.push(resolve);
       });
     }
-  }
-}
-
-async function writeSrtmXYZ(tiles, regionText, seconds, outputPath, hooks = {}) {
-  const values = String(regionText || "").split("/").map((value) => Number(value));
-  if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) throw new Error("地形范围无效，无法裁剪 SRTM。");
-  const [west, east, south, north] = values;
-  const margin = Math.max(seconds / 3600, 1 / 3600);
-  const stride = Math.max(1, Math.round(seconds));
-  const stream = fs.createWriteStream(outputPath, { highWaterMark: 1024 * 1024 });
-  let streamError = null;
-  let pending = "";
-  let points = 0;
-  stream.on("error", (error) => {
-    streamError = error;
-  });
-
-  const flush = async () => {
-    if (!pending) return;
-    const chunk = pending;
-    pending = "";
-    if (!stream.write(chunk)) await once(stream, "drain");
-    if (streamError) throw streamError;
-  };
-
-  try {
-    for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
-      if (hooks.shouldCancel?.()) throw new Error("SRTM 裁剪已取消。");
-      await hooks.waitIfPaused?.();
-      const tile = tiles[tileIndex];
-      const buffer = fs.readFileSync(tile.hgtPath);
-      const dimension = Math.sqrt(buffer.length / 2);
-      if (!Number.isInteger(dimension)) throw new Error(`SRTM 瓦片 ${tile.name} 尺寸异常。`);
-      const tileWest = tile.lon;
-      const tileNorth = tile.lat + 1;
-      for (let row = 0; row < dimension; row += stride) {
-        if (hooks.shouldCancel?.()) throw new Error("SRTM 裁剪已取消。");
-        if (row % Math.max(stride * 128, 128) === 0) {
-          await hooks.waitIfPaused?.();
-          await waitTurn();
-        }
-        const lat = tileNorth - row / 3600;
-        if (lat < south - margin || lat > north + margin) continue;
-        for (let col = 0; col < dimension; col += stride) {
-          const lon = tileWest + col / 3600;
-          if (lon < west - margin || lon > east + margin) continue;
-          const elevation = buffer.readInt16BE((row * dimension + col) * 2);
-          if (elevation <= -32768) continue;
-          pending += `${lon.toFixed(8)}\t${lat.toFixed(8)}\t${elevation}\n`;
-          points += 1;
-          if (pending.length >= 1024 * 1024) await flush();
-        }
-      }
-      hooks.onProgress?.({ tileIndex: tileIndex + 1, totalTiles: tiles.length, points });
-    }
-    await flush();
-    if (!points) throw new Error("SRTM 裁剪后没有得到有效高程点。");
-    stream.end();
-    await once(stream, "finish");
-    if (streamError) throw streamError;
-  } catch (error) {
-    stream.destroy();
-    throw error;
   }
 }
 
 function gmtChildEnv(gmtInfo, config = {}) {
   const env = {
     ...process.env,
+    ...gmtCacheEnv(process.cwd(), config),
     PATH: `${gmtInfo.binDir}${path.delimiter}${process.env.PATH || ""}`,
     GMT_DATA_SERVER: terrainDataServer(config.terrainDataServer || process.env.GMT_DATA_SERVER)
   };

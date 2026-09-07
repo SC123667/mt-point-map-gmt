@@ -1,3 +1,4 @@
+const { cachePaths, gmtCacheEnv } = require("./terrain-cache");
 const { geographicRegionIssue } = require("./map-region");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -325,14 +326,17 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     : `-B${config.frame}${gridPrefix}`;
   const title = config.showTitle === false ? "" : (config.title || "").trim();
   const titleOption = title && (!needsNativeTextRendering(title) || config.forceGMTTitle) ? ` -B+t${quote(title)}` : "";
-  const outputPrefix = shell === "bat" ? config.outputName || "mt_point_map" : path.join(outputDirectory, config.outputName || "mt_point_map");
+  const outputPrefix = config.outputName || "mt_point_map";
   const pointsPathForScript = shell === "bat" ? "stations_points.tsv" : pointsPath;
   const labelsPathForScript = shell === "bat" ? "stations_labels.tsv" : labelsPath;
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}=~0.65p,white`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
   const scale = scaleForRegion(regionValues);
   const gmt = resolveGMT();
-  const environmentLines = gmtEnvironmentLines(gmt, shell, config);
+  const environmentLines = gmtEnvironmentLines(gmt, shell, config, outputDirectory);
+  for (const [name,value] of Object.entries(gmtCacheEnv(outputDirectory,config))) {
+    environmentLines.push(shell === "bat" ? `set "${name}=${value}"` : `export ${name}=${quote(value)}`);
+  }
   const terrain = terrainScriptParts(config, region, outputDirectory, shell, sourceRegion);
   const mtOverlay = mtOverlayScriptParts(records, config, outputDirectory, region, regionValues, shell);
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
@@ -372,6 +376,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   return [
     "#!/usr/bin/env bash",
     "set -euo pipefail",
+    `cd ${quote(outputDirectory)}`,
     ...environmentLines,
     "",
     `  ${gmtBeginCommand(outputPrefix, formats, config)}`,
@@ -708,9 +713,12 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const station = records.find((record) => record.name === config.curveStation) || records.find((record) => record.mtResponses?.length);
   if (!station || !station.mtResponses?.length) throw new Error("当前数据没有可绘制的阻抗曲线。");
   const shell = process.platform === "win32" ? "bat" : "sh";
-  const outputPrefix = shell === "bat" ? config.outputName || "mt_response_curve" : path.join(outputDirectory, config.outputName || "mt_response_curve");
+  const outputPrefix = config.outputName || "mt_response_curve";
   const gmt = resolveGMT();
-  const environmentLines = gmtEnvironmentLines(gmt, shell, config);
+  const environmentLines = gmtEnvironmentLines(gmt, shell, config, outputDirectory);
+  for (const [name,value] of Object.entries(gmtCacheEnv(outputDirectory,config))) {
+    environmentLines.push(shell === "bat" ? `set "${name}=${value}"` : `export ${name}=${quote(value)}`);
+  }
   const curve = buildCurveFiles(station, outputDirectory);
   const q = (value) => quote(value);
   const f = (name) => shell === "bat" ? name : path.join(outputDirectory, name);
@@ -751,7 +759,7 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
       ...commands,
       "gmt end", ""].filter((line) => line !== "-").join("\r\n");
   }
-  return ["#!/usr/bin/env bash", "set -euo pipefail", ...environmentLines, "",
+  return ["#!/usr/bin/env bash", "set -euo pipefail", `cd ${quote(outputDirectory)}`, ...environmentLines, "",
     gmtBeginCommand(outputPrefix, formats, config),
     "  gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
     ...commands,
@@ -862,11 +870,12 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   if (!config.showTerrain) return { preCommands: [], imageCommand: "" };
   const geographicRegion = String(sourceRegion || config.region || region);
   const paths = terrainPaths(outputDirectory, config, geographicRegion);
-  fs.mkdirSync(paths.directory, { recursive: true });
+  require("./terrain-cache").initializeArea(paths, config);
   const configuredGrid = config.terrainGridPath && fs.existsSync(config.terrainGridPath) ? config.terrainGridPath : "";
   const localGrid = config.localTerrainGridPath && fs.existsSync(config.localTerrainGridPath) ? config.localTerrainGridPath : configuredGrid;
-  const grid = localGrid || paths.gridPath;
-  const shade = config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
+  const sampleLocalPreview = Boolean(config.terrainPreview && config.localTerrainGridPath && localGrid);
+  const grid = sampleLocalPreview ? paths.gridPath : (localGrid || paths.gridPath);
+  const shade = !sampleLocalPreview && config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
   const remote = terrainRemoteName(config.terrainResolution);
   const intensity = terrainIntensity(config.terrainIntensity);
   const cpt = terrainCpt(config.terrainCpt);
@@ -875,6 +884,7 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   preCommands.push(`${prefix}gmt set GMT_DATA_SERVER ${quote(terrainDataServer(config.terrainDataServer))}`);
   preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
   if (localGrid) {
+    if (sampleLocalPreview && !fs.existsSync(grid)) preCommands.push(`${prefix}gmt grdsample ${quote(localGrid)} -R${geographicRegion} -I${terrainResolutionSeconds(config.terrainResolution)}s -G${quote(grid)} -nl`);
     if (!fs.existsSync(shade)) preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
   } else if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
     preCommands.push(`${prefix}gmt grdcut ${remote} -R${geographicRegion} -G${quote(grid)} -V`);
@@ -896,13 +906,13 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   }
   return {
     preCommands,
-    imageCommand: `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt}`
+    imageCommand: `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt} -E${config.terrainPreview ? 150 : pngDpi(config.pngDpi)}`
   };
 }
 
 function swappedTerrainPaths(paths, config) {
   const resolution = config.terrainResolution || "06m";
-  const stem = `earth_relief_${resolution}_${paths.key}_swapxy`;
+  const stem = `${path.basename(paths.gridPath, ".nc")}_swapxy`;
   return {
     gridPath: path.join(paths.directory, `${stem}.nc`),
     shadePath: path.join(paths.directory, `${stem}_shade.nc`)
@@ -1149,29 +1159,7 @@ function srtmTileCount(region) {
 }
 
 function terrainPaths(outputDirectory, config, region = config.region) {
-  const resolution = config.terrainResolution || "06m";
-  const key = terrainKey(outputDirectory, config, region);
-  const directory = path.join(outputDirectory, "terrain_cache");
-  return {
-    key,
-    directory,
-    gridPath: path.join(directory, `earth_relief_${resolution}_${key}.nc`),
-    shadePath: path.join(directory, `earth_relief_${resolution}_${key}_shade.nc`)
-  };
-}
-
-function terrainKey(outputDirectory, config, region = config.region) {
-  return crypto
-    .createHash("sha1")
-    .update([
-      path.resolve(outputDirectory || "."),
-      String(region || ""),
-      String(config.terrainResolution || "06m"),
-      String(config.terrainIntensity || "0.65"),
-      String(config.localTerrainGridPath || "")
-    ].join("|"))
-    .digest("hex")
-    .slice(0, 12);
+  return cachePaths(outputDirectory, config, region);
 }
 
 function formatBytes(bytes) {
@@ -1230,7 +1218,7 @@ function ghostscriptLibraryPath(binDir) {
   return parts.join(path.delimiter);
 }
 
-function gmtEnvironmentLines(gmt, shell, config = {}) {
+function gmtEnvironmentLines(gmt, shell, config = {}, outputDirectory = process.cwd()) {
   const dataServer = terrainDataServer(config.terrainDataServer || process.env.GMT_DATA_SERVER);
   if (!gmt.available || !gmt.binDir) return [];
   if (shell === "bat") {

@@ -6,6 +6,8 @@ const state = {
   mapping: null,
   plotType: "stationMap",
   outputDirectory: "",
+  workspaceDirectory: "",
+  terrainCacheDirectory: "",
   projectPath: "",
   filters: {
     line: "",
@@ -163,7 +165,8 @@ const ids = [
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
 	  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
-	  "terrainSrtmSourceInput", "terrainSrtmSourceRow", "terrainDataServerRow", "terrainSourceHint",
+	  "terrainRegionNameInput", "workspacePathText", "openWorkspaceBtn",
+    "terrainSrtmSourceInput", "terrainSrtmSourceRow", "terrainDataServerRow", "terrainSourceHint",
 	  "terrainAllowDownloadInput", "terrainDataServerInput", "terrainDataServerCustomRow", "terrainDataServerCustomInput",
     "terrainEstimateText", "prepareTerrainBtn", "pauseTerrainBtn", "resumeTerrainBtn",
 	  "cancelTerrainBtn", "terrainProgressPanel", "terrainProgress", "terrainProgressText", "terrainProgressPercent",
@@ -308,6 +311,7 @@ function wireEvents() {
   bind(el.northDragHandle, "pointermove", (event) => handleElementPointerMove(event, "north"));
   bind(el.northDragHandle, "pointerup", (event) => handleElementPointerUp(event, "north"));
   bind(el.northDragHandle, "pointercancel", () => cancelElementDrag("north"));
+  bind(el.openWorkspaceBtn, "click", () => window.mtApp.openPath(state.workspaceDirectory));
   bind(el.prepareTerrainBtn, "click", () => prepareTerrain(false));
   bind(el.pauseTerrainBtn, "click", () => window.mtApp.pauseTerrain());
   bind(el.resumeTerrainBtn, "click", () => window.mtApp.resumeTerrain());
@@ -865,6 +869,7 @@ function applyConfigToUI(config) {
   setInputValue(el.labelDXInput, config.labelDX);
   setInputValue(el.labelDYInput, config.labelDY);
   setChecked(el.showTerrainInput, config.showTerrain);
+  el.terrainRegionNameInput.value = config.terrainRegionName || "";
   setInputValue(el.terrainResolutionInput, config.terrainResolution);
   setInputValue(el.terrainCptInput, config.terrainCpt);
   setInputValue(el.terrainIntensityInput, config.terrainIntensity);
@@ -1164,6 +1169,9 @@ async function exportSkippedEdiList() {
 async function refreshStatus() {
   const status = await window.mtApp.status();
   state.outputDirectory = status.outputDirectory;
+  state.workspaceDirectory = status.workspaceDirectory;
+  state.terrainCacheDirectory = status.terrainCacheDirectory;
+  el.workspacePathText.textContent = `全局目录：${state.workspaceDirectory}；导出、工程、地形与预览分类保存。`;
   if (el.versionText) el.versionText.textContent = `v${status.version || ""}`;
   renderOutputDirectory();
   renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
@@ -1171,7 +1179,7 @@ async function refreshStatus() {
 }
 
 function renderOutputDirectory() {
-  el.outputPath.textContent = `输出目录：${state.outputDirectory}`;
+  el.outputPath.textContent = `全局目录：${state.workspaceDirectory || state.outputDirectory}`;
 }
 
 async function chooseOutputDirectory() {
@@ -1453,6 +1461,8 @@ function readConfig() {
     terrainAllowDownload: el.terrainAllowDownloadInput.checked,
     terrainDataServer: readTerrainDataServer(),
     terrainSrtmSource: el.terrainSrtmSourceInput.value,
+    terrainRegionName: el.terrainRegionNameInput.value.trim(),
+    terrainCacheDirectory: state.terrainCacheDirectory,
     localTerrainGridPath: state.terrain.localGridPath,
     terrainGridPath: state.terrain.localGridPath || state.terrain.gridPath,
     terrainShadePath: state.terrain.shadePath,
@@ -1566,7 +1576,7 @@ function renderFaultLayers() {
 }
 
 function previewConfig(config) {
-  return { ...config };
+  return window.mtApp.previewConfig(config);
 }
 
 function sanitizePngDpi(value) {
@@ -1641,6 +1651,9 @@ async function exportMap(formats, showAlert, options = {}) {
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
+  if (isPreviewRender && config.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
+    setRuntimeStatus(`快速预览地形 ${config.terrainResolution}；正式导出保持 ${baseConfig.terrainResolution}`, "busy");
+  }
   try {
     if (!validatePlotReadiness(config, { auto: Boolean(options.auto) })) return false;
     if (showAlert && formats.includes("png")) {
@@ -1725,14 +1738,7 @@ async function ensureTerrainReady(config, options = {}) {
     setPreviewStatus("地形底图尚未准备，先点“生成预览”或“下载/准备底图”后再自动更新。");
     return false;
   }
-  if (!config.terrainAllowDownload) {
-    if (options.auto) {
-      setPreviewStatus("地形底图本地缓存未命中，且已关闭联网下载。");
-      return false;
-    }
-    const confirmed = confirm("当前未准备本地地形底图，并且关闭了联网下载。是否仍然尝试只使用 GMT 本地缓存准备底图？");
-    if (!confirmed) return false;
-  }
+  if (!config.terrainAllowDownload) setPreviewStatus("正在从已下载的原始瓦片准备地形...");
   try {
     await prepareTerrain(true, config);
     return Boolean(state.terrain.gridPath && state.terrain.shadePath);
@@ -1933,7 +1939,8 @@ function coarserRecommendedLabelClient(values, currentResolution) {
 
 function terrainKeyClient(config) {
   return [
-    state.outputDirectory,
+    state.terrainCacheDirectory,
+    config.terrainPreview ? "preview" : "full",
     config.region,
     config.terrainResolution,
     config.terrainIntensity,
@@ -1999,7 +2006,7 @@ async function refreshTerrainCacheSummary() {
     const summary = await window.mtApp.terrainCacheSummary({ outputDirectory: state.outputDirectory });
     el.terrainCacheResolutionInput.innerHTML = "";
     if (!summary.totalFiles) {
-      el.terrainCacheSummaryText.textContent = "当前输出目录没有地形缓存文件。";
+      el.terrainCacheSummaryText.textContent = "全局目录没有地形缓存文件。";
       el.deleteTerrainCacheResolutionBtn.disabled = true;
       return;
     }
