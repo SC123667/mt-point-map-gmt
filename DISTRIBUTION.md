@@ -1,16 +1,16 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.5.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.6.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.5.0`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.6.0`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 
 - https://github.com/SC123667/mt-point-map-gmt
 
-公开用户可从 GitHub Releases 下载 `v1.1.3` 正式安装包；本地 `v1.2.x–v1.5.x` 分支必须完成真实 GMT 和跨平台验证后才能发布。
+公开用户可从 GitHub Releases 下载 `v1.1.3` 正式安装包；本地 `v1.2.x–v1.6.x` 分支必须完成真实 GMT 和跨平台验证后才能发布。
 
-Public users can download the `v1.1.3` GitHub Release. The local `v1.2.x–v1.5.x` branch must complete real-GMT and cross-platform validation before publication.
+Public users can download the `v1.1.3` GitHub Release. The local `v1.2.x–v1.6.x` branch must complete real-GMT and cross-platform validation before publication.
 
 ## macOS
 
@@ -93,3 +93,9 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 本地源码升级到 1.5.0，公开版本仍为 1.1.3，未上传 GitHub。macOS 全局数据目录为 `/Volumes/MacBook Pro SSD/GMT-缓存`，运行前须连接该磁盘；自动化验证可用 `MT_GMT_WORKSPACE` 隔离数据。GeoNames 城镇数据与许可证随 `electron/data/` 打包。
 
 本次须分别核对源代码 12 组 Node 测试、真实 GMT 数值和速度、候选及实用app安装包、迁移 SHA-256 清单。实际交付结果见 PROJECT_HANDOFF.md 最新记录。
+
+## v1.6.0 地理数据与标注
+
+新增 `shpjs`（SHP 重投影）和 `fast-xml-parser`（WFS 能力文档），需随生产依赖打包。`cartography-ui.js` 由主进程内嵌加载；`geodata-worker.js` 负责后台下载和解析。公共构造数据不打入 ASAR，首次下载后存入全局目录，数据许可与应用 MIT 许可分别处理。
+
+本轮验证 macOS App、GMT 6.5.0 和 Windows 布局/ASCII 工作区代码路径；未在 Windows 实机执行。GitHub main/Release 仍为 v1.1.3，不自动上传。

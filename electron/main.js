@@ -591,6 +591,18 @@ ipcMain.handle("gmt:recheck", () => ({
   gmtAvailable: gmtAvailable(),
   installPlan: installPlan()
 }));
+const geodataTasks = new Map();
+ipcMain.handle("geodata:task", async (event, payload) => {
+  if (geodataTasks.has(event.sender.id)) throw new Error("地理数据任务正在进行，请等待或取消。");
+  geodataTasks.set(event.sender.id, null);
+  try { return await runForkWorker("geodata-worker.js", payload, event.sender, "geodata", {track:"geodata"}); }
+  finally { geodataTasks.delete(event.sender.id); }
+});
+ipcMain.handle("geodata:cancel", event => { const child=geodataTasks.get(event.sender.id); if(child) child.send({type:"cancel"}); return true; });
+ipcMain.handle("geodata:open", async () => {
+  const result=await dialog.showOpenDialog({title:"导入地点或构造数据",properties:["openFile"],filters:[{name:"矢量图层 / 地点表",extensions:["geojson","json","shp","zip","gmt","xy","dat","csv","tsv","txt","xlsx","xls"]}]});
+  return result.canceled?null:result.filePaths[0];
+});
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));
 
@@ -608,6 +620,7 @@ function runForkWorker(scriptName, payload, webContents, progressChannel, option
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       serialization: "advanced"
     });
+    if (options.track === "geodata" && webContents) geodataTasks.set(webContents.id, child);
     if (options.track === "gmt") currentGMTRenderTask = { child, startedAt: Date.now() };
     let settled = false;
     let stderr = "";
@@ -710,9 +723,11 @@ function writeSettings(settings) {
 async function overlayNativeDecorations(result, config, outputName, requestedFormats) {
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
-  const rendered = await renderDecoratedMap(pngPath, config, requestedFormats.includes("pdf"));
+  const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
+  const rendered = await renderDecoratedMap(pngPath, {...config, annotationLayout: result.annotationLayout}, needsPDF);
+  if (result.annotationLayout) fs.writeFileSync(path.join(result.outputDirectory,"自定义标注.svg"),require("./cartography-gmt").labelSVG(result.annotationLayout));
   let vectorPDF;
-  if (requestedFormats.includes("pdf")) {
+  if (needsPDF) {
     vectorPDF = await runForkWorker("gmt-worker.js", {
       mode: "composeVectorPDF",
       baseBytes: fs.readFileSync(path.join(result.outputDirectory, `${outputName}.pdf`)),
@@ -722,9 +737,10 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
     });
   }
   fs.writeFileSync(pngPath, rendered.pngBuffer);
-  if (requestedFormats.includes("pdf")) {
+  if (needsPDF) {
     fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), vectorPDF);
   }
+  if ((result.generatedFormats || requestedFormats).includes("eps")) await runForkWorker("gmt-worker.js",{mode:"pdfToEPS",pdfPath:path.join(result.outputDirectory,`${outputName}.pdf`),epsPath:path.join(result.outputDirectory,`${outputName}.eps`)});
   if (!requestedFormats.includes("png")) {
     try {
       fs.unlinkSync(pngPath);
@@ -746,6 +762,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const imageUrl = image.toDataURL();
   const legend = nativeLegendMarkup(config, size);
   const mapElements = nativeMapElementsMarkup(config, size);
+  const annotations = require("./cartography-gmt").labelSVG(config.annotationLayout).replace("<svg ", `<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" `);
   const html = `<!doctype html>
 <html>
 <head>
@@ -838,6 +855,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
     <img src="${escapeHTML(imageUrl)}" />
     ${legend}
     ${mapElements}
+    ${annotations}
   </div>
 </body>
 </html>`;
@@ -1053,6 +1071,10 @@ function loadRenderer(win) {
       deleteCurrentTerrainCache: (payload) => ipcRenderer.invoke("terrain:deleteCurrentCache", payload),
       deleteTerrainCacheResolution: (payload) => ipcRenderer.invoke("terrain:deleteCacheResolution", payload),
       onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
+      geodata: (payload) => ipcRenderer.invoke("geodata:task",payload),
+      openGeodata: () => ipcRenderer.invoke("geodata:open"),
+      cancelGeodata: () => ipcRenderer.invoke("geodata:cancel"),
+      onGeodataProgress: (handler) => ipcRenderer.on("geodata:progress",(_event,payload)=>handler(payload)),
       openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),
       imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
@@ -1095,7 +1117,7 @@ function loadRenderer(win) {
 
   let html = fs.readFileSync(htmlPath, "utf8");
   const css = fs.readFileSync(cssPath, "utf8");
-  const renderer = fs.readFileSync(jsPath, "utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8");
   html = html
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);

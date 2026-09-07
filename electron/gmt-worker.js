@@ -49,6 +49,12 @@ function send(payload) {
 }
 
 async function handleTask(payload) {
+  if (payload.mode === "pdfToEPS") {
+    const gmt=resolveGMT(),exe=process.platform==='win32'?'gswin64c.exe':'gs';
+    const bundled=path.join(gmt.binDir||'',exe),command=fs.existsSync(bundled)?bundled:exe;
+    await new Promise((resolve,reject)=>{let stderr='';currentChild=spawn(command,['-dBATCH','-dNOPAUSE','-dSAFER','-sDEVICE=eps2write',`-sOutputFile=${payload.epsPath}`,payload.pdfPath],{env:{...process.env,...(gmt.gsLib?{GS_LIB:gmt.gsLib}:{})}});currentChild.stderr.on('data',c=>stderr+=c);currentChild.on('error',reject);currentChild.on('close',code=>{currentChild=null;code?reject(new Error(stderr||'EPS 转换失败')):resolve();});});
+    return {ok:true};
+  }
   if (payload.mode === "composeVectorPDF") {
     const { composeVectorPDF } = require("./vector-pdf");
     return composeVectorPDF(payload.baseBytes, payload.overlayBytes, payload.imageSize, payload.titleHeight);
@@ -64,9 +70,10 @@ async function exportGMTMap(payload) {
   const includesVector = formats.some(isVectorFormat);
   const nativeTitle = shouldOverlayTitle(payload.config);
   const nativeLegend = shouldOverlayLegend(payload.config);
+  const nativeAnnotations = payload.config?.plotType !== "responseCurve" && (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel);
   const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
-  const needsNativeDecorations = formats.some((format) => ["png", "pdf"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements);
-  const gmtFormats = needsNativeDecorations && !formats.includes("png") ? [...formats, "png"] : formats;
+  const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations);
+  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...(nativeAnnotations ? ["eps"] : [])])];
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
@@ -75,14 +82,17 @@ async function exportGMTMap(payload) {
     forceGMTTitle: includesVector && nativeTitle && !needsNativeDecorations
   };
   sendProgress("script", 22, `正在生成 GMT 脚本和 ${payload.records?.length || 0} 个测点数据文件...`);
+  for (const name of ["map_label_styles.json", "map_label_projected.tsv"]) fs.rmSync(path.join(gmtWorkspace.directory,name), {force:true});
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
-  finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, formats);
+  if (result.ok && nativeAnnotations && fs.existsSync(path.join(gmtWorkspace.directory,"map_label_styles.json"))) result.annotationLayout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName);
+  finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
     result.outputDirectory = outputDirectory;
     result.needsNativeDecorations = needsNativeDecorations;
+    result.generatedFormats = gmtFormats;
   }
   sendProgress(result.ok ? "completed" : "failed", result.ok ? 100 : 90, result.ok ? "GMT 绘图完成。" : (result.message || "GMT 绘图失败。"));
   return result;
@@ -212,7 +222,7 @@ function isAsciiPath(targetPath) {
 
 async function cacheTerrainInputs(config, cacheRoot) {
   const nextConfig = { ...(config || {}) };
-  if (!nextConfig.showTerrain) return nextConfig;
+  if (!nextConfig.showTerrain && !nextConfig.cartography?.contours?.show) return nextConfig;
   if (nextConfig.terrainGridPath && fs.existsSync(nextConfig.terrainGridPath)) {
     const cached = await cachedCopy(nextConfig.terrainGridPath, cacheRoot, "terrain_grid", path.extname(nextConfig.terrainGridPath) || ".grd");
     nextConfig.terrainGridPath = cached;
@@ -267,6 +277,7 @@ function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, fo
     copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
     copyIfExists(path.join(workspace.directory, DEFAULT_OVERLAY_FILE), path.join(outputDirectory, DEFAULT_OVERLAY_FILE));
     copyIfExists(path.join(workspace.directory, DEFAULT_LEGEND_FILE), path.join(outputDirectory, DEFAULT_LEGEND_FILE));
+    for (const name of fs.readdirSync(workspace.directory)) if (/^map_|^地图图层|^图层来源/.test(name)) copyIfExists(path.join(workspace.directory,name),path.join(outputDirectory,name));
     fs.rmSync(workspace.directory, { recursive: true, force: true });
   }
 }

@@ -90,7 +90,7 @@ function gmtCacheEnv(outputDirectory,config={}) {
 }
 function previewConfig(config) {
   const next={...config,terrainPreview:true,pngDpi:150};
-  if(!config.showTerrain || !config.region) return next;
+  if((!config.showTerrain && !config.cartography?.contours?.show) || !config.region) return next;
   const [w,e,s,n]=config.region.split('/').map(Number);
   const seconds={"01s":1,"03s":3,"15s":15,"30s":30,"01m":60,"06m":360,"10m":600,"20m":1200};
   const requested=seconds[config.terrainResolution]||360;

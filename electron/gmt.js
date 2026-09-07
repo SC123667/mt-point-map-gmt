@@ -342,6 +342,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const faultOverlay = faultOverlayScriptParts(config, outputDirectory, region, shell);
   const stationPlots = stationPlotScriptParts(records, config, outputDirectory, region, shell);
   const legend = legendScriptPart(config, outputDirectory, region, shell);
+  const cartography = require("./cartography-gmt").scriptParts(config, outputDirectory, region, shell, quote);
   const prefix = shell === "bat" ? "" : "  ";
   const mapStyleCommand = `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 12p,Helvetica-Bold,gray15 FONT_ANNOT_PRIMARY 8.5p,Helvetica,gray25 FONT_LABEL 9p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mm:ssF MAP_FRAME_PEN 0.70p,gray25 MAP_TICK_PEN_PRIMARY 0.55p,gray35 MAP_GRID_PEN_PRIMARY 0.20p,gray82,- MAP_TITLE_OFFSET 0.14c`;
   const backgroundCommands = [];
@@ -362,6 +363,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       ...terrain.preCommands,
       ...backgroundCommands,
       `gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
+      terrain.contourCommand,
+      ...cartography.commands,
       ...faultOverlay.commands,
       ...stationPlots.commands,
       ...mtOverlay.commands,
@@ -384,6 +387,8 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     ...terrain.preCommands,
     ...backgroundCommands,
     `  gmt basemap -R${region} -J${config.projection} ${frameOption}${titleOption}`,
+    terrain.contourCommand,
+    ...cartography.commands,
     ...faultOverlay.commands,
     ...stationPlots.commands,
     ...mtOverlay.commands,
@@ -867,7 +872,7 @@ function ceilPad(value, pad) {
 }
 
 function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion = config.region) {
-  if (!config.showTerrain) return { preCommands: [], imageCommand: "" };
+  if (!config.showTerrain && !config.cartography?.contours?.show) return { preCommands: [], imageCommand: "" };
   const geographicRegion = String(sourceRegion || config.region || region);
   const paths = terrainPaths(outputDirectory, config, geographicRegion);
   require("./terrain-cache").initializeArea(paths, config);
@@ -906,7 +911,8 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   }
   return {
     preCommands,
-    imageCommand: `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt} -E${config.terrainPreview ? 150 : pngDpi(config.pngDpi)}`
+    contourCommand: require("./cartography-gmt").contourCommand(config, renderGrid, region, quote, prefix),
+    imageCommand: !config.showTerrain ? "" : `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt} -E${config.terrainPreview ? 150 : pngDpi(config.pngDpi)}`
   };
 }
 

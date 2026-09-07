@@ -43,6 +43,7 @@ const state = {
     dragPanStart: null
   },
   terrainWaiter: null,
+  cartography: {features:[],categoryStyles:{},contours:{}},
   faultLayers: [],
   stationGroups: [],
   labelNames: [],
@@ -129,6 +130,9 @@ const TERRAIN_RESOLUTIONS = {
 };
 const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
 const SETTINGS_PANELS = {
+  cartography: "地点与构造",
+  geodata: "查询地理与构造数据",
+  contours: "地形等高线",
   data: "数据",
   quality: "数据质检",
   filters: "筛选/分组绘图",
@@ -193,6 +197,7 @@ const ids = [
 const el = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 
 window.addEventListener("DOMContentLoaded", async () => {
+  initCartography();
   populateColorControls();
   wireEvents();
   renderLocalTerrainGrid();
@@ -706,6 +711,7 @@ function restoreSettingsDialogNodes() {
 
 async function confirmSettingsDialog() {
   const panel = state.settingsDialog.panel;
+  if (panel === "cartography" && cartUI.dirty && !(await saveCartFeature(false))) return;
   if (panel === "frame" && regionIssue()) {
     renderRegionValidation();
     el.regionWestInput.focus();
@@ -836,6 +842,8 @@ function restoreProjectSnapshot(project, filePath = "") {
 
 function applyConfigToUI(config) {
   if (!config) return;
+  state.cartography = {features:[],categoryStyles:{},contours:{},...(config.cartography || {})};
+  renderCartography();
   state.stationGroups = Array.isArray(config.stationGroups) ? config.stationGroups.map((group) => ({ ...group })) : [];
   state.labelNames = Array.isArray(config.labelNames) ? [...config.labelNames] : [];
   state.axisTransform = {
@@ -1416,6 +1424,7 @@ function readMTMapping() {
 
 function readConfig() {
   const config = {
+    cartography: state.cartography,
     showTitle: el.showTitleInput.checked,
     title: el.titleInput.value,
     plotType: state.plotType,
@@ -1662,7 +1671,7 @@ async function exportMap(formats, showAlert, options = {}) {
       config.pngDpi = dpi;
       el.pngDpiInput.value = String(dpi);
     }
-    if (config.showTerrain) {
+    if (config.showTerrain || config.cartography?.contours?.show) {
       const ready = await ensureTerrainReady(config, { auto: Boolean(options.auto), preview: isPreviewRender });
       if (!ready) return false;
       if (config.localTerrainGridPath) {
@@ -2134,7 +2143,7 @@ function renderTerrainDataServerCustom() {
 async function saveScript() {
   const config = readConfig();
   if (!validatePlotReadiness(config)) return;
-  if (config.showTerrain) {
+  if (config.showTerrain || config.cartography?.contours?.show) {
     const ready = await ensureTerrainReady(config);
     if (!ready) return;
     if (config.localTerrainGridPath) {

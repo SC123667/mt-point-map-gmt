@@ -14,10 +14,10 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.5.0`（全局工作目录、缓存迁移与地形加速）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.5.0` 八个尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.6.0`（构造数据、地点标注和等高线）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.6.0` 尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.5.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`1245cde675b485931ffbeefb8788fefdb079ca136673b55498fcbdd9d6820590`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.6.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`913e281afc9d24649653b69c018b12cde26898a1cceb5ded8beab3c63fe9311e`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
@@ -27,13 +27,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.5.0` |
+| 本地源码版本 | `1.6.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.5.0`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.6.0`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.5.0`，从该路径验证运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.6.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
@@ -555,3 +555,21 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 - 远端：未执行 GitHub 推送或 Release；公开状态仍沿用此前已核对的 v1.1.3。Windows 保留 ASCII 路径兼容边界，本次未进行 Windows 实机验证。
 
 - v1.5.0 最终实装 ASAR SHA-256：`1245cde675b485931ffbeefb8788fefdb079ca136673b55498fcbdd9d6820590`；来源包严格深度验签通过，实际安装包深度验签通过。
+
+## 2026-09-07 v1.6.0 构造制图维护
+
+- 新模块：`cartography.js`（纯几何/样式/坐标校验），`cartography-gmt.js`（批量点线面、等高线、GMT/EPS 定位与 SVG 标注），`geodata-sources.js`（来源和许可），`geodata-worker.js`（下载、SHP 重投影、WFS/本地查询），`renderer/cartography-ui.js`（三个紧凑设置面板）。
+- 工程字段：`config.cartography = {features,categoryStyles,contours}`，每个 feature 保留 geometry、name、category、style、labelAnchor、source 和原始 properties。经纬度不因 swapAxes 修改。
+- 直接源 6 组（Hima 3、GEM 1、PB2002 2）；另有 GeoNames、SARIG 与通用 WFS。中国活动断层中心/地质云为明确标注的官网获取后导入入口，OneGeology 为服务发现和 WFS 入口，不表示已获取受限数据。
+- `gmt-worker` 输出辅助 EPS，读取裁切平移与 PSL 原点，再配合 `gmt mapproject -Dc` 定位原生标注；PDF 保留 GMT 页和原生矢量文字，EPS 由 Ghostscript eps2write 转换。不要改成把整个 PNG 嵌入 PDF。
+- 13 组 Node 测试与真实图件/界面验证结果位于全局目录 `验证/v1.6.0`。Windows 无本轮实机证据；新依赖须随生产包包含。
+- 使用、来源许可及服务限制详见 `docs/CARTOGRAPHY.md`。
+
+### v1.6.0 实装验证
+
+- 来源包：全局目录 `安装包/v1.6.0/mac-arm64/MT点位图制作工具—GMT.app`，严格深度验签通过。
+- 实际安装包：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 1.6.0，深度验签通过，ASAR SHA-256 `913e281afc9d24649653b69c018b12cde26898a1cceb5ded8beab3c63fe9311e`。29 个 Electron 源码/资源文件及 README、CHANGELOG、VERSION 与实装 ASAR 一致。
+- 来源、候选 App、实装路径分别执行 UI 与真实 GMT 出图；`验证/v1.6.0/installed/verified.json` 保留结果。真实青藏 30 秒网格、构造/城市/区域/等高线 PNG/PDF/EPS 约 3.1 秒；这一时长不代表大区域 1 秒分辨率导出的速度。
+- PDF 检查：纯等高线构造图和交换轴图没有栅格图像，地形组合图仅有一个地形影像；中文名称及 IYZS 文本可提取。
+- 旧 v1.5.0 App 保留在 `版本备份/v1.5.0-20260907-升级v1.6.0/`，升级前用户工程已保存为全局 `工程文件/升级v1.6.0前_当前工程.mtgmt`（86/96/28/32、0 测点、地形 01s）。
+- 实装验收后按普通启动方式打开“实用app”路径并恢复上述工程。GitHub 没有推送或创建 Release，公开版仍为 v1.1.3。

@@ -2946,3 +2946,25 @@ body[data-platform="win32"] .quick-inspector-trigger {
 .region-bounds-grid input { width: 100%; min-width: 0; box-sizing: border-box; }
 #regionValidationMessage { color: #b42318; }
 body[data-plot-type="baseMap"] .toolbar-context > label { display: none; }
+
+/* Cartography uses the same modal host and compact controls on both platforms. */
+.cart-panel { min-width:0; }
+.cart-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 16px; margin:10px 0;}
+.cart-panel label {display:flex;flex-direction:column;gap:5px;min-width:0;}
+.cart-panel label.checkbox-row {flex-direction:row;align-items:center;}
+.cart-panel input:not([type=checkbox]),.cart-panel select,.cart-panel textarea {width:100%;box-sizing:border-box;}
+.cart-panel textarea {resize:vertical;font:12px/1.5 ui-monospace,monospace;min-height:55px;}
+.cart-actions {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;}
+.cart-panel details {margin:14px 0;border-top:1px solid var(--border,#dde4e9);padding-top:10px;}
+.cart-panel summary {cursor:pointer;font-weight:600;margin-bottom:10px;}
+.cart-results {max-height:290px;overflow:auto;border-top:1px solid #dfe7ea;}
+.cart-panel .cart-result {display:flex;flex-direction:row;gap:10px;padding:8px;border-bottom:1px solid #edf1f4;}
+.cart-result span {display:flex;flex-direction:column;gap:3px;}
+.cart-result small {color:#72808b;}
+.cart-source-details {white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:150px;overflow:auto;}
+
+.settings-dialog .cart-panel label {text-align:left;align-items:stretch;margin:0;padding:0;font-size:12px;}
+.settings-dialog .cart-panel .checkbox-row {align-items:center;}
+.cart-panel .cart-grid {row-gap:9px;}
+.cart-panel input,.cart-panel select {min-height:28px;}
+.cart-panel textarea {border:1px solid #cbd5df;border-radius:6px;padding:7px;}
