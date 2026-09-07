@@ -56,4 +56,10 @@ assert(renderer.includes("requestRevision === state.preview.revision"), "stale p
 assert(renderer.includes("expectedPlotType !== state.plotType"), "stale preview plot-type guard missing");
 assert(css.includes(".curve-station-nav"), "curve-station navigation styling missing");
 
+assert(html.includes('data-plot-type="baseMap"'), "region-only plot entry missing");
+for (const id of ["regionWestInput", "regionEastInput", "regionSouthInput", "regionNorthInput", "rangeMapBtn", "exportEpsBtn"]) {
+  assert(ids.includes(id), `region map control missing: ${id}`);
+}
+assert(renderer.includes('window.mtApp.exportMap({ records: renderRecords'), "basemap export must exclude retained station data");
+assert(renderer.includes('window.mtApp.saveScript({ records: recordsForPlot()'), "basemap scripts must exclude retained station data");
 console.log("UI workbench tests passed");

@@ -1,6 +1,6 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-02 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 最后核对日期 / Last verified: 2026-09-07 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
 ## 1. 一页接手摘要 / Executive Summary
 
@@ -14,26 +14,26 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.3.0`（标题/图例可见性与论文点位图样式版本）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.3.0` 五个尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.4.0`（无测点区域底图与可编辑矢量 PDF）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.4.0` 六个尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.3.0`。2026-09-04 已核对包内版本、ASAR 完整性、深度签名和真实启动路径；“实用app”内只有这一个 GMT 绘图应用。
-- 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.4.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`adc02bdc391b648ddc2ef8f688cc8bad0227d46d5b6c9f30fe3a62f4910638b8`。
+- 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
-- 本次只整理本地项目和建立本地 Git 回滚点，不会自动推送 GitHub。
+- 本地功能维护、安装包交付与 Git 回滚点均在本机完成；不会自动推送 GitHub。
 
 ## 2. 版本与分支状态 / Version and Branch State
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.3.0` |
+| 本地源码版本 | `1.4.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.3.0`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.4.0`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已验证 `1.3.0` 并从该路径运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.4.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
@@ -60,6 +60,8 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - EDI 响应：频率、阻抗张量 `ZXX/ZXY/ZYX/ZYY`、`ZXY.VAR`、`ZYX.VAR`、Tipper `TX/TY`。
 
 ### 图件类型
+
+- 区域底图 / Region basemap：无需导入测点，直接指定西/东/南/北边界。
 
 - 点位图 / Station map
 - 相位张量主轴或广义电性走向图 / Strike map
@@ -144,6 +146,8 @@ flowchart LR
 | `electron/import-worker.js` | 表格/Excel/EDI/构造线后台导入 | IPC 大结果发送完成后才能退出 |
 | `electron/faults.js` | 构造线格式识别、解析和 GMT overlay 文件 | 保留多编码兼容 |
 | `electron/legend.js` | 图例条目、样式、GMT legend spec | `stationGroups` 会生成多测点图例项 |
+| `electron/map-region.js` | 经纬度范围共享校验 | renderer 与 GMT worker 使用同一规则 |
+| `electron/vector-pdf.js` | 保留矢量的 PDF 图层合成 | 经 GMT worker 执行，不嵌入预览位图 |
 | `electron/native-position.js` | 归一化位置解析和原生元素 CSS 定位 | 与预览拖拽/工程恢复保持一致 |
 | `tests/*.test.js` | 正式 Electron/Node 回归测试 | `npm run test:node` 一次运行全部 |
 | `mt_gmt_tool/`, `run.py` | 早期 Python/Tkinter 原型 | 不属于 Electron 正式分发，不要混合开发 |
@@ -202,6 +206,7 @@ flowchart LR
 
 - JSON schema 名：`mt-point-map-gmt-project`
 - `schemaVersion`: `1`
+- `plotType: "baseMap"` 支持 `parsed: null` 和空 `allRecords`；保存/重开无需虚构测点，已有测点在底图模式保留但不绘制。
 - 保存内容：解析结果、全部测点、筛选条件、图件类型、输出目录、地形状态、构造线、图例位置、比例尺/指北针位置、图例标签状态和完整绘图配置。
 - 工程文件内会保存构造线、本地地形和输出目录的绝对路径。工程复制到另一台电脑后，这些外部路径可能失效，需要重新选择文件。
 - 当前打开工程只检查 schema 名，没有严格迁移器和字段级 schema 验证；新增字段时要提供默认值并保持旧工程兼容。
@@ -284,6 +289,20 @@ flowchart LR
 
 视觉基线：深海军蓝、地质青绿、冷灰背景、克制阴影和清晰焦点状态。目标是专业科学软件，不是装饰型仪表盘。
 
+## 8.1 v1.4.0 接手增量（2026-09-07）
+
+- “区域底图”标签和“制图 → 按经纬度范围绘图”打开已有图幅面板，新增四个十进制度边界输入框；高级 GMT 范围文本仍保留。
+- `electron/map-region.js` 在 renderer 内联桥接和 GMT worker 之间共享范围校验；跨日期变更线支持 170～190 度，墨卡托投影拒绝极点。
+- `baseMap` 不绘制测点、测点名、测点分组或虚构测点图例；构造线、地形、图框、标题和比例尺等仍沿原有路径绘制。
+- `electron/vector-pdf.js` 使用 `pdf-lib` 合成 GMT 矢量 PDF 与透明原生标注 PDF；合成通过 GMT worker 执行，等待 IPC 数据发送完毕再退出。
+- 旧版原生中文叠加把 PNG 嵌入 PDF，底图因此栅格化；v1.4.0 已修复。普通和中文 PDF 的底图路径、文字继续保留，地形晕渲本身仍为栅格。EPS 仍不包含原生中文叠加。
+- 本轮 Node 回归 10 组通过（新增 `base_map`、`vector_pdf`）。真实 Electron 流程验证了空测点预览/导出、范围拒绝、工程保存/恢复、测点保留和最小窗口布局；Windows 仅检查了平台样式，未做 Windows 实机运行。
+- 真实 GMT 6.5.0 已生成零测点 PNG/PDF/EPS，包含普通底图、中文标题/图例、合成本地地形网格。该地形是验证夹具，不是真实 DEM；本轮未下载 SRTM。
+- PDF 检查：普通底图 948 个绘图对象、0 图像；中文图件 964 个绘图对象、0 图像，中文可提取。Illustrator 2024 实测打开中文 PDF：1,052 条路径、10 个文字框、0 栅格对象；可编辑文字，另存 `.ai` 并重新打开通过。
+- 最终安装包已从“实用app”路径用隔离测试配置完成上述 Electron 回归，并已恢复正常启动。包内 16 个 Electron 源码文件与工作区一致；源包严格深度验签通过，目标包普通深度验签通过，目标严格验签仍有 FileProvider Finder 信息告警。Windows 实机/安装器和公开发布本轮未执行。
+- 示例与核验材料：`outputs/v1.4.0-validation/`（已忽略），包括 PDF/EPS/PNG、Illustrator 实际另存的 `.ai`、截图和安装包 PDF 对象检查结果。
+- `script/package_mac_local.sh` 在临时目录准备生产依赖，并使用隔离缓存中的锁定版 electron-builder 标准构建、签名和严格深度验签，避免 Documents 中工具依赖冷读取/签名问题；复制到目标后普通深度验签，不停止或替换运行中的 App。
+
 ## 9. 开发环境 / Development Environment
 
 本机 2026-09-02 验证环境：
@@ -349,6 +368,8 @@ npx electron-builder --win nsis portable --arm64
 | `import_worker.test.js` | 表格、字段映射、EDI 递归/批量解析和 worker IPC |
 | `gmt_worker.test.js` | 2500 点 worker 绘图、输出文件和隐藏中文标题不触发原生叠加，使用 mock GMT |
 | `srtm_worker.test.js` | SRTM worker、缓存 HGT、网格/阴影交接，使用 mock GMT |
+| `base_map.test.js` | 范围边界校验、无测点出图、隐藏保留测点及无虚构图例 |
+| `vector_pdf.test.js` | 原始 PDF 路径/字体以 Form 合成，保持物理尺寸与单页约束 |
 | `ui_workbench.test.js` | DOM ID、数据入口、标题/图例快捷开关、论文默认值、曲线测点按钮/方向键导航、预览修订隔离、右栏默认关闭/滚动、macOS/Windows CSS |
 | `test_data_and_gmt.py` | Python 原型点位解析和 GMT 脚本 |
 
@@ -476,7 +497,7 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 
 ## 16. 推荐后续顺序 / Recommended Next Work
 
-1. 先审阅 `codex/method-colored-stations` 相对 `main` 的两个功能提交和本次文档提交。
+1. 先审阅 `codex/method-colored-stations` 相对 `main` 的全部本地提交，以实时 `git log origin/main..HEAD` 为准。
 2. 继续用真实 GMT 对 `v1.2.x–v1.3.x` 做互换轴地形、中文图例、PNG/PDF/EPS 的对比导出；点位图的默认/元素开关路径已用 9 个真实 EDI 验证。
 3. 为 station groups、轴互换和指定标签增加独立紧凑设置窗口，避免要求用户手改工程 JSON。
 4. 为 `.mtgmt` 增加 schema 验证、版本迁移和外部资源丢失提示。

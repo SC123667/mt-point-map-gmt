@@ -2938,3 +2938,10 @@ body[data-platform="win32"] .quick-inspector-trigger {
   .toolbar-context label > select { width: 92px; }
   .quick-inspector-trigger { padding: 0 8px; }
 }
+
+/* Geographic bounds stay compact in the existing settings dialog. */
+.region-bounds-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.region-bounds-grid label { min-width: 0; }
+.region-bounds-grid input { width: 100%; min-width: 0; box-sizing: border-box; }
+#regionValidationMessage { color: #b42318; }
+body[data-plot-type="baseMap"] .toolbar-context > label { display: none; }

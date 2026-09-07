@@ -1,6 +1,8 @@
+const { geographicRegionIssue } = require("./map-region");
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("mtApp", {
+  geographicRegionIssue,
   status: () => ipcRenderer.invoke("app:status"),
   openFile: () => ipcRenderer.invoke("file:open"),
   openEdiDirectory: () => ipcRenderer.invoke("edi:openDirectory"),

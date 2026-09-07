@@ -1,3 +1,4 @@
+const { geographicRegionIssue } = require("./map-region");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -708,10 +709,20 @@ function writeSettings(settings) {
 async function overlayNativeDecorations(result, config, outputName, requestedFormats) {
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
-  const rendered = await renderDecoratedMap(pngPath, config);
+  const rendered = await renderDecoratedMap(pngPath, config, requestedFormats.includes("pdf"));
+  let vectorPDF;
+  if (requestedFormats.includes("pdf")) {
+    vectorPDF = await runForkWorker("gmt-worker.js", {
+      mode: "composeVectorPDF",
+      baseBytes: fs.readFileSync(path.join(result.outputDirectory, `${outputName}.pdf`)),
+      overlayBytes: rendered.pdfBuffer,
+      imageSize: rendered.imageSize,
+      titleHeight: rendered.titleHeight
+    });
+  }
   fs.writeFileSync(pngPath, rendered.pngBuffer);
   if (requestedFormats.includes("pdf")) {
-    fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), rendered.pdfBuffer);
+    fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), vectorPDF);
   }
   if (!requestedFormats.includes("png")) {
     try {
@@ -722,11 +733,12 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   }
 }
 
-async function renderDecoratedMap(pngPath, config = {}) {
+async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const image = nativeImage.createFromPath(pngPath);
   const size = image.getSize();
   if (!size.width || !size.height) throw new Error("中文图名/图例叠加失败：无法读取 GMT PNG 尺寸。");
-  const title = config.showTitle === false ? "" : String(config.title || "").trim();
+  const requestedTitle = config.showTitle === false ? "" : String(config.title || "").trim();
+  const title = needsNativeTextRendering(requestedTitle) ? requestedTitle : "";
   const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
   const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
@@ -847,14 +859,19 @@ async function renderDecoratedMap(pngPath, config = {}) {
         ...Array.from(document.images).map((image) => image.decode ? image.decode() : Promise.resolve())
       ]).then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     `);
-    const pngBuffer = win.webContents.capturePage().then((captured) => captured.toPNG());
-    const pdfBuffer = win.webContents.printToPDF({
-      printBackground: true,
-      preferCSSPageSize: true,
-      margins: { marginType: "none" }
-    });
-    const [png, pdf] = await Promise.all([pngBuffer, pdfBuffer]);
-    return { pngBuffer: png, pdfBuffer: pdf };
+    const png = (await win.webContents.capturePage()).toPNG();
+    let pdf;
+    if (includePDF) {
+      // Print only native decorations on a transparent page. The GMT PDF is
+      // combined in the worker, preserving paths/fonts and the physical size.
+      await win.webContents.insertCSS("html, body { background: transparent !important; } .map-wrap > img { visibility: hidden !important; } .native-scale, .native-compass { filter: none !important; box-shadow: none !important; }");
+      pdf = await win.webContents.printToPDF({
+        printBackground: true,
+        preferCSSPageSize: true,
+        margins: { marginType: "none" }
+      });
+    }
+    return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight };
   } finally {
     win.destroy();
   }
@@ -1007,6 +1024,7 @@ function loadRenderer(win) {
   const bridge = `
     const { ipcRenderer } = require("electron");
     window.mtApp = {
+      geographicRegionIssue: ${geographicRegionIssue.toString()},
       status: () => ipcRenderer.invoke("app:status"),
       openFile: () => ipcRenderer.invoke("file:open"),
       openEdiDirectory: () => ipcRenderer.invoke("edi:openDirectory"),

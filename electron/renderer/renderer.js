@@ -152,6 +152,7 @@ const ids = [
   "periodColumn", "frequencyColumn", "zxxrColumn", "zxxiColumn", "zxyrColumn", "zxyiColumn", "zyxrColumn", "zyxiColumn",
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "curvePreviousBtn", "curveNextBtn", "curveStationPosition", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
+  "exportEpsBtn", "rangeMapBtn", "regionWestInput", "regionEastInput", "regionSouthInput", "regionNorthInput", "regionValidationMessage",
   "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
@@ -223,7 +224,10 @@ function wireEvents() {
   window.mtApp.onMenuRecheckGMT?.(recheckGMT);
   window.mtApp.onMenuInstallGMT?.(installGMT);
   document.querySelectorAll(".tool-tab").forEach((button) => {
-    button.addEventListener("click", () => setPlotType(button.dataset.plotType));
+    button.addEventListener("click", () => {
+      setPlotType(button.dataset.plotType);
+      if (state.plotType === "baseMap" && regionIssue()) openSettingsPanel("frame");
+    });
   });
   wireToolbarMenus();
   document.querySelectorAll(".settings-tool[data-settings-panel]").forEach((button) => {
@@ -237,6 +241,10 @@ function wireEvents() {
   bind(el.sidebarImportFileBtn, "click", openPointFile);
   bind(el.sidebarImportEdiBtn, "click", openEdiDirectory);
   bind(el.sidebarLoadSampleBtn, "click", loadSampleData);
+  bind(el.rangeMapBtn, "click", () => { setPlotType("baseMap"); openSettingsPanel("frame"); });
+  for (const control of regionBoundControls()) bind(control, "input", syncRegionFromBounds);
+  bind(el.regionInput, "input", syncRegionBounds);
+  bind(el.projectionInput, "input", renderRegionValidation);
   bind(el.tableHelpBtn, "click", showTableHelp);
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
   bind(el.curveStationInput, "change", () => {
@@ -261,6 +269,7 @@ function wireEvents() {
   bind(el.autoRegionBtn, "click", () => {
     if (!state.records.length) return notify("请先导入点位文件。");
     el.regionInput.value = autoRegionClient(state.records);
+    syncRegionBounds();
     scheduleAutoPreview("图幅范围已更新，正在自动绘制预览...", { delay: 100 });
   });
   bind(el.showTitleInput, "change", () => {
@@ -271,6 +280,7 @@ function wireEvents() {
   bind(el.cancelRenderBtn, "click", cancelCurrentRender);
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
+  bind(el.exportEpsBtn, "click", () => exportMap(["eps"], true));
   bind(el.exportBothBtn, "click", () => exportMap(["png", "pdf"], true));
   bind(el.exportAllBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
   bind(el.saveScriptBtn, "click", saveScript);
@@ -468,6 +478,7 @@ function wireQuickInspector() {
 
 function renderQuickInspector() {
   const plotLabels = {
+    baseMap: "区域底图",
     stationMap: "点位图",
     strikeMap: "走向图",
     phaseTensorMap: "相位张量",
@@ -477,7 +488,7 @@ function renderQuickInspector() {
   const plotLabel = plotLabels[state.plotType] || plotLabels.stationMap;
   if (el.quickInspectorTitle) el.quickInspectorTitle.textContent = plotLabel;
   if (el.canvasPlotTitle) el.canvasPlotTitle.textContent = plotLabel;
-  const records = state.records || [];
+  const records = recordsForPlot();
   const validCount = records.filter((record) => Number.isFinite(record.lon) && Number.isFinite(record.lat) && Math.abs(record.lon) <= 180 && Math.abs(record.lat) <= 90).length;
   const lineCount = new Set(records.map((record) => String(record.line || "").trim()).filter(Boolean)).size;
   if (el.quickStationCount) el.quickStationCount.textContent = String(records.length);
@@ -485,7 +496,7 @@ function renderQuickInspector() {
   if (el.quickValidCount) el.quickValidCount.textContent = String(validCount);
   if (el.quickStationLayer) el.quickStationLayer.textContent = `station_points · ${records.length}`;
   if (el.canvasDataMeta) {
-    el.canvasDataMeta.textContent = records.length ? `${records.length} 个测点${lineCount ? ` · ${lineCount} 条测线` : ""}` : "尚未导入测点";
+    el.canvasDataMeta.textContent = state.plotType === "baseMap" ? `经纬度范围 ${el.regionInput.value || "待设置"}` : records.length ? `${records.length} 个测点${lineCount ? ` · ${lineCount} 条测线` : ""}` : "尚未导入测点";
   }
   let issueCount = 0;
   if (state.allRecords.length) {
@@ -605,6 +616,7 @@ function setPlotType(plotType) {
   });
   document.body.dataset.plotType = state.plotType;
   const labels = {
+    baseMap: ["区域底图", "按经纬度范围绘图，无需测点；可导出到 Illustrator 编辑"],
     stationMap: ["绘图参数", "点位图模式"],
     strikeMap: ["相位张量主轴 / 广义电性走向", "按选定周期叠加 alpha - beta 主轴线段"],
     phaseTensorMap: ["相位张量椭圆", "按选定周期叠加相位张量椭圆"],
@@ -624,6 +636,7 @@ function setPlotType(plotType) {
 
 function defaultOutputNameForPlot(plotType) {
   return {
+    baseMap: "region_basemap",
     stationMap: "mt_point_map",
     strikeMap: "mt_strike_map",
     phaseTensorMap: "mt_phase_tensor_map",
@@ -653,7 +666,8 @@ function showTableHelp() {
 function openSettingsPanel(panel) {
   const panelKey = SETTINGS_PANELS[panel] ? panel : "frame";
   closeSettingsDialog();
-  const nodes = Array.from(document.querySelectorAll(`[data-settings-panel="${panelKey}"]`));
+  if (panelKey === "frame") syncRegionBounds();
+  const nodes = Array.from(document.querySelectorAll(`[data-settings-panel="${panelKey}"]`)).filter((node) => node.tagName !== "BUTTON");
   if (!nodes.length) return notify("这个设置面板还没有可编辑内容。");
   el.settingsDialogTitle.textContent = SETTINGS_PANELS[panelKey];
   el.settingsDialogBody.replaceChildren();
@@ -687,6 +701,11 @@ function restoreSettingsDialogNodes() {
 
 async function confirmSettingsDialog() {
   const panel = state.settingsDialog.panel;
+  if (panel === "frame" && regionIssue()) {
+    renderRegionValidation();
+    el.regionWestInput.focus();
+    return;
+  }
   if (panel === "fields" || panel === "mtFields") {
     const applied = await applyMapping({ silent: true });
     if (!applied) return;
@@ -722,7 +741,9 @@ async function loadSampleData() {
 }
 
 async function saveProjectFile() {
-  if (!state.parsed || !state.allRecords.length) return notify("请先导入数据后再保存工程。");
+  if (state.plotType === "baseMap") {
+    if (!validatePlotReadiness(readConfig())) return;
+  } else if (!state.parsed || !state.allRecords.length) return notify("请先导入数据，或选择区域底图并设置范围后再保存工程。");
   const project = createProjectSnapshot();
   try {
     const saved = await window.mtApp.saveProject({
@@ -821,6 +842,7 @@ function applyConfigToUI(config) {
   setChecked(el.showTitleInput, typeof config.showTitle === "boolean" ? config.showTitle : Boolean(String(config.title || "").trim()));
   setInputValue(el.titleInput, config.title);
   setInputValue(el.regionInput, config.region);
+  syncRegionBounds();
   setInputValue(el.projectionInput, config.projection);
   setInputValue(el.frameInput, config.frame);
   setChecked(el.showGridInput, config.showGrid);
@@ -1227,6 +1249,8 @@ function loadParsed(parsed, options = {}) {
   state.columns = parsed.columns;
   state.mapping = parsed.mapping;
   if (!options.keepRegion) el.regionInput.value = parsed.region;
+  syncRegionBounds();
+  if (options.autoPreview !== false && state.plotType === "baseMap") setPlotType("stationMap");
   if (!options.keepFilters) resetFilterState();
   applyRecordFilters({ updateOnly: true });
   renderDataSummary();
@@ -1595,7 +1619,7 @@ function formatsDialogAvailable() {
 }
 
 async function exportMap(formats, showAlert, options = {}) {
-  if (!state.records.length) return notify("请先导入点位数据。");
+  if (!state.records.length && state.plotType !== "baseMap") return notify("请先导入点位数据，或选择区域底图按范围绘图。");
   if (!options.auto && state.preview.autoTimer) {
     clearTimeout(state.preview.autoTimer);
     state.preview.autoTimer = null;
@@ -1607,6 +1631,7 @@ async function exportMap(formats, showAlert, options = {}) {
   state.preview.rendering = true;
   const requestRevision = state.preview.revision;
   const requestPlotType = state.plotType;
+  const renderRecords = recordsForPlot();
   el.cancelRenderBtn.classList.remove("hidden");
   const isPreviewRender = !showAlert;
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
@@ -1633,7 +1658,7 @@ async function exportMap(formats, showAlert, options = {}) {
     }
     let result;
     try {
-      result = await window.mtApp.exportMap({ records: state.records, config, formats, outputDirectory: state.outputDirectory });
+      result = await window.mtApp.exportMap({ records: renderRecords, config, formats, outputDirectory: state.outputDirectory });
     } catch (error) {
       notify(error.message || String(error));
       return false;
@@ -1738,9 +1763,10 @@ async function adoptTerrainCache(config, key = terrainKeyClient(config)) {
 }
 
 async function prepareTerrain(waitForCompletion, configOverride = null) {
-  if (!state.records.length) return notify("请先导入点位文件。");
   const config = configOverride ? { ...configOverride } : readConfig();
   if (!config.region) config.region = autoRegionClient(state.records);
+  const issue = window.mtApp.geographicRegionIssue(config.region, config.projection);
+  if (issue) { notify(issue); return false; }
   const estimate = estimateTerrainClient(config.region, config.terrainResolution);
   if (estimate.blocked) {
     el.terrainEstimateText.textContent = estimate.label;
@@ -1994,7 +2020,7 @@ async function deleteTerrainCacheResolution() {
 }
 
 async function deleteCurrentTerrainCache() {
-  if (!state.records.length) return notify("请先导入点位数据。");
+  if (regionIssue()) return notify(regionIssue());
   const config = readConfig();
   if (!config.region) config.region = autoRegionClient(state.records);
   if (!confirm(`确定删除当前范围 ${config.region} / ${config.terrainResolution} 的本地地形缓存吗？`)) return;
@@ -2088,7 +2114,6 @@ function renderTerrainDataServerCustom() {
 }
 
 async function saveScript() {
-  if (!state.records.length) return notify("请先导入点位数据。");
   const config = readConfig();
   if (!validatePlotReadiness(config)) return;
   if (config.showTerrain) {
@@ -2104,7 +2129,7 @@ async function saveScript() {
   }
   let saved;
   try {
-    saved = await window.mtApp.saveScript({ records: state.records, config, outputDirectory: state.outputDirectory, formats: ["png", "pdf", "eps"] });
+    saved = await window.mtApp.saveScript({ records: recordsForPlot(), config, outputDirectory: state.outputDirectory, formats: ["png", "pdf", "eps"] });
   } catch (error) {
     notify(error.message || String(error));
     return;
@@ -2127,6 +2152,12 @@ function validatePlotReadiness(config, options = {}) {
 }
 
 function plotReadinessIssue(config) {
+  if (config.plotType === "baseMap") return window.mtApp.geographicRegionIssue(config.region, config.projection);
+  if (!state.records.length) return "请先导入点位数据，或选择区域底图按范围绘图。";
+  if (config.plotType !== "responseCurve") {
+    const issue = String(config.region || "").trim() ? window.mtApp.geographicRegionIssue(config.region, config.projection) : "";
+    if (issue) return issue;
+  }
   if (["strikeMap", "phaseTensorMap", "tipperMap", "responseCurve"].includes(config.plotType)) {
     const hasMT = state.records.some((record) => record.mtResponses?.length);
     if (!hasMT) {
@@ -2410,7 +2441,8 @@ function clearPreviewImage() {
 
 function renderPlaceholder() {
   const labels = {
-    stationMap: "导入点位后自动绘制点位图",
+    baseMap: "点击左侧“制图 → 按经纬度范围绘图”，填写边界即可生成底图",
+    stationMap: "导入点位后自动绘制点位图，也可选择“区域底图”直接按范围绘图",
     strikeMap: "导入 MT 数据并选择周期后自动绘制走向图",
     phaseTensorMap: "导入 MT 数据并选择周期后自动绘制相位张量椭圆图",
     tipperMap: "导入 MT 数据并选择周期后自动绘制感应矢量图",
@@ -2431,7 +2463,8 @@ function scheduleAutoPreview(message, options = {}) {
   if (state.preview.autoTimer) clearTimeout(state.preview.autoTimer);
   state.preview.revision += 1;
   renderLegendDragHandle();
-  if (!state.records.length) return;
+  if (!state.records.length && state.plotType !== "baseMap") return;
+  if (state.plotType === "baseMap" && regionIssue()) return;
   setPreviewStatus(message || "设置已更改，正在自动更新预览...", "pending");
   state.preview.autoTimer = setTimeout(() => {
     state.preview.autoTimer = null;
@@ -2920,6 +2953,35 @@ function autoRegionClient(records) {
   const lonPad = Math.max((east - west) * 0.12, 0.001);
   const latPad = Math.max((north - south) * 0.12, 0.001);
   return `${(west - lonPad).toFixed(6)}/${(east + lonPad).toFixed(6)}/${(south - latPad).toFixed(6)}/${(north + latPad).toFixed(6)}`;
+}
+
+function recordsForPlot() {
+  return state.plotType === "baseMap" ? [] : (state.records || []);
+}
+
+function regionBoundControls() {
+  return [el.regionWestInput, el.regionEastInput, el.regionSouthInput, el.regionNorthInput];
+}
+
+function regionIssue() {
+  if (!el.regionInput.value.trim() && state.plotType !== "baseMap" && state.records.length) return "";
+  return window.mtApp.geographicRegionIssue(el.regionInput.value, el.projectionInput.value);
+}
+
+function renderRegionValidation() {
+  el.regionValidationMessage.textContent = regionIssue();
+}
+
+function syncRegionBounds() {
+  const parts = String(el.regionInput.value || "").split("/");
+  regionBoundControls().forEach((control, index) => { control.value = parts[index]?.trim() || ""; });
+  renderRegionValidation();
+}
+
+function syncRegionFromBounds() {
+  el.regionInput.value = regionBoundControls().map((control) => control.value.trim()).join("/");
+  renderRegionValidation();
+  updateTerrainEstimate();
 }
 
 function parseRegionClient(regionText) {

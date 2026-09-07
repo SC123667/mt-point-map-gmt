@@ -4,6 +4,14 @@ All notable changes to this project are recorded in this file.
 
 ## Unreleased
 
+## v1.4.0 - 2026-09-07
+
+- Added a region-only basemap workflow with explicit west/east/south/north inputs, coordinate validation, automatic preview, and PNG/PDF/EPS/GMT-script export without importing stations.
+- Added save/open support for empty-station basemap projects while retaining imported stations when switching plot types.
+- Added a direct vector PDF (Illustrator editing) export label and an EPS action, with clear raster-terrain and EPS Chinese-annotation limitations.
+- Preserved GMT paths and fonts when composing native Chinese titles/legends into PDF, replacing the previous PNG-backed PDF composition with vector PDF layers in the GMT worker.
+- Added geographic-range, station-free plotting, PDF vector-composition, and UI regression coverage.
+
 ## v1.3.0 - 2026-09-04
 
 - Added independent title and legend visibility controls in both the full settings and quick inspector, with project-file persistence and backward-compatible restoration for older projects.

@@ -1,3 +1,4 @@
+const { buildLegendEntries } = require("./legend");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -25,10 +26,10 @@ process.on("message", async (message) => {
   if (message.type !== "start") return;
   try {
     const result = await handleTask(message.payload || {});
-    send({ type: "result", result });
+    await send({ type: "result", result });
     setImmediate(() => process.exit(0));
   } catch (error) {
-    send({ type: "error", message: error.message || String(error), stack: error.stack || "" });
+    await send({ type: "error", message: error.message || String(error), stack: error.stack || "" });
     setImmediate(() => process.exit(1));
   }
 });
@@ -40,10 +41,17 @@ process.on("disconnect", () => {
 });
 
 function send(payload) {
-  if (process.connected) process.send(payload);
+  return new Promise((resolve, reject) => {
+    if (!process.connected) return resolve();
+    process.send(payload, (error) => error ? reject(error) : resolve());
+  });
 }
 
 async function handleTask(payload) {
+  if (payload.mode === "composeVectorPDF") {
+    const { composeVectorPDF } = require("./vector-pdf");
+    return composeVectorPDF(payload.baseBytes, payload.overlayBytes, payload.imageSize, payload.titleHeight);
+  }
   if (payload.mode === "saveScript") return saveGMTScript(payload);
   return exportGMTMap(payload);
 }
@@ -163,7 +171,7 @@ function stopCurrentChild() {
 }
 
 function sendProgress(step, percent, message) {
-  send({ type: "progress", progress: { step, percent, message } });
+  void send({ type: "progress", progress: { step, percent, message } }).catch(() => {});
 }
 
 function tailMessage(output, fallback) {
@@ -304,13 +312,9 @@ function shouldOverlayTitle(config) {
 
 function shouldOverlayLegend(config) {
   if (!config?.legend?.show) return false;
-  const labels = [
-    config.legend.title,
-    config.legend.stationLabel,
-    config.legend.overlayLabel,
-    ...(Array.isArray(config.stationGroups) ? config.stationGroups.map((group) => group?.label) : []),
-    ...(Array.isArray(config.faultLayers) ? config.faultLayers.map((layer) => layer?.name) : [])
-  ];
+  const entries = buildLegendEntries(config);
+  if (!entries.length) return false;
+  const labels = [config.legend.title, ...entries.map((entry) => entry.label)];
   return labels.some((label) => needsNativeTextRendering(label));
 }
 

@@ -37,6 +37,7 @@ function buildLegendEntries(config) {
 }
 
 function buildStationLegendEntries(config = {}) {
+  if (config.plotType === "baseMap") return [];
   const groups = Array.isArray(config.stationGroups) ? config.stationGroups.filter(Boolean) : [];
   if (groups.length) {
     return groups.map((group, index) => ({

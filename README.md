@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.3.0-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.4.0-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -14,9 +14,9 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.3.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.4.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.3.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.4.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 软件界面 / Interface Preview
 
@@ -90,14 +90,14 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
 - Build distributable macOS and Windows desktop packages.
-- 本地 v1.2.x–v1.3.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注、原生中文图例、标题/图例独立开关和论文点位图样式；这些功能尚未进入公开 `main`。
-- The local v1.2.x–v1.3.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, native Chinese legends, independent title/legend visibility, and a publication station-map style; these features are not yet on public `main`.
+- 本地 v1.2.x–v1.4.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注、原生中文图例、标题/图例独立开关和论文点位图样式；这些功能尚未进入公开 `main`。
+- The local v1.2.x–v1.4.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, native Chinese legends, independent title/legend visibility, and a publication station-map style; these features are not yet on public `main`.
 
 ## 正式版下载 / Stable Release
 
-当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.3.0**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
+当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.4.0**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
 
-GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.3.0** and has not been published; end users should use the stable GitHub Release.
+GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.4.0** and has not been published; end users should use the stable GitHub Release.
 
 [打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 
@@ -112,6 +112,21 @@ GitHub `main` and the latest public installer release are **v1.1.3**. The local 
 - 相位张量 / Phase tensor ellipse map
 - 感应矢量 / Tipper or induction vector map
 - 电阻率和相位曲线 / Apparent-resistivity and phase sounding curve
+
+## 无测点区域底图与 Illustrator 编辑 / Region-only Maps and Illustrator
+
+1. 点击顶部 **区域底图**，或左侧 **制图 → 按经纬度范围绘图**。
+2. 填写西、东、南、北四个边界，例如经度 `115–125°`、纬度 `20–30°`，点击 **确认并更新预览**。无需导入测点。
+3. 可继续设置投影、经纬网、地形、构造线、标题和比例尺，也可保存为 `.mtgmt` 工程。
+4. 点击 **导出 → 矢量 PDF（AI 编辑）**，在 Adobe Illustrator 中选择 **文件 → 打开**，随后可另存为 `.ai`。线条、图框、文字和填充保留为矢量对象；可能需要取消编组或进入剪切组编辑。字体编辑取决于本机字体。
+
+区域底图模式不绘制已导入测点，但会保留数据，切回点位图即可继续使用。坐标采用十进制度，西经/南纬为负数；跨日期变更线可使用 `170/190/-10/10`，墨卡托投影不包含南北极。
+
+Select **Region basemap**, enter west/east/south/north bounds, and confirm to preview without station data. Save/reopen `.mtgmt` projects or export vector PDF/EPS. Open the PDF in Adobe Illustrator to edit paths and text and save as `.ai`; groups or clipping masks may need to be entered or released, and editable fonts depend on local availability.
+
+**矢量范围说明：** 地形晕渲属于栅格影像，不会自动变成可逐条编辑的等高线。PDF 中的中文标题/图例采用矢量合成，保持 GMT 底图可编辑；EPS 仍不包含原生中文叠加，中文图件优先选 PDF。软件不直接生成 Illustrator 专有 `.ai` 文件，也不恢复为带图层名称的 GIS 工程。
+
+**Vector scope:** Shaded relief remains a raster image. Chinese PDF decorations preserve the GMT vector base; EPS omits native Chinese overlays. The app exports PDF/EPS, not native `.ai` or named GIS layers.
 
 ## 输入数据 / Input Data
 

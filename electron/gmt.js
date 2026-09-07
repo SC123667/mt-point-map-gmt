@@ -1,3 +1,4 @@
+const { geographicRegionIssue } = require("./map-region");
 const fs = require("fs");
 const crypto = require("crypto");
 const https = require("https");
@@ -297,6 +298,11 @@ function autoRegion(records) {
 }
 
 function buildScript(records, config, outputDirectory, formats = ["png"]) {
+  if (config.plotType === "baseMap") {
+    const issue = geographicRegionIssue(config.region, config.projection);
+    if (issue) throw new Error(issue);
+    records = [];
+  }
   fs.mkdirSync(outputDirectory, { recursive: true });
   if (config.plotType === "responseCurve") {
     return buildResponseCurveScript(records, config, outputDirectory, formats);
@@ -422,6 +428,7 @@ function axisFrameOption(axis, label, gridPrefix, shell) {
 }
 
 function stationPlotScriptParts(records, config, outputDirectory, region, shell) {
+  if (!records.length) return { commands: [] };
   const prefix = shell === "bat" ? "" : "  ";
   const defaultCommand = (dataPath) => `${prefix}gmt plot ${quote(dataPath)} -R${region} -J${config.projection} -S${config.pointSymbol}${Number(config.pointSize).toFixed(3)}c -G${quote(config.pointFill)} -W${Number(config.pointPenWidth).toFixed(3)}p,${config.pointPenColor}`;
   const defaultPath = shell === "bat" ? "stations_points.tsv" : path.join(outputDirectory, "stations_points.tsv");
