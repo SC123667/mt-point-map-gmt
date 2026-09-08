@@ -434,7 +434,8 @@ ipcMain.handle("file:saveText", async (_event, payload) => {
   return result.filePath;
 });
 
-ipcMain.handle("gmt:buildScript", (_event, payload) => {
+ipcMain.handle("gmt:buildScript", async (event, payload) => {
+  payload=await resolveLocalLibrary(event.sender,payload);
   return buildScript(payload.records, normalizeTerrainConfig(payload), outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
 });
 
@@ -448,6 +449,7 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
     ]
   });
   if (result.canceled || !result.filePath) return null;
+  payload=await resolveLocalLibrary(event.sender,payload);
   await runGMTWorker(event.sender, {
     mode: "saveScript",
     records: payload.records,
@@ -460,6 +462,7 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
 });
 
 ipcMain.handle("gmt:export", async (event, payload) => {
+  payload=await resolveLocalLibrary(event.sender,payload);
   payload={...payload,config:require("./map-names").plotConfig(payload.config)};
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
@@ -475,6 +478,7 @@ ipcMain.handle("gmt:export", async (event, payload) => {
   if (result.ok && result.needsNativeDecorations) {
     await overlayNativeDecorations(result, payload.config, outputName, formats);
   }
+  result.localLibrary=payload.localLibrary;
   return result;
 });
 
@@ -577,13 +581,14 @@ ipcMain.handle("gmt:downloadCancel", () => {
 });
 ipcMain.handle("gmt:cancelRender", () => {
   if (!currentGMTRenderTask?.child || currentGMTRenderTask.child.killed) return { ok: false, message: "当前没有正在运行的 GMT 绘图任务。" };
+  const cancelledRenderChild=currentGMTRenderTask.child;
   try {
-    currentGMTRenderTask.child.send({ type: "cancel" });
+    cancelledRenderChild.send({ type: "cancel" });
   } catch {
     // Fall through to a direct kill below.
   }
   setTimeout(() => {
-    if (currentGMTRenderTask?.child && !currentGMTRenderTask.child.killed) currentGMTRenderTask.child.kill();
+    if (!cancelledRenderChild.killed && currentGMTRenderTask?.child===cancelledRenderChild) cancelledRenderChild.kill();
   }, 1200);
   return { ok: true, message: "已请求取消当前 GMT 绘图任务。" };
 });
@@ -608,6 +613,16 @@ ipcMain.handle("geodata:open", async () => {
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
 ipcMain.handle("shell:openPath", (_event, targetPath) => shell.openPath(targetPath));
 
+async function resolveLocalLibrary(webContents,payload){
+ const config=payload.config||{},c=config.cartography||{};
+ if(config.plotType==='responseCurve'||!c.localLibrary?.enabled)return payload;
+ const result=await runForkWorker('geodata-worker.js',{mode:'libraryQuery',region:config.region,settings:c.localLibrary},webContents,'gmt',{track:'gmt'});
+ const {features,...info}=result;
+ info.pendingNames=require("./map-names").pending({...c,features}).length;
+ const model=require('./local-structures'),manual=c.features||[],seen=new Set(manual.map(f=>model.geometryKey(f.geometry)));
+ return {...payload,localLibrary:info,config:{...config,cartography:{...c,features:[...manual,...features.filter(f=>!seen.has(model.geometryKey(f.geometry)))]}}};
+}
+ipcMain.handle('library:chooseDirectory',async()=>{const r=await dialog.showOpenDialog({title:'选择本地构造文件夹（复制至全局缓存）',properties:['openDirectory']});return r.canceled?null:r.filePaths[0];});
 function runImportWorker(webContents, payload) {
   return runForkWorker("import-worker.js", payload, webContents, "import");
 }
@@ -1077,6 +1092,7 @@ function loadRenderer(win) {
       deleteTerrainCacheResolution: (payload) => ipcRenderer.invoke("terrain:deleteCacheResolution", payload),
       onTerrainProgress: (handler) => ipcRenderer.on("terrain:progress", (_event, payload) => handler(payload)),
       geodata: (payload) => ipcRenderer.invoke("geodata:task",payload),
+      chooseLibraryDirectory: () => ipcRenderer.invoke("library:chooseDirectory"),
       openGeodata: () => ipcRenderer.invoke("geodata:open"),
       cancelGeodata: () => ipcRenderer.invoke("geodata:cancel"),
       onGeodataProgress: (handler) => ipcRenderer.on("geodata:progress",(_event,payload)=>handler(payload)),
@@ -1122,7 +1138,7 @@ function loadRenderer(win) {
 
   let html = fs.readFileSync(htmlPath, "utf8");
   const css = fs.readFileSync(cssPath, "utf8");
-  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"local-library-ui.js"),"utf8");
   html = html
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);

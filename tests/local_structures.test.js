@@ -1,0 +1,26 @@
+const assert=require('assert'),fs=require('fs'),path=require('path'),{fork}=require('child_process');
+const base=process.env.MT_GMT_WORKSPACE||'/Volumes/MacBook Pro SSD/GMT-缓存';
+const tmp=fs.mkdtempSync(path.join(require('../electron/workspace').workspaceDirectory('验证'),'local-library-test-'));
+process.env.MT_GMT_WORKSPACE=path.join(tmp,'workspace');
+const lib=require('../electron/local-structures'),model=require('../electron/cartography');
+const task=p=>new Promise((resolve,reject)=>{const child=fork(path.join(__dirname,'../electron/geodata-worker.js'),[],{env:process.env,stdio:['ignore','ignore','pipe','ipc']});let done=false;child.on('message',m=>{if(m.type==='result'){done=true;resolve(m.result);}if(m.type==='error'){done=true;reject(new Error(m.message));}});child.on('exit',c=>{if(!done)reject(Error('worker exit '+c));});child.send({type:'start',payload:p});});
+(async()=>{try{
+ const r=[0,2,0,2],line=c=>({type:'LineString',coordinates:c});
+ assert.deepEqual(lib.intersect(line([[-1,1],[3,1]]),r).coordinates,[[0,1],[2,1]]);
+ assert.equal(lib.intersect(line([[-2,1],[1,4]]),r),null,'bbox overlap alone must not include a diagonal outside');
+ assert.equal(lib.intersect({type:'Polygon',coordinates:[[[-5,-5],[5,-5],[5,5],[-5,5],[-5,-5]],[[-1,-1],[3,-1],[3,3],[-1,3],[-1,-1]]]},r),null,'map lies entirely inside polygon hole');
+ assert(lib.intersect({type:'Polygon',coordinates:[[[-5,-5],[5,-5],[5,5],[-5,5],[-5,-5]]]},r));
+ assert(lib.intersect(line([[175,1],[-175,1]]),[178,182,0,2]));
+ const src=path.join(tmp,'input');fs.mkdirSync(src);const gmt='# @VGMT1.0 @GLINESTRING\n# @NName|Type|Source\n>\n# @D"Bangong-Nujiang Suture Zone"|suture|Reference\n-1 1\n3 1\n';
+ fs.writeFileSync(path.join(src,'tibet_sutures.gmt'),gmt);fs.writeFileSync(path.join(src,'duplicate_sutures.gmt'),gmt);fs.writeFileSync(path.join(src,'CN-border-L1.gmt'),'>\n0 0\n1 1\n');fs.writeFileSync(path.join(src,'faults.geojson'),JSON.stringify(model.geoJSON([model.feature({name:'Other',geometry:line([[1,1],[1,1.5]])})])));
+ const result=await task({mode:'libraryImport',directory:src});assert(result.ready);assert.equal(result.total,2);assert.equal(result.duplicateFiles,1);assert.equal(result.copy.fileCount,4);
+ const q=await task({mode:'libraryQuery',region:'0/2/0/2',settings:{categories:['缝合带'],showLabels:true}});assert.equal(q.total,1);assert.equal(q.features[0].nameZh,'班公湖—怒江缝合带');assert.equal(q.features[0].properties.Source,'Reference');assert.deepEqual(q.features[0].geometry.coordinates,[[0,1],[2,1]]);
+ assert.equal((await task({mode:'libraryQuery',region:'0/2/0/2',settings:{categories:[]}})).total,0);
+ assert.equal((await task({mode:'libraryQuery',region:'0/2/0/2',settings:{excludedSources:[q.features[0].source.id],categories:['缝合带']}})).total,0);
+ assert.equal((await task({mode:'libraryQuery',region:'10/12/0/2'})).total,0);
+ const off=model.normalize({localLibrary:{enabled:false,categories:['缝合带']}});assert.equal(off.localLibrary.enabled,false);assert.deepEqual(off.localLibrary.categories,['缝合带']);
+ const index=lib.readIndex(),built=index.builtAt;await task({mode:'libraryQuery',region:'0/2/0/2'});assert.equal(lib.readIndex().builtAt,built,'warm query must reuse index');
+ fs.rmSync(src,{recursive:true});assert.equal((await task({mode:'libraryQuery',region:'0/2/0/2'})).total,2,'original directory is no longer required');
+ const cached=path.join(lib.root(),'原始文件/input/tibet_sutures.gmt');fs.appendFileSync(cached,'>\n# @D"New suture"|suture|Ref\n1 0\n1 2\n');assert.equal((await task({mode:'libraryQuery',region:'0/2/0/2'})).total,3,'changed cached files are indexed incrementally');
+ console.log('local structures: geometry, holes, crossing, metadata, dedup, categories, cache reuse, source independence and incremental worker tests passed');
+ }finally{fs.rmSync(tmp,{recursive:true,force:true});process.env.MT_GMT_WORKSPACE=base;}})().catch(e=>{console.error(e);process.exitCode=1;});

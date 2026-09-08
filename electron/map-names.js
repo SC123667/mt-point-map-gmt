@@ -11,6 +11,7 @@ const terms = [
  ['城市','Cities','',['City']],['地点','Places','',['Place']],['矿床','Deposits','',['Deposit']],
  ['断层','Faults','',['Fault']],['活动断层','Active faults','',['Active fault']],['缝合带','Suture zones','',['Suture zone']],
  ['构造区域','Tectonic regions','',[]],['研究区','Study area','',[]],['板块边界','Plate boundaries','',[]],['板块区域','Tectonic plates','',[]],
+ ['正断层','Normal faults','',[]],['逆冲断层','Thrust faults','',[]],['左旋断层','Sinistral faults','',[]],['右旋断层','Dextral faults','',[]],['背斜','Anticlines','',[]],['向斜','Synclines','',[]],['构造边界','Tectonic boundaries','',[]],
  ['火山岩','Volcanic rocks','',[]],['地质构造','Geological structures','',[]],
  ['测点','Station','',['Stations']],['走向','Strike','',[]],['相位张量','Phase tensor','',[]],['感应矢量','Tipper','',[]],['图例','Legend','',[]]
 ].map(([nameZh,nameEn,abbreviation,aliases])=>({nameZh,nameEn,abbreviation,aliases}));

@@ -61,10 +61,10 @@ on('selected',()=>selectCartFeature(ce('selected').value),'change');
  for(const k of ['show','interval','major','width','majorWidth','color','fontSize','minLength','labelSpacing','labels'])on('contour-'+k,()=>{state.cartography.contours=readCartContours();cartChanged();},'change');
  window.mtApp.onGeodataProgress(p=>ce('search-status').textContent=p.message);
  document.querySelector('[data-settings-panel=cartography].cart-panel').addEventListener('input',e=>{if(!['cart-selected','cart-paste','cart-language','cart-name-format','cart-remember-names'].includes(e.target.id))cartUI.dirty=true;});
- initMapDrawing();renderCartography();window.mtApp.geodata({mode:'catalog'}).then(s=>{cartUI.sources=s;ce('source').innerHTML += s.map(x=>`<option value="${ch(x.id)}">${ch(x.name)}${x.access==='portal'?' · 官网获取':''}</option>`).join('');renderCartSource();}).catch(()=>{});
+ initLocalLibrary();initMapDrawing();renderCartography();window.mtApp.geodata({mode:'catalog'}).then(s=>{cartUI.sources=s;ce('source').innerHTML += s.map(x=>`<option value="${ch(x.id)}">${ch(x.name)}${x.access==='portal'?' · 官网获取':''}</option>`).join('');renderCartSource();}).catch(()=>{});
 }
 function readCartContours(){return Object.fromEntries(['show','interval','major','width','majorWidth','color','fontSize','minLength','labelSpacing','labels'].map(k=>[k,ce('contour-'+k).type==='checkbox'?ce('contour-'+k).checked:k==='color'?ce('contour-'+k).value:Number(ce('contour-'+k).value)]));}
-function renderCartography(){if(!ce('selected'))return;const c=state.cartography;renderCartLanguage();ce('summary').textContent=`${c.features.length} 个对象 · ${c.features.filter(f=>f.visible).length} 个显示；内容随工程保存。`;
+function renderCartography(){if(!ce('selected'))return;renderLocalLibrary();const c=state.cartography;renderCartLanguage();ce('summary').textContent=`${c.features.length} 个对象 · ${c.features.filter(f=>f.visible).length} 个显示；内容随工程保存。`;
  ce('selected').innerHTML='<option value="">新对象</option>'+c.features.map(f=>`<option value="${ch(f.id)}">${ch(f.name)} · ${ch(f.category)}${f.visible?'':'（隐藏）'}</option>`).join('');
  ce('categories').innerHTML=[...new Set(c.features.map(f=>f.category))].map(x=>`<option value="${ch(x)}">`).join('');
  selectCartFeature(cartUI.selected);for(const [k,v]of Object.entries({show:false,interval:500,major:2000,width:.25,majorWidth:.65,color:'#666666',fontSize:8,minLength:.4,labelSpacing:1.2,labels:true,...c.contours})){const el=ce('contour-'+k);if(el)el.type==='checkbox'?el.checked=v:el.value=v;}}

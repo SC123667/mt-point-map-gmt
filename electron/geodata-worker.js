@@ -56,6 +56,8 @@ async function importFile(file,source={}) {
 }
 function wfsURL(p,request){const u=new URL(p.url);for(const k of [...u.searchParams.keys()])if(['service','request','version','typename','typenames','srsname','bbox','outputformat','count','maxfeatures','startindex'].includes(k.toLowerCase()))u.searchParams.delete(k);u.searchParams.set('service','WFS');u.searchParams.set('version',p.version||'2.0.0');u.searchParams.set('request',request);return u;}
 async function handle(p){
+ if(p.mode?.startsWith('library')){const lib=require('./local-structures');if(p.mode==='libraryStatus')return lib.summary(lib.readIndex());if(p.mode==='libraryImport')return lib.importDirectory(p.directory,progress,controller.signal);if(p.mode==='libraryRefresh')return lib.refresh(progress,controller.signal);if(p.mode==='libraryQuery')return lib.query(p.region,p.settings,progress,controller.signal);}
+
  if(p.mode==='rememberNames'){const f=model.feature(p.feature),d=dictionary();d[names.identity(f)]={nameZh:f.nameZh,nameEn:f.nameEn,abbreviation:f.abbreviation};saveAtomic(dictionaryPath(),JSON.stringify(d,null,2));return {file:dictionaryPath()};}
  if(p.mode==='structures'){
   const features=[],issues=[];

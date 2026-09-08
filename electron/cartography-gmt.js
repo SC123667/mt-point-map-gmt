@@ -28,6 +28,7 @@ function scriptParts(config,outputDirectory,region,shell,quote){
   const p=file(`map_features_${String(i+1).padStart(3,'0')}.gmt`,group.parts.join('\n')+'\n');
   commands.push(`${prefix}gmt plot ${quote(p)} -R${region} -J${config.projection} ${group.options}`);
  }
+ for(const name of ['地图图层.geojson','图层来源.json'])fs.rmSync(path.join(outputDirectory,name),{force:true});
  if(features.length){file('地图图层.geojson',JSON.stringify(m.geoJSON(features),null,2));file('图层来源.json',JSON.stringify([...new Map(features.filter(f=>f.source?.id).map(f=>[f.source.id,f.source])).values()],null,2));}
  if(labels.length){
   const input=file('map_label_anchors.tsv',labels.map(l=>xy(l.anchor)).join('\n')+'\n');

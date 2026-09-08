@@ -131,6 +131,7 @@ const TERRAIN_RESOLUTIONS = {
 const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
 const SETTINGS_PANELS = {
   cartography: "地点与构造",
+  localLibrary: "本地构造库 · 自动匹配图幅",
   geodata: "查询地理与构造数据",
   contours: "地形等高线",
   data: "数据",
@@ -1696,6 +1697,7 @@ async function exportMap(formats, showAlert, options = {}) {
       notify(`${result.message}\n脚本已保存：${result.scriptPath}`);
       return false;
     }
+    if (result.localLibrary && typeof libraryUI !== "undefined") { libraryUI.match=result.localLibrary; renderLibraryStatus(); }
     state.outputDirectory = result.outputDirectory;
     renderOutputDirectory();
     const isCurrentRequest = requestRevision === state.preview.revision && requestPlotType === state.plotType;

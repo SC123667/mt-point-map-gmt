@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.7.0-0d8584)](PROJECT_HANDOFF.md)
+[![Development Version](https://img.shields.io/badge/development-v1.8.0-0d8584)](PROJECT_HANDOFF.md)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -11,6 +11,16 @@
 **MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
+
+## 本地构造库自动叠加（v1.8.0）
+
+打开“图层 → 本地构造库 · 自动叠加”，选择构造文件夹。程序复制、校验并缓存原文件，后台识别 GMT/DAT/XY/BLN、GeoJSON、SHP、KML 构造，处理 GB18030 中文和重复数据。勾选“叠加本地构造”后，每次预览、导出或保存 GMT 脚本都会按当前图幅重新匹配；不需要重复导入。可选类别、来源、颜色、线宽和名称开关，沿用统一中英文设置。
+
+缓存保存在全局目录 `构造数据/本地构造库`：原始文件、标准化数据、空间索引、复制校验清单和历史文件分类保存。读取只依赖缓存，原目录移走不影响绘图。缓存文件变化会增量更新索引；原目录的新文件需点击“选择 / 同步构造文件夹”。参考文献、色带、脚本、行政区划和 backup 备用数据不会当作构造自动绘制。ZIP 保留为原始附件，本地构造库使用解压后的数据。
+
+自动叠加设置随工程保存；构造几何按图幅读取，不累积到工程。需要单独改节点、译名或样式，可点击“转为可编辑图层”，复制当前范围的构造到“地点与构造”并关闭自动叠加。整套源数据继续保留。导出 PDF/EPS 的构造线为矢量；不同作者的近似线不自动合并，可按来源取消。
+
+The offline tectonic library copies and checksums local datasets, indexes geometries in a background worker, and automatically selects intersecting features for each map extent. Toggle the overlay, choose categories/sources and styles, or convert the current extent into editable layers. Cached data is independent of the original folder; project files preserve overlay settings. No network download is required for this library.
 
 ## 构造节点编辑与统一中英文（v1.7.0）
 
@@ -34,9 +44,9 @@
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.7.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.8.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.7.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.8.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
 
 ## 高精度地形下载 / High-resolution terrain
 

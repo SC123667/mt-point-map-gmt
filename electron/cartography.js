@@ -65,7 +65,7 @@ function anchor(f,region) {
 }
 function effectiveStyle(f,c={}){return style({...c.categoryStyles?.[f.category],...f.style});}
 function labelText(f,s,c={}){return names.label(f,s,c);}
-function normalize(value={}) {return {...names.settings(value),categoryNames:{...(value.categoryNames||{})},features:(value.features||[]).map((f,i)=>feature(f,i)),categoryStyles:{...(value.categoryStyles||{})},contours:contours(value.contours)};}
+function normalize(value={}) {return {...names.settings(value),categoryNames:{...(value.categoryNames||{})},localLibrary:require('./local-structures').settings(value.localLibrary),features:(value.features||[]).map((f,i)=>feature(f,i)),categoryStyles:{...(value.categoryStyles||{})},contours:contours(value.contours)};}
 function parsePaste(text,type='Point',name='自定义构造',category='地点') {
   const rows=String(text).trim().split(/\r?\n/).filter(x=>x.trim()).map(x=>x.trim().split(/[\t,，;；]|\s{2,}/).map(s=>s.trim()));
   if(type==='Point')return rows.map((r,i)=>{if(r.length<3)throw new Error(`第 ${i+1} 行需要：名称、经度、纬度，可附类别。`);return feature({name:r[0],category:r[3]||category,geometry:{type:'Point',coordinates:[r[1],r[2]]}},i);});

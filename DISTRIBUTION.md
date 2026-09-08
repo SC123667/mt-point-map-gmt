@@ -1,8 +1,8 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.7.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.8.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.7.0`, while GitHub `main` and the latest public release remain `1.1.3`.
+The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.8.0`, while GitHub `main` and the latest public release remain `1.1.3`.
 
 公开源码仓库：
 
@@ -103,3 +103,7 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 ## v1.7.0 构造编辑与名称
 
 新增 `map-names.js`、`map-project-worker.js` 和 `renderer/map-drawing-ui.js`，必须随 Electron 目录打包。投影转换在独立 worker 中执行，不改变 GMT/SRTM/导入边界。名称词典为运行数据，保存在全局目录下的 `名称词典`，不打入 ASAR；旧工程语言默认 original，新工程默认中文。
+
+## v1.8.0 本地构造库
+
+新增 local-structures.js 和 renderer/local-library-ui.js，沿用 geodata worker。用户构造数据不打入 ASAR，不上传仓库；库保存在全局目录的 `构造数据/本地构造库`。换电脑需另行复制该目录，原始文件夹不是绘图时的依赖。安装包只包含解析、索引及界面代码。公开版本未发布更新。

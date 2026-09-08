@@ -1,6 +1,6 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-07 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 最后核对日期 / Last verified: 2026-09-08 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
 ## 1. 一页接手摘要 / Executive Summary
 
@@ -14,10 +14,10 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.7.0`（地图构造节点编辑与统一中英文）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.7.0` 尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.8.0`（本地构造库自动匹配与叠加）
+- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.8.0` 尚未发布到 GitHub 的本地版本。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.7.0`。2026-09-07 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`43d31b377c49742d28e349ff357f1f7e07937f4246385c55c68a03976747495d`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.8.0`。2026-09-08 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`84cb67a1843d93a0a5431a8c92292f827bc56beaf39028ddaa07345dd6c2734f`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
@@ -27,13 +27,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.7.0` |
+| 本地源码版本 | `1.8.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.7.0`，尚未推送 |
+| 本地功能标签 | `v1.2.0` 至 `v1.8.0`，尚未推送 |
 | GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.7.0`，从该路径验证运行 |
+| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.8.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
@@ -600,3 +600,24 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 - 实装路径的严格验签仍受 FileProvider 附加 Finder 元数据影响（GPU Helper 提示 resource fork）；来源包严格验签通过，实装普通深度验签和 ASAR 一致性通过。这与既有维护边界一致。
 - 最终实装测试 `验证/v1.7.0/installed/verified.json` 通过；对应 `PDF验证.json` 确认两种语言图件均无栅格图像、图例只出现一次，英文图件无中文标签。
 - 正常用户环境已从“实用app”启动，验证 PID 28465；通过原生打开工程对话框恢复 `升级v1.6.0前_当前工程.mtgmt`，预览 `region_basemap.png` 于 2026-09-07 21:17:33 更新，未停留在测试环境。
+
+## 2026-09-08 v1.8.0 本地构造库自动匹配
+
+- `electron/local-structures.js` 仅在 geodata worker 执行复制、编码解析、索引和范围查询。主进程在预览、导出和保存脚本之前解析 `config.cartography.localLibrary`，合并当次自动图层供 GMT 和原生文字共同使用；查询结果不写回 renderer 的工程要素数组。
+- localLibrary 保存 enabled、categories、excludedSources、showLabels、styles；缺省关闭，旧工程行为不变。renderer/local-library-ui.js 接入既有“图层”菜单和设置窗口，可转换成当前范围的可编辑图层并自动关闭动态叠加。
+- 原目录 `/Volumes/MacBook Pro SSD/构造文件` 已复制到全局 `构造数据/本地构造库/原始文件/构造文件`，450 个数据/配套文件、194350116 字节逐项 SHA-256 一致；原目录保留。Finder `.DS_Store` 不作为数据复制。
+- 缓存目录包含复制校验清单、原始文件、按来源命名的标准化 NDJSON、空间索引、构造库说明和历史文件。索引 schema 3；按内容哈希复用解析结果，以空间网格和字节偏移读取相交要素。缓存文件改动自动重建增量索引；更新原目录后由用户点击“选择 / 同步构造文件夹”。
+- 17998 个唯一要素，126 个重复文件、1507 个重复几何不重复绘制；52 份唯一来源记录（部分与其他文件完全重叠，独有要素数为 0）。GMT 属性优先于 KML，保留名称、分类和 Source 等元数据。GB18030 中文可读取。不同版本的近似线不强行合并，按来源选择控制。
+- GMT/DAT/TXT/BLN、GeoJSON、SHP、KML 支持；用户目录中的 ZIP/PDF/色带/脚本/行政区划及 backup 资料保留但不自动作为构造。GMT/KML 火山岩轮廓归为区域；经纬度几何保持原值，去重键以 7 位小数比较，线段支持逆序、多边形支持轮廓起点/方向不同。
+- 线段使用 Liang–Barsky 按图幅裁剪，覆盖两端都在图外的相交线；面保留孔洞并由 GMT 进行最终图框裁剪。支持经度跨 180°。转换为可编辑图层时只复制本次图幅内容，原数据库不改动。
+- 验证：15 组 npm run test:node 全通过；真实 source/candidate/installed Electron+GMT 验证自动叠加、分类/来源过滤、图幅切换、关闭叠加、工程恢复、GMT 脚本和转换编辑。真实范围 86/96/28/32 匹配 664 项，后台检索约数十毫秒，不包括 GMT 绘图时间。中文和英文 PDF 均无栅格图像，EPS 成功生成。Windows 仅验证最小窗口布局和平台样式，未运行 Windows 实机。
+- 未改变 MT 数学和地形计算；本轮不宣称新的真实 EDI 或 1 秒地形性能验证。证据保存在全局 `验证/v1.8.0/`。
+
+### v1.8.0 安装与回滚
+
+- 来源 App：全局 `安装包/v1.8.0/mac-arm64/MT点位图制作工具—GMT.app`，严格深度验签通过，37 个 Electron/版本/README/CHANGELOG 文件与源码逐项一致。
+- 实装：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 1.8.0，普通深度验签及 ASAR 一致性通过。ASAR SHA-256 `84cb67a1843d93a0a5431a8c92292f827bc56beaf39028ddaa07345dd6c2734f`。
+- 实装严格验签仍有既有 FileProvider Finder 元数据提示（GPU Helper resource fork）；来源包严格验签通过，未通过清理扩展属性改变用户目录行为。
+- 旧 App 完整保存在全局 `版本备份/v1.7.0-20260908-升级v1.8.0/MT点位图制作工具—GMT.app`，旧 ASAR 哈希与升级前一致、普通深度验签通过。
+- 关闭旧版前，将真实当前工程通过应用另存到 `工程文件/升级v1.8.0前_当前工程_20260908.mtgmt`，区域 86/96/28/32，0 测点。原有工程文件未覆盖。
+- 仅本地维护与交付；未推送 GitHub、未创建 Release。
