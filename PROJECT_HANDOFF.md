@@ -10,7 +10,8 @@
 - 源码 17 组 Node 测试通过。真实 GMT 6.7 已验证 6 个地图范围/投影的双语 PNG/PDF/EPS 与 5 类 MT 图件；欧洲 Mercator/Lambert、全球 Robinson、南北极和日期变更线均使用真实 GMT。无地形 PDF 保留文字与矢量，无栅格图片。GMT 6.7 与旧 6.5 都完成真实缓存地形与全部构造叠加回归。
 - tests/gmt67_integration.cjs 使用隐藏、不可聚焦 Electron，不模拟键鼠。MT_GMT_WORKSPACE 必须指向隔离验证目录；QA_MODULE_ROOT 可指向候选 app.asar，GMT_QA_TERRAIN_GRID 可指定已有网格追加等高线回归。验证输出位于 验证/v1.10.0。
 - 候选 v1.10.0 已严格深度验签，39 个 Electron 文件与源码相同，ASAR SHA-256：`fdd8717457ea238d5794ede1eafd037146c7c4da4c0a294898c186744be9963a`。包内 18 个真实出图案例通过（含实际网格等高线），18 份 PDF 检查通过；无地形图零栅格图像，中英文文字可提取。候选位于全局目录 安装包/v1.10.0/mac-arm64。
-- 19:59 外置 SSD 从 /Volumes 与 diskutil external 列表消失，候选与验证文件暂时不可读取。没有创建替代缓存，也未关闭/替换用户 App。继续交付需磁盘重新连接后校验候选，并确认当前工程已保存再后台替换。实用app 当前仍为 1.9.0。GitHub main/Latest 仍为 v1.8.1，本轮未授权远端发布。
+- 19:59 SSD 曾断开，21:18 恢复；重新核验候选哈希/严格验签和 18 份导出文件/PDF 通过。旧 App 当时已退出，备份核验后将实用app 更新至 1.10.0，open -g 后台启动，确认目标主进程及 Renderer 在运行。目录内唯一 GMT App，目标 ASAR 与候选一致；普通深度验签通过，严格验签仍有 FileProvider 附加 Finder 信息的已知提示，不反复清理元数据。
+- 旧版备份：/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.9.0-升级v1.10.0/MT点位图制作工具—GMT.app。GMT 6.7 适配与本机交付完成；GitHub main/Latest 仍为 v1.8.1，本轮未发布。
 
 ## 2026-09-09 v1.9.0 本地制图样式更新
 
@@ -47,7 +48,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 当前本地源码版本：`v1.10.0`（GMT 6.7 引擎适配）
 - 当前分支基于已发布的 `b40c16a` / v1.8.1，另含本地 v1.9.0 与 v1.10.0。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.9.0`。2026-09-09 已更新；目录内只有这一个 GMT 绘图应用。ASAR SHA-256：`1ad2c814b25b108a4f600d8396436e2b0766087c14ad192184375bf8a5b456d6`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.10.0`。ASAR SHA-256：`fdd8717457ea238d5794ede1eafd037146c7c4da4c0a294898c186744be9963a`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机默认使用 `/opt/homebrew/bin/gmt` 6.7.0，保留 `/Applications/GMT-6.5.0.app` 作为回退。
@@ -63,7 +64,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 | 远端 `main` 基线 | `b40c16a` / `v1.8.1` |
 | 本地功能标签 | v1.9.0 与 v1.10.0 为本地版本；v1.8.1 已发布 |
 | GitHub 最新 Release | `v1.8.1`，Latest、非草稿、非预发布 |
-| 本机 App | 桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.9.0`，从该路径验证运行 |
+| 本机 App | 桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.10.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
