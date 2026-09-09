@@ -1705,8 +1705,10 @@ async function exportMap(formats, showAlert, options = {}) {
       const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
       if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType, {frame:result.mapFrame, config:JSON.parse(JSON.stringify(config))});
     }
-    if (showAlert) setRuntimeStatus(`导出完成：${result.files.length} 个文件`, "ready");
-    else if (isCurrentRequest) setRuntimeStatus("预览已更新", "ready");
+    const labelReport=result.annotationLayout?.placement;
+    const labelStatus=labelReport?.enabled?` · 名称 ${labelReport.shown} 项${labelReport.hidden.length?`，略去 ${labelReport.hidden.length} 项重复/编号/拥挤文字`:''}`:'';
+    if (showAlert) setRuntimeStatus(`导出完成：${result.files.length} 个文件${labelStatus}`, "ready");
+    else if (isCurrentRequest) setRuntimeStatus(`预览已更新${labelStatus}`, "ready");
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
   } finally {
@@ -2063,7 +2065,18 @@ async function deleteCurrentTerrainCache() {
 }
 
 function applyPlotPreset(preset) {
+  const paper = (gray=false) => {
+    setChecked(el.showTerrainInput,true);setInputValue(el.terrainCptInput,gray?'paperGray':'paper');
+    setInputValue(el.terrainIntensityInput,.25);setChecked(el.showTitleInput,false);setChecked(el.showLabelsInput,false);
+    setChecked(el.showGridInput,false);setChecked(el.showNorthInput,false);setChecked(el.showScaleInput,true);
+    setInputValue(el.pngDpiInput,450);setInputValue(el.labelSizeInput,7);setInputValue(el.pointSizeInput,.16);
+    setColorControlValue('pointFill','#2f6f8f');setColorControlValue('penColor','#30383c');setInputValue(el.penWidthInput,.35);
+    state.cartography=window.PaperStyle.applyCartography(state.cartography);
+    setChecked(el.showLegendInput,false);renderCartography();
+  };
   const presets = {
+    paperTectonic:()=>paper(false),
+    paperGray:()=>paper(true),
     paperMono: () => {
       setChecked(el.showTerrainInput, false);
       setChecked(el.showTitleInput, false);

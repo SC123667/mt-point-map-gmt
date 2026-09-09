@@ -8,6 +8,9 @@ function initCartography(){
  <fieldset data-settings-panel="cartography" class="cart-panel"><legend>地点与构造 · 我的图层</legend>
   <div class="cart-grid"><label>绘图语言<select id="cart-language"><option value="zh">统一中文</option><option value="en">统一英文</option><option value="original">保留原始名称（兼容旧工程）</option></select></label><label>统一名称形式<select id="cart-name-format"><option value="name">完整名称</option><option value="abbreviation">简称（无简称用完整名称）</option><option value="both">完整名称 + 简称</option></select></label></div>
   <p id="cart-language-status" class="hint"></p><div id="cart-pending" class="cart-actions"></div>
+  <div class="cart-grid"><label class="checkbox-row"><input id="cart-smart-labels" type="checkbox" checked>名称自动去重、沿线排布与避让</label><label class="checkbox-row"><input id="cart-hide-generic" type="checkbox" checked>不标注未命名项与文件编号</label></div>
+  <p class="hint">自动排布保留构造几何；拥挤或超出图框的文字暂不绘制。手动指定锚点优先保留，不自动移动；各项隐藏原因随图件保存为“标注排布报告.json”。</p>
+  <div class="cart-actions"><button id="cart-paper-style">应用论文构造地形样式</button></div>
   <div class="cart-actions"><button id="cart-draw-line">在地图上画构造线</button><button id="cart-draw-polygon">在地图上画构造区域</button><button id="cart-edit-vertices">拖动当前对象节点</button></div>
   <div class="cart-actions"><button id="cart-new">新增对象</button><button id="cart-import">导入矢量 / 地点表</button><button id="cart-export">导出图层 GeoJSON</button></div>
   <p id="cart-summary" class="hint">尚未添加图层。可以输入坐标，也可以查询数据源。</p>
@@ -44,6 +47,8 @@ function initCartography(){
  on('new',()=>selectCartFeature(''));
  on('draw-line',()=>startMapDrawing('LineString'));on('draw-polygon',()=>startMapDrawing('Polygon'));on('edit-vertices',()=>startMapDrawing('edit'));
  on('language',()=>{state.cartography.language=ce('language').value;renderCartLanguage();cartChanged();},'change');
+ on('paper-style',()=>applyPlotPreset('paperTectonic'));
+ for(const [id,key]of [['smart-labels','enabled'],['hide-generic','hideGeneric']])on(id,()=>{state.cartography.labelLayout={...state.cartography.labelLayout,[key]:ce(id).checked};cartChanged();},'change');
  on('category',()=>{const category=ce('category').value,custom=state.cartography.categoryNames?.[category]||{};ce('category-zh').value=custom.nameZh||window.MapNames.translated(category,'zh');ce('category-en').value=custom.nameEn||window.MapNames.translated(category,'en');},'change');
  on('name-format',()=>{state.cartography.nameFormat=ce('name-format').value;renderCartLanguage();cartChanged();},'change');
 on('selected',()=>selectCartFeature(ce('selected').value),'change');
@@ -64,7 +69,7 @@ on('selected',()=>selectCartFeature(ce('selected').value),'change');
  initLocalLibrary();initMapDrawing();renderCartography();window.mtApp.geodata({mode:'catalog'}).then(s=>{cartUI.sources=s;ce('source').innerHTML += s.map(x=>`<option value="${ch(x.id)}">${ch(x.name)}${x.access==='portal'?' · 官网获取':''}</option>`).join('');renderCartSource();}).catch(()=>{});
 }
 function readCartContours(){return Object.fromEntries(['show','interval','major','width','majorWidth','color','fontSize','minLength','labelSpacing','labels'].map(k=>[k,ce('contour-'+k).type==='checkbox'?ce('contour-'+k).checked:k==='color'?ce('contour-'+k).value:Number(ce('contour-'+k).value)]));}
-function renderCartography(){if(!ce('selected'))return;renderLocalLibrary();const c=state.cartography;renderCartLanguage();ce('summary').textContent=`${c.features.length} 个对象 · ${c.features.filter(f=>f.visible).length} 个显示；内容随工程保存。`;
+function renderCartography(){if(!ce('selected'))return;renderLocalLibrary();const c=state.cartography;ce('smart-labels').checked=c.labelLayout?.enabled!==false;ce('hide-generic').checked=c.labelLayout?.hideGeneric!==false;renderCartLanguage();ce('summary').textContent=`${c.features.length} 个对象 · ${c.features.filter(f=>f.visible).length} 个显示；内容随工程保存。`;
  ce('selected').innerHTML='<option value="">新对象</option>'+c.features.map(f=>`<option value="${ch(f.id)}">${ch(f.name)} · ${ch(f.category)}${f.visible?'':'（隐藏）'}</option>`).join('');
  ce('categories').innerHTML=[...new Set(c.features.map(f=>f.category))].map(x=>`<option value="${ch(x)}">`).join('');
  selectCartFeature(cartUI.selected);for(const [k,v]of Object.entries({show:false,interval:500,major:2000,width:.25,majorWidth:.65,color:'#666666',fontSize:8,minLength:.4,labelSpacing:1.2,labels:true,...c.contours})){const el=ce('contour-'+k);if(el)el.type==='checkbox'?el.checked=v:el.value=v;}}

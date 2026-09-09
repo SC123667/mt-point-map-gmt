@@ -382,6 +382,8 @@
           </label>
           <label>色带
             <select id="terrainCptInput">
+              <option value="paper">论文 · 低饱和地形</option>
+              <option value="paperGray">论文 · 浅灰地形</option>
               <option value="geo" selected>geo 地形色带</option>
               <option value="relief">relief 阴影地形</option>
               <option value="topo">topo 高程色带</option>
@@ -446,13 +448,15 @@
         <fieldset class="map-settings" data-settings-panel="presets">
           <legend>绘图模板/预设</legend>
           <div class="preset-grid">
+            <button class="preset-button" data-preset="paperTectonic" type="button">论文构造地形图</button>
+            <button class="preset-button" data-preset="paperGray" type="button">论文浅灰底图</button>
             <button class="preset-button" data-preset="paperMono" type="button">论文点位图</button>
             <button class="preset-button" data-preset="fieldQuick" type="button">野外快速图</button>
             <button class="preset-button" data-preset="terrainColor" type="button">带地形彩色图</button>
             <button class="preset-button" data-preset="faultMap" type="button">构造线图</button>
             <button class="preset-button" data-preset="phaseTensor" type="button">相位张量图</button>
           </div>
-          <p class="field-note">“论文点位图”采用简洁高对比符号，默认不重复放标题、单类图例或全部测点名。预设不会删除已导入数据。</p>
+          <p class="field-note">“论文构造地形图”弱化地形、区分构造线层级，名称自动去重避让；“论文浅灰底图”适合突出彩色测点。预设不改变坐标、原始高程或选择的分辨率。</p>
         </fieldset>
 
         <fieldset class="analysis-settings" data-settings-panel="mtParams">

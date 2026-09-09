@@ -1061,6 +1061,7 @@ function loadRenderer(win) {
   const bridge = `
     const { ipcRenderer } = require("electron");
     window.MapNames = require(${JSON.stringify(path.join(__dirname,"map-names.js"))});
+    window.PaperStyle = require(${JSON.stringify(path.join(__dirname,"paper-style.js"))});
     window.mtApp = {
       geographicRegionIssue: ${geographicRegionIssue.toString()},
       previewConfig: ${makePreviewConfig.toString()},

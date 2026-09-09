@@ -332,7 +332,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const labelsPathForScript = shell === "bat" ? "stations_labels.tsv" : labelsPath;
   const labelFont = `${Number(config.labelFontSize).toFixed(1)}p,Helvetica,${config.labelColor}=~0.65p,white`;
   const offset = `${Number(config.labelDX).toFixed(3)}c/${Number(config.labelDY).toFixed(3)}c`;
-  const scale = scaleForRegion(regionValues);
+  const scale = scaleForRegion(regionValues,!!config.cartography?.paperStyle);
   const gmt = resolveGMT();
   const environmentLines = gmtEnvironmentLines(gmt, shell, config, outputDirectory);
   for (const [name,value] of Object.entries(gmtCacheEnv(outputDirectory,config))) {
@@ -345,7 +345,9 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const legend = legendScriptPart(config, outputDirectory, region, shell);
   const cartography = require("./cartography-gmt").scriptParts(config, outputDirectory, region, shell, quote);
   const prefix = shell === "bat" ? "" : "  ";
-  const mapStyleCommand = `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 12p,Helvetica-Bold,gray15 FONT_ANNOT_PRIMARY 8.5p,Helvetica,gray25 FONT_LABEL 9p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mm:ssF MAP_FRAME_PEN 0.70p,gray25 MAP_TICK_PEN_PRIMARY 0.55p,gray35 MAP_GRID_PEN_PRIMARY 0.20p,gray82,- MAP_TITLE_OFFSET 0.14c`;
+  const mapStyleCommand = config.cartography?.paperStyle
+    ? `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 10p,Helvetica,gray20 FONT_ANNOT_PRIMARY 7.5p,Helvetica,gray25 FONT_LABEL 7.5p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mmF MAP_FRAME_PEN 0.5p,gray30 MAP_TICK_PEN_PRIMARY 0.4p,gray35 MAP_TICK_LENGTH_PRIMARY 0.1c MAP_GRID_PEN_PRIMARY 0.15p,gray85,- MAP_TITLE_OFFSET 0.14c`
+    : `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 12p,Helvetica-Bold,gray15 FONT_ANNOT_PRIMARY 8.5p,Helvetica,gray25 FONT_LABEL 9p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mm:ssF MAP_FRAME_PEN 0.70p,gray25 MAP_TICK_PEN_PRIMARY 0.55p,gray35 MAP_GRID_PEN_PRIMARY 0.20p,gray82,- MAP_TITLE_OFFSET 0.14c`;
   const backgroundCommands = [];
   if (terrain.imageCommand) {
     backgroundCommands.push(terrain.imageCommand);
@@ -884,9 +886,17 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   const shade = !sampleLocalPreview && config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
   const remote = terrainRemoteName(config.terrainResolution);
   const intensity = terrainIntensity(config.terrainIntensity);
-  const cpt = terrainCpt(config.terrainCpt);
+  let cpt = terrainCpt(config.terrainCpt);
+  const paperTerrain=['paper','paperGray'].includes(cpt);
+  if(['paper','paperGray'].includes(cpt)){
+    const cptName=`terrain_${cpt}.cpt`;fs.writeFileSync(path.join(outputDirectory,cptName),require('./paper-style').terrainCPT(cpt));
+    cpt=quote(shell==='bat'?cptName:path.join(outputDirectory,cptName));
+  }
   const prefix = shell === "bat" ? "" : "  ";
   const preCommands = [];
+  // GMT's default dark-side HSV saturation amplifies tiny yellow/green tints.
+  // Keep the illumination neutral and restrained for the publication palettes.
+  if(paperTerrain)preCommands.push(`${prefix}gmt set COLOR_HSV_MIN_S 0 COLOR_HSV_MAX_S 0 COLOR_HSV_MIN_V 0.55 COLOR_HSV_MAX_V 1`);
   preCommands.push(`${prefix}gmt set GMT_DATA_SERVER ${quote(terrainDataServer(config.terrainDataServer))}`);
   preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
   if (localGrid) {
@@ -1187,11 +1197,12 @@ function formatCount(value) {
   return String(Math.round(count));
 }
 
-function scaleForRegion(region) {
+function scaleForRegion(region,compact=false) {
   if (!region) return { length: "1k", label: "km" };
   const midLat = (region.south + region.north) / 2;
   const widthKm = Math.max(0.001, (region.east - region.west) * 111.32 * Math.cos(toRadians(midLat)));
-  const targetKm = widthKm / 4;
+  const targetKm = widthKm / (compact?5:4);
+  if(compact){const power=10**Math.floor(Math.log10(targetKm)),n=targetKm/power,step=n>=5?5:n>=2?2:1,km=step*power;return km<1?{length:`${Number((km*1000).toPrecision(6))}e`,label:'m'}:{length:`${Number(km.toPrecision(6))}k`,label:'km'};}
   if (targetKm < 1) return { length: `${niceDistanceMeters(targetKm * 1000)}e`, label: "m" };
   return { length: `${niceDistanceKm(targetKm)}k`, label: "km" };
 }

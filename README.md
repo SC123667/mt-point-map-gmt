@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/version-v1.8.1-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
+[![Version](https://img.shields.io/badge/version-v1.9.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -11,6 +11,14 @@
 **MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
+
+## 论文构造地形图（本地 v1.9.0）
+
+本地源码版本 **v1.9.0**；GitHub 公开版本仍为 **v1.8.1**。打开“图层 → 本地构造库”，点击“论文构造地形图”；也可以在绘图预设中选择“论文浅灰底图”。浅色地形、弱阴影、分类构造线、较短比例尺与统一字体一起应用，构造类别选择、坐标、高程分辨率和工程数据保持原有设置。
+
+“图层 → 地点与构造”提供名称语言、自动排布和隐藏文件编号开关。排布根据投影后的图幅尺寸选择线上的标注位置与角度，去除重复名称，避免文字互相遮挡和越出图框。放不下或没有可靠名称的对象仍绘制几何；遗漏原因写入输出目录的 `标注排布报告.json`。手动标注锚点优先保留，过密图件仍需按来源/类别筛选及最终人工审阅。
+
+论文预设保留已选中文或英文；原始名称模式转为统一中文。PDF 中文字、构造线和等高线保持矢量，晕渲底图仍是栅格。具体配色与适用边界见 [构造图使用说明](docs/CARTOGRAPHY.md)。
 
 ## 本地构造库自动叠加（v1.8.0）
 

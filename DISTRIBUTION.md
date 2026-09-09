@@ -1,5 +1,7 @@
 # 分发说明 / Distribution
 
+本地开发版本 **v1.9.0**（论文构造地形图）；此轮仅本地构建与验证，公开发行仍为下述 v1.8.1。
+
 当前发布版本 **v1.8.1**，仓库与下载：[SC123667/mt-point-map-gmt](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)。这是 v1.1.3 之后的累积更新。
 
 Current release: **v1.8.1**, a cumulative update after v1.1.3.

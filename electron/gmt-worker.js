@@ -82,14 +82,14 @@ async function exportGMTMap(payload) {
     forceGMTTitle: includesVector && nativeTitle && !needsNativeDecorations
   };
   sendProgress("script", 22, `正在生成 GMT 脚本和 ${payload.records?.length || 0} 个测点数据文件...`);
-  for (const name of ["map_label_styles.json", "map_label_projected.tsv"]) fs.rmSync(path.join(gmtWorkspace.directory,name), {force:true});
+  for (const name of ["map_label_styles.json", "map_label_projected.tsv", "map_frame_size.tsv", "标注排布报告.json"]) fs.rmSync(path.join(gmtWorkspace.directory,name), {force:true});
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
   if (result.ok && (nativeAnnotations || payload.config?.interactiveMap)) {
     const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName);
     result.mapFrame = {width:layout.width,height:layout.height,ox:layout.ox,oy:layout.oy};
-    if(layout.labels.length) result.annotationLayout = layout;
+    if(layout.labels.length || layout.placement?.enabled) result.annotationLayout = layout;
   }
   finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
@@ -282,7 +282,7 @@ function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, fo
     copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
     copyIfExists(path.join(workspace.directory, DEFAULT_OVERLAY_FILE), path.join(outputDirectory, DEFAULT_OVERLAY_FILE));
     copyIfExists(path.join(workspace.directory, DEFAULT_LEGEND_FILE), path.join(outputDirectory, DEFAULT_LEGEND_FILE));
-    for (const name of fs.readdirSync(workspace.directory)) if (/^map_|^地图图层|^图层来源/.test(name)) copyIfExists(path.join(workspace.directory,name),path.join(outputDirectory,name));
+    for (const name of fs.readdirSync(workspace.directory)) if (/^map_|^地图图层|^图层来源|^terrain_paper(?:Gray)?\.cpt$|^标注排布报告\.json$/.test(name)) copyIfExists(path.join(workspace.directory,name),path.join(outputDirectory,name));
     fs.rmSync(workspace.directory, { recursive: true, force: true });
   }
 }

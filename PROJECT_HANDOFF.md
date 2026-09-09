@@ -2,6 +2,14 @@
 
 > 最后核对日期 / Last verified: 2026-09-09 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
+## 2026-09-09 v1.9.0 本地制图样式更新
+
+- 源码 1.9.0；新增 paper-style.js（纯展示预设）和 label-layout.js（以 PostScript 点为单位的确定性标注排布）。GMT mapproject 提供真实投影位置、方向和图框尺寸，cartography-gmt.js 生成 SVG 文字与排布报告。
+- 地形使用自定义浅色色带和中性 HSV 阴影，保持数据分辨率；构造几何全部保留，低优先级编号对象弱化显示。论文预设不会改动类别选择或原始数据。
+- “图层 → 本地构造库”与绘图预设都有样式入口；名称语言和避让开关在“图层 → 地点与构造”。原始名称模式应用论文预设后统一中文。
+- 本轮验证和安装包位于全局目录 验证/v1.9.0 与 安装包/v1.9.0；用户旧工程保留。使用隐藏且不可聚焦的 Electron 窗口验证，不模拟键鼠。
+- GitHub 公开版本仍为 v1.8.1；本地 1.9.0 未上传。实际安装路径版本、签名与交付状态单独核验。
+
 ## 2026-09-09 v1.8.1 发布状态（优先于下方历史快照）
 
 - 用户已明确授权更新原 GitHub 仓库与 Release；发布目标为 origin/main 和 v1.8.1 标签。
@@ -21,10 +29,10 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 - GitHub 仓库：<https://github.com/SC123667/mt-point-map-gmt>
 - GitHub 默认分支：`main`
-- GitHub 最新正式版：`v1.1.3`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.1.3>
+- GitHub 最新正式版：`v1.8.1`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.8.0`（本地构造库自动匹配与叠加）
-- 当前分支基于远端 `main` 的 `a5d97e4`，另含 `v1.2.0` 至 `v1.8.0` 尚未发布到 GitHub 的本地版本。
+- 当前本地源码版本：`v1.9.0`（论文构造地形图与名称排布）
+- 当前分支基于已发布的 `b40c16a` / v1.8.1，另含本地 v1.9.0。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
 - 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.8.0`。2026-09-08 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`84cb67a1843d93a0a5431a8c92292f827bc56beaf39028ddaa07345dd6c2734f`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
@@ -36,12 +44,12 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.8.0` |
+| 本地源码版本 | `1.9.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
-| 远端 `main` 基线 | `a5d97e4` / `v1.1.3` |
-| 本地功能标签 | `v1.2.0` 至 `v1.8.0`，尚未推送 |
-| GitHub 最新 Release | `v1.1.3`，Latest、非草稿、非预发布 |
+| 远端 `main` 基线 | `b40c16a` / `v1.8.1` |
+| 本地功能标签 | v1.9.0 为本地版本；v1.8.1 已发布 |
+| GitHub 最新 Release | `v1.8.1`，Latest、非草稿、非预发布 |
 | 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.8.0`，从该路径验证运行 |
 
 版本号必须同步维护：
