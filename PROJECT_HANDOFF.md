@@ -1,6 +1,15 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-08 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 最后核对日期 / Last verified: 2026-09-09 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+
+## 2026-09-09 v1.8.1 发布状态（优先于下方历史快照）
+
+- 用户已明确授权更新原 GitHub 仓库与 Release；发布目标为 origin/main 和 v1.8.1 标签。
+- 源码版本 1.8.1；现有“实用app”仍为已验证的 1.8.0，本轮发布不关闭或替换运行中的软件。
+- 修复 workspace.js 的开发者专用路径：默认当前用户 Documents/GMT工作区，允许环境变量与目录链接。维护机将此入口链接到原 SSD，缓存和词典保持原位置。
+- 所有公开构建产物与本轮验证保存在全局目录的 安装包/v1.8.1-public。个人构造资料、汉化词典与项目不包含于发行包。
+- 使用标准 electron-builder 生成 macOS ARM64 DMG 与 Windows x64/ARM64 setup/portable；Windows 运行验证、macOS Apple 公证与构建成功必须分别报告，不混淆。
+- script/package_release.sh 为隔离构建入口，不自动发布或操作应用窗口。下面各版本的“未发布”说明为历史记录；当前远端结果以 GitHub Release 及发布核验记录为准。
 
 ## 1. 一页接手摘要 / Executive Summary
 

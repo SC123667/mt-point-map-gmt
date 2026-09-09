@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Development Version](https://img.shields.io/badge/development-v1.8.0-0d8584)](PROJECT_HANDOFF.md)
+[![Version](https://img.shields.io/badge/version-v1.8.1-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -30,7 +30,7 @@ The offline tectonic library copies and checksums local datasets, indexes geomet
 
 “查询构造 / 城市数据”新增公开构造联合查询与点/线/区域筛选，IYZS 等已知简称可匹配真实构造线。数据源没有提供某条构造时，需要导入其他可靠矢量或手工描绘；软件不会根据单个名称点猜测边界。
 
-## 地点、构造数据与等高线（本地 v1.7.0）
+## 地点、构造数据与等高线
 
 先选择“区域底图”并设置经纬度范围，然后打开左侧“图层”：
 
@@ -44,9 +44,9 @@ The offline tectonic library copies and checksums local datasets, indexes geomet
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前本地开发分支为 `codex/method-colored-stations`，源码版本为 **v1.8.0**；GitHub `main` 和最新公开安装包仍为 **v1.1.3**。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前发布版本为 **v1.8.1**，包含此前本地 v1.2.0–v1.8.0 的累积更新。
 
-See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The local development branch is **v1.8.0**, while GitHub `main` and the latest public installers remain **v1.1.3**.
+See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The current release is **v1.8.1**, including the cumulative v1.2.0–v1.8.0 updates.
 
 ## 高精度地形下载 / High-resolution terrain
 
@@ -128,14 +128,18 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 - Export PNG with custom DPI, vector PDF, EPS, all formats, and reproducible GMT scripts.
 - 支持 macOS 和 Windows 打包分发。
 - Build distributable macOS and Windows desktop packages.
-- 本地 v1.2.x–v1.4.x 开发分支支持按勘探方法分组样式、经纬轴互换、指定测点标注、原生中文图例、标题/图例独立开关和论文点位图样式；这些功能尚未进入公开 `main`。
-- The local v1.2.x–v1.4.x development branch adds method-based station styling, swapped geographic axes, explicit label selection, native Chinese legends, independent title/legend visibility, and a publication station-map style; these features are not yet on public `main`.
+- 支持按勘探方法分组样式、经纬轴互换、指定测点标注、原生中文图例、标题/图例独立开关和论文点位图样式。
+- Includes method-based station styling, swapped geographic axes, explicit label selection, native Chinese legends, independent title/legend visibility, and a publication station-map style.
 
 ## 正式版下载 / Stable Release
 
-当前 GitHub `main` 与最新公开安装包版本为 **v1.1.3**。本地 `codex/method-colored-stations` 开发分支已推进到 **v1.4.1**，尚未上传；普通用户应从 GitHub Releases 下载公开稳定版。
+当前版本 **v1.8.1**。下载与你电脑架构对应的安装包，安装 GMT 6.x 后即可绘图。新用户默认数据目录为 `~/Documents/GMT工作区`；缓存、导出和工程在其中分类保存，无需开发者的外接硬盘。
 
-GitHub `main` and the latest public installer release are **v1.1.3**. The local `codex/method-colored-stations` development branch is **v1.4.1** and has not been published; end users should use the stable GitHub Release.
+Current version: **v1.8.1**. Choose the matching installer and install GMT 6.x separately. New users store generated files under their own `~/Documents/GMT工作区`.
+
+macOS 包采用 ad-hoc 签名，未做 Apple 公证。如系统阻止打开，可在“系统设置 → 隐私与安全性”中确认允许此应用。Windows 包未作商业代码签名；本次没有 Windows 实机安装/升级验证。个人构造库、地形缓存、工程和用户名称词典不随安装包分发；可自行导入或通过软件的公开数据入口获取。
+
+The macOS package is ad-hoc signed, not notarized. Windows packages are unsigned and have not been tested on physical Windows systems in this release. Personal datasets, projects and user dictionaries are not bundled. See [Distribution](DISTRIBUTION.md) for validation limits.
 
 [打开 GitHub Releases / Open GitHub Releases](https://github.com/SC123667/mt-point-map-gmt/releases)
 
@@ -162,9 +166,9 @@ GitHub `main` and the latest public installer release are **v1.1.3**. The local 
 
 Select **Region basemap**, enter west/east/south/north bounds, and confirm to preview without station data. Save/reopen `.mtgmt` projects or export vector PDF/EPS. Open the PDF in Adobe Illustrator to edit paths and text and save as `.ai`; groups or clipping masks may need to be entered or released, and editable fonts depend on local availability.
 
-**矢量范围说明：** 地形晕渲属于栅格影像，不会自动变成可逐条编辑的等高线。PDF 中的中文标题/图例采用矢量合成，保持 GMT 底图可编辑；EPS 仍不包含原生中文叠加，中文图件优先选 PDF。软件不直接生成 Illustrator 专有 `.ai` 文件，也不恢复为带图层名称的 GIS 工程。
+**矢量范围说明：** 地形晕渲属于栅格影像，不会自动变成可逐条编辑的等高线。PDF 中的中文标题/图例采用矢量合成，保持 GMT 底图可编辑；v1.6.0 起应用导出支持原生中文 EPS 合成，中文编辑仍优先选 PDF。软件不直接生成 Illustrator 专有 `.ai` 文件，也不恢复为带图层名称的 GIS 工程。
 
-**Vector scope:** Shaded relief remains a raster image. Chinese PDF decorations preserve the GMT vector base; EPS omits native Chinese overlays. The app exports PDF/EPS, not native `.ai` or named GIS layers.
+**Vector scope:** Shaded relief remains a raster image. Chinese PDF decorations preserve the GMT vector base; App exports since v1.6.0 also compose native Chinese EPS decorations. The app exports PDF/EPS, not native `.ai` or named GIS layers.
 
 ## 输入数据 / Input Data
 
@@ -266,7 +270,7 @@ Release artifacts are written to `release/`.
 默认输出目录 / Default output directory:
 
 ```text
-~/Documents/MT点位图制作工具-GMT输出
+~/Documents/GMT工作区/导出图件
 ```
 
 常见输出 / Typical files:
@@ -299,10 +303,10 @@ MIT License. See [LICENSE](LICENSE).
 
 ### v1.5.0 全局工作目录与地形加速
 
-本机统一使用 `/Volumes/MacBook Pro SSD/GMT-缓存`。`导出图件`、`预览文件`、`工程文件`、`导出表格`、`导出脚本`、`地形缓存`、`安装包`、`运行数据`、`运行日志` 和 `临时文件` 各自分类。原始导入文件保持原位置。地形设置中可查看和打开全局目录，也可填写区域名称；自动命名使用随 App 附带的 GeoNames 城镇数据（CC BY 4.0），无须联网查询位置。
+v1.8.1 起新用户统一使用 `~/Documents/GMT工作区`，也可通过 `MT_GMT_WORKSPACE` 或目录链接指定其他磁盘。`导出图件`、`预览文件`、`工程文件`、`导出表格`、`导出脚本`、`地形缓存`、`安装包`、`运行数据`、`运行日志` 和 `临时文件` 各自分类。原始导入文件保持原位置。地形设置中可查看和打开全局目录，也可填写区域名称；自动命名使用随 App 附带的 GeoNames 城镇数据（CC BY 4.0），无须联网查询位置。
 
 同一区域的高程跨工程/导出目录共享，改变阴影强度只生成新阴影。1 秒原始瓦片最多 3 块并行下载，直接写二进制高程，避免几十 GB 文本中间文件。宽区域预览按屏幕大小选择较低分辨率，正式导出保持用户选择的地形源分辨率；PDF/EPS 中的地形晕渲按 DPI 嵌入影像，图框、文字和线条保留矢量。
 
-外接盘未连接或不可写时会提示，不会悄悄写回系统盘。其他机器可通过 `MT_GMT_WORKSPACE` 环境变量指定全局目录；Windows 默认 `Documents/GMT工作区`，GMT 的 ASCII 兼容入口通过目录联接指向该目录。Windows 修改尚需在 Windows 实机回归。
+外接盘未连接或不可写时会提示，不会悄悄写回系统盘。可通过 `MT_GMT_WORKSPACE` 环境变量指定全局目录；macOS 和 Windows 默认 `Documents/GMT工作区`，GMT 的 ASCII 兼容入口通过目录联接指向该目录。Windows 修改尚需在 Windows 实机回归。
 
 迁移执行器：`node scripts/migrate-workspace.cjs --apply 已审核的计划.json`。每条计划含 `source` 和 `target`，复制后校验 SHA-256，并保留旧路径兼容链接；日志用于核对和恢复。不要未经授权清理旧数据或迁移记录。

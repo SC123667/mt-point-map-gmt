@@ -2,7 +2,13 @@ const fs=require('fs');
 const path=require('path');
 const os=require('os');
 const {ensureCacheRoot,safeName,placeName,regionLabel}=require('./terrain-cache');
-function workspaceRoot(){return path.resolve(process.env.MT_GMT_WORKSPACE || (process.platform==='darwin'?'/Volumes/MacBook Pro SSD/GMT-缓存':path.join(os.homedir(),'Documents','GMT工作区')));}
+function workspaceRoot(){
+  const root=path.resolve(process.env.MT_GMT_WORKSPACE || path.join(os.homedir(),'Documents','GMT工作区'));
+  // Resolve a configured directory link even when its external disk is absent.
+  // ensureCacheRoot must then report the missing disk, never create a fallback.
+  try{return path.resolve(path.dirname(root),fs.readlinkSync(root));}
+  catch(error){if(['ENOENT','EINVAL','UNKNOWN'].includes(error.code))return root;throw error;}
+}
 function workspaceDirectory(category){const root=ensureCacheRoot(workspaceRoot());const dir=path.join(root,category);fs.mkdirSync(dir,{recursive:true});return dir;}
 function areaOutputDirectory(config={}){
   const category=config.terrainPreview?'预览文件':'导出图件';

@@ -1,5 +1,5 @@
 const assert=require('assert'),fs=require('fs'),path=require('path'),{fork}=require('child_process');
-const base=process.env.MT_GMT_WORKSPACE||'/Volumes/MacBook Pro SSD/GMT-缓存';
+const base=require('../electron/workspace').workspaceRoot();
 const tmp=fs.mkdtempSync(path.join(require('../electron/workspace').workspaceDirectory('验证'),'local-library-test-'));
 process.env.MT_GMT_WORKSPACE=path.join(tmp,'workspace');
 const lib=require('../electron/local-structures'),model=require('../electron/cartography');

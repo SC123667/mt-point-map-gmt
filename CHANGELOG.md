@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.1 — 2026-09-09
+
+- 发布 v1.2.0–v1.8.0 累积功能：区域底图、可编辑矢量导出、地形加速、构造编辑、双语名称与本地构造库自动叠加。
+- 修复 macOS 工作区写死开发者外接盘的问题；新用户默认使用自己的 Documents/GMT工作区，支持 MT_GMT_WORKSPACE 与目录链接，外接盘断开时不静默回退。
+- 增加可复现的 macOS ARM64 与 Windows x64/ARM64 发布打包脚本，更新安装、数据来源和验证边界说明。
+- Public cumulative release with a portable per-user workspace; custom external workspaces remain supported.
+
 ## v1.8.0 — 2026-09-08
 
 - 新增本地构造库：文件夹复制与 SHA-256 校验、GMT/DAT/BLN/GeoJSON/SHP/KML 解析、GB18030 中文处理、重复文件/几何去重、背景增量空间索引。

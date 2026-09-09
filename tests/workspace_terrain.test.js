@@ -1,11 +1,24 @@
 const assert=require('assert'),fs=require('fs'),os=require('os'),path=require('path');
 const {writeSrtmRaster,gridLayout}=require('../electron/srtm-grid');
 const tc=require('../electron/terrain-cache');
-const {workspaceFile,areaOutputDirectory}=require('../electron/workspace');
+const {workspaceRoot,workspaceFile,areaOutputDirectory}=require('../electron/workspace');
 (async()=>{
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'workspace-terrain-'));
  const old=process.env.MT_GMT_WORKSPACE;process.env.MT_GMT_WORKSPACE=tmp;
  try{
+  delete process.env.MT_GMT_WORKSPACE;
+  const defaultRoot=path.join(os.homedir(),'Documents','GMT工作区');
+  let expected=defaultRoot;try{expected=path.resolve(path.dirname(defaultRoot),fs.readlinkSync(defaultRoot));}catch{}
+  assert.strictEqual(workspaceRoot(),expected,'default workspace belongs to the current user');
+  process.env.MT_GMT_WORKSPACE=tmp;
+  assert.strictEqual(workspaceRoot(),tmp,'explicit workspace overrides the default');
+  if(process.platform!=='win32'){
+   const alias=path.join(tmp,'external-link');fs.symlinkSync('/Volumes/MT-GMT-missing-test-volume/cache',alias);
+   process.env.MT_GMT_WORKSPACE=alias;
+   assert.strictEqual(workspaceRoot(),'/Volumes/MT-GMT-missing-test-volume/cache');
+   assert.throws(()=>areaOutputDirectory({}),/未连接/,'disconnected linked disk must not silently fall back');
+   process.env.MT_GMT_WORKSPACE=tmp;
+  }
   const config={region:'86/96/28/32',terrainResolution:'01s',terrainIntensity:.65,showTerrain:true,terrainCacheDirectory:path.join(tmp,'cache')};
   const p=tc.cachePaths('/one',config),q=tc.cachePaths('/two',config);
   assert.strictEqual(p.key,q.key);assert.strictEqual(p.gridPath,q.gridPath);

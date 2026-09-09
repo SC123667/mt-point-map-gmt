@@ -1,16 +1,18 @@
 # 分发说明 / Distribution
 
-`MT点位图制作工具—GMT` 的正式分发路线是 Electron 跨平台版。当前本地开发分支版本为 `1.8.0`，GitHub `main` 和最新公开 Release 仍为 `1.1.3`。
+当前发布版本 **v1.8.1**，仓库与下载：[SC123667/mt-point-map-gmt](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)。这是 v1.1.3 之后的累积更新。
 
-The official distribution route for `MT Point Map GMT` is the cross-platform Electron desktop app. The local development branch is `1.8.0`, while GitHub `main` and the latest public release remain `1.1.3`.
+Current release: **v1.8.1**, a cumulative update after v1.1.3.
 
-公开源码仓库：
+发布包：macOS Apple Silicon DMG；Windows x64/ARM64 各有安装版和便携版；另附 SHA-256 校验文件。macOS 为 ad-hoc 签名、未公证，Windows 未签名。本轮 Windows 为交叉构建，未进行实机安装、升级和卸载验证。
 
-- https://github.com/SC123667/mt-point-map-gmt
+Packages: Apple Silicon DMG and Windows x64/ARM64 setup and portable executables, with SHA-256 checksums. macOS is ad-hoc signed and not notarized; Windows is unsigned and cross-built, without on-device install/upgrade/uninstall validation.
 
-公开用户可从 GitHub Releases 下载 `v1.1.3` 正式安装包；本地 `v1.2.x–v1.6.x` 分支必须完成真实 GMT 和跨平台验证后才能发布。
+发布构建：`./script/package_release.sh /absolute/output/path`。脚本在隔离目录使用锁定依赖和标准 electron-builder，保留 NSIS 补丁，不启动或替换正在使用的 App，也不自动上传。
 
-Public users can download the `v1.1.3` GitHub Release. The local `v1.2.x–v1.6.x` branch must complete real-GMT and cross-platform validation before publication.
+新用户默认全局目录：`~/Documents/GMT工作区`；可用 `MT_GMT_WORKSPACE` 或目录符号链接指定外接盘。链接目标磁盘断开时明确报错，不创建替代缓存。安装包不包含用户工程、地形缓存、本地构造库和个人名称词典。
+
+New users default to their own `~/Documents/GMT工作区`; an environment override or directory symlink can select another disk. User datasets and dictionaries are not distributed.
 
 ## macOS
 
@@ -78,9 +80,9 @@ GMT is not bundled inside this app. This avoids shipping large cross-platform GM
 
 ## v1.4.0 矢量导出 / Vector Export
 
-无需测点即可按经纬度范围出图。PDF 可在 Illustrator 中打开并编辑；中文标题/图例通过 PDF 页面合成保留底图矢量。地形晕渲仍是栅格影像，EPS 仍不包含原生中文叠加。
+无需测点即可按经纬度范围出图。PDF 可在 Illustrator 中打开并编辑；中文标题/图例通过 PDF 页面合成保留底图矢量。地形晕渲仍是栅格影像，v1.6.0 起应用导出已增加原生中文 EPS 合成。
 
-Region-only maps require no station import. PDF composition preserves vector paths beneath native Chinese decorations. Shaded relief remains raster; EPS omits native Chinese overlays. `pdf-lib` is a bundled pure-JavaScript runtime dependency used by the GMT worker.
+Region-only maps require no station import. PDF composition preserves vector paths beneath native Chinese decorations. Shaded relief remains raster; app exports since v1.6.0 support native Chinese EPS composition. `pdf-lib` is a bundled pure-JavaScript runtime dependency used by the GMT worker.
 
 ## v1.4.1 地形下载 / Terrain Downloads
 
@@ -90,7 +92,7 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 
 ## v1.5.0 本地安装版与全局目录
 
-本地源码升级到 1.5.0，公开版本仍为 1.1.3，未上传 GitHub。macOS 全局数据目录为 `/Volumes/MacBook Pro SSD/GMT-缓存`，运行前须连接该磁盘；自动化验证可用 `MT_GMT_WORKSPACE` 隔离数据。GeoNames 城镇数据与许可证随 `electron/data/` 打包。
+v1.5.0 本机曾指定外接 SSD；v1.8.1 起默认目录以本文顶部为准。自动化验证可用 `MT_GMT_WORKSPACE` 隔离数据。GeoNames 城镇数据与许可证随 `electron/data/` 打包。
 
 本次须分别核对源代码 12 组 Node 测试、真实 GMT 数值和速度、候选及实用app安装包、迁移 SHA-256 清单。实际交付结果见 PROJECT_HANDOFF.md 最新记录。
 
@@ -98,7 +100,7 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 
 新增 `shpjs`（SHP 重投影）和 `fast-xml-parser`（WFS 能力文档），需随生产依赖打包。`cartography-ui.js` 由主进程内嵌加载；`geodata-worker.js` 负责后台下载和解析。公共构造数据不打入 ASAR，首次下载后存入全局目录，数据许可与应用 MIT 许可分别处理。
 
-本轮验证 macOS App、GMT 6.5.0 和 Windows 布局/ASCII 工作区代码路径；未在 Windows 实机执行。GitHub main/Release 仍为 v1.1.3，不自动上传。
+本轮验证 macOS App、GMT 6.5.0 和 Windows 布局/ASCII 工作区代码路径；未在 Windows 实机执行。以上为该版本历史验证记录。
 
 ## v1.7.0 构造编辑与名称
 
@@ -106,4 +108,4 @@ The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local packag
 
 ## v1.8.0 本地构造库
 
-新增 local-structures.js 和 renderer/local-library-ui.js，沿用 geodata worker。用户构造数据不打入 ASAR，不上传仓库；库保存在全局目录的 `构造数据/本地构造库`。换电脑需另行复制该目录，原始文件夹不是绘图时的依赖。安装包只包含解析、索引及界面代码。公开版本未发布更新。
+新增 local-structures.js 和 renderer/local-library-ui.js，沿用 geodata worker。用户构造数据不打入 ASAR，不上传仓库；库保存在全局目录的 `构造数据/本地构造库`。换电脑需另行复制该目录，原始文件夹不是绘图时的依赖。安装包只包含解析、索引及界面代码。该功能包含于 v1.8.1 累积发布。
