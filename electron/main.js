@@ -326,11 +326,9 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-ipcMain.handle("app:status", () => ({
+ipcMain.handle("app:status", async () => ({
   platform: process.platform,
-  gmtInfo: resolveGMT(),
-  gmtAvailable: gmtAvailable(),
-  installPlan: installPlan(),
+  ...await runForkWorker("gmt-engine-worker.js", {mode:"status"}),
   outputDirectory: savedOutputDirectory(),
   workspaceDirectory: workspaceRoot(),
   terrainCacheDirectory: workspaceDirectory("地形缓存"),
@@ -592,11 +590,12 @@ ipcMain.handle("gmt:cancelRender", () => {
   }, 1200);
   return { ok: true, message: "已请求取消当前 GMT 绘图任务。" };
 });
-ipcMain.handle("gmt:recheck", () => ({
-  gmtInfo: resolveGMT(),
-  gmtAvailable: gmtAvailable(),
-  installPlan: installPlan()
-}));
+ipcMain.handle("gmt:recheck", () => runForkWorker('gmt-engine-worker.js',{mode:'status'}));
+ipcMain.handle("gmt:selectEngine", async (_event, selected) => {
+  if(currentGMTRenderTask || (currentTerrainTask&&!currentTerrainTask.done))throw new Error('请等待绘图或地形任务结束后再切换引擎。');
+  if(selected===null){const r=await dialog.showOpenDialog({title:'选择 GMT 可执行文件',properties:['openFile','showHiddenFiles','treatPackageAsDirectory']});if(r.canceled)return null;selected=r.filePaths[0];}
+  return runForkWorker('gmt-engine-worker.js',{mode:'select',path:selected});
+});
 ipcMain.handle("map:project", (_event, payload) => runForkWorker("map-project-worker.js", payload));
 const geodataTasks = new Map();
 ipcMain.handle("geodata:task", async (event, payload) => {
@@ -1100,6 +1099,7 @@ function loadRenderer(win) {
       openFaultFiles: (payload) => ipcRenderer.invoke("fault:openFiles", payload),
       imageDataUrl: (filePath) => ipcRenderer.invoke("preview:imageDataUrl", filePath),
       installGMT: () => ipcRenderer.invoke("gmt:install"),
+      selectGMTEngine: (selected) => ipcRenderer.invoke("gmt:selectEngine", selected),
       pauseGMTDownload: () => ipcRenderer.invoke("gmt:downloadPause"),
       resumeGMTDownload: () => ipcRenderer.invoke("gmt:downloadResume"),
       cancelGMTDownload: () => ipcRenderer.invoke("gmt:downloadCancel"),
@@ -1392,18 +1392,17 @@ function gmtChildEnv(gmtInfo, config = {}) {
 }
 
 function startInstallerDownload(webContents) {
-  const gmtInfo = resolveGMT();
-  if (gmtInfo.available) {
-    return { ok: false, message: `GMT 已安装，无需下载。\n${gmtInfo.path}`, status: null };
-  }
   if (currentInstallerDownload && !currentInstallerDownload.done) {
     return { ok: true, message: "GMT 安装包正在下载。", status: currentInstallerDownload.statusPayload() };
   }
 
   const plan = installPlan();
-  if (!plan.canAutoInstall || !plan.download) {
-    return { ok: false, message: plan.message, status: null };
+  if (!plan.canAutoInstall) return {ok:false,message:plan.message,status:null};
+  if(plan.method==='brew'){
+    const task=new (require('./gmt-installer').BrewInstallTask)(plan.brew,workspaceDirectory('安装包/GMT-6.7'),status=>{if(!webContents.isDestroyed())webContents.send('gmt:downloadProgress',status);},()=>{if(currentInstallerDownload===task)currentInstallerDownload=null;});
+    currentInstallerDownload=task;task.start();return {ok:true,status:task.statusPayload()};
   }
+  if(!plan.download)return {ok:false,message:plan.message,status:null};
 
   const targetDir = workspaceDirectory("安装包");
   const targetPath = path.join(targetDir, plan.download.fileName);

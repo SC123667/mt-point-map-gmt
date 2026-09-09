@@ -64,6 +64,9 @@ async function handleTask(payload) {
 }
 
 async function exportGMTMap(payload) {
+  // Pin one engine for the entire job, including script generation and metadata.
+  const engine = resolveGMT();
+  if (engine.available) process.env.MT_GMT_PATH = engine.path;
   const outputDirectory = payload.outputDirectory;
   const formats = payload.formats || ["png"];
   const outputName = payload.config?.outputName || "mt_point_map";
@@ -93,6 +96,8 @@ async function exportGMTMap(payload) {
   }
   finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
+    result.gmtEngine={version:engine.version,path:engine.path};
+    fs.writeFileSync(path.join(outputDirectory,'GMT运行信息.json'),JSON.stringify({engine:result.gmtEngine,region:config.region,projection:config.projection,formats,createdAt:new Date().toISOString()},null,2));
     result.files = formats.map((format) => path.join(outputDirectory, `${outputName}.${format}`));
     result.outputDirectory = outputDirectory;
     result.needsNativeDecorations = needsNativeDecorations;

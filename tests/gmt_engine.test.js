@@ -1,0 +1,21 @@
+const assert=require('assert'),fs=require('fs'),path=require('path'),os=require('os');
+const e=require('../electron/gmt-engine'),gmt=require('../electron/gmt');
+const engines=['6.5.0','6.7.0','6.6.0','6.7.1','6.10.0'].map(version=>({version,path:'/gmt-'+version,available:true}));
+assert.equal(e.select(engines).version,'6.7.1');
+assert.equal(e.select(engines,'/gmt-6.5.0').version,'6.5.0');
+assert(!e.select(engines,'/missing').available,'manual missing engine must never fall back');
+assert(e.compare('6.10.0','6.7.0')>0);assert(e.supported('6.5.0'));assert(!e.supported('7.0.0'));assert(!e.supported('6.7.0-dev'));assert(!e.supported('6.4.0'));
+assert.equal(gmt.installerDownloadPlan('darwin'),null,'do not fabricate a macOS DMG URL');
+assert(gmt.installerDownloadPlan('win32').url.endsWith('/6.7.0/gmt-6.7.0-win64.exe'));
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'gmt-engine-'));const before=process.env.MT_GMT_WORKSPACE,override=process.env.MT_GMT_PATH;
+(async()=>{try{
+ process.env.MT_GMT_WORKSPACE=root;delete process.env.MT_GMT_PATH;
+ fs.mkdirSync(path.join(root,'运行数据'));fs.writeFileSync(path.join(root,'运行数据/GMT引擎.json'),JSON.stringify({path:'/missing-selected-gmt'}));
+ assert.equal(e.preference(),'/missing-selected-gmt');assert(!e.resolve(true).available);
+ process.env.MT_GMT_PATH='/override-gmt';assert.equal(e.preference(),'/override-gmt');assert.throws(()=>e.savePreference(''),/MT_GMT_PATH/);delete process.env.MT_GMT_PATH;
+ const {BrewInstallTask}=require('../electron/gmt-installer');let calls=[];
+ const task=new BrewInstallTask('/not-called',path.join(root,'install'),()=>{},()=>{});
+ task.run=async args=>{calls.push(args);return JSON.stringify({formulae:[{versions:{stable:'6.8.0'}}]});};
+ await task.start();assert.equal(task.state,'failed');assert.equal(calls.length,1,'different minor must not be installed');assert(task.done);
+ console.log('GMT engine: recommendation, semantic versions, explicit selection, missing engine, installer target and version guard passed');
+}finally{if(before===undefined)delete process.env.MT_GMT_WORKSPACE;else process.env.MT_GMT_WORKSPACE=before;if(override===undefined)delete process.env.MT_GMT_PATH;else process.env.MT_GMT_PATH=override;fs.rmSync(root,{recursive:true,force:true});}})().catch(error=>{console.error(error);process.exitCode=1;});

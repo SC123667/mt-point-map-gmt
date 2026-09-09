@@ -130,6 +130,7 @@ const TERRAIN_RESOLUTIONS = {
 };
 const TERRAIN_RECOMMENDATION_ORDER = ["01s", "03s", "15s", "30s", "01m", "06m", "10m", "20m"];
 const SETTINGS_PANELS = {
+  gmt: "GMT 设置",
   cartography: "地点与构造",
   localLibrary: "本地构造库 · 自动匹配图幅",
   geodata: "查询地理与构造数据",
@@ -166,6 +167,7 @@ const ids = [
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
   "pngDpiDialog", "pngDpiDialogInput", "pngDpiCancelBtn", "pngDpiDialogCancelBtn", "pngDpiConfirmBtn",
   "windowControls", "exitFullscreenBtn", "minimizeWindowBtn", "closeWindowBtn",
+  "gmtEngineSelect", "gmtEngineBrowse", "engineStatusText", "engineInstallText",
   "installPlanText", "outputPath", "chooseOutputBtn", "showTitleInput", "titleInput", "regionInput", "projectionInput", "frameInput",
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
@@ -247,7 +249,9 @@ function wireEvents() {
   bind(el.headerOpenProjectBtn, "click", openProjectFile);
   bind(el.headerSaveProjectBtn, "click", saveProjectFile);
   bind(el.headerExportBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
-  bind(el.sidebarGMTButton, "click", recheckGMT);
+  bind(el.sidebarGMTButton, "click", () => {openSettingsPanel("gmt");recheckGMT(false);});
+  bind(el.gmtEngineSelect,"change",()=>selectGMTEngine(el.gmtEngineSelect.value));
+  bind(el.gmtEngineBrowse,"click",()=>selectGMTEngine(null));
   bind(el.sidebarImportFileBtn, "click", openPointFile);
   bind(el.sidebarImportEdiBtn, "click", openEdiDirectory);
   bind(el.sidebarLoadSampleBtn, "click", loadSampleData);
@@ -788,6 +792,7 @@ function createProjectSnapshot() {
     schema: "mt-point-map-gmt-project",
     schemaVersion: 1,
     appVersion: el.versionText?.textContent?.replace(/^v/, "") || "",
+    gmtEngine: state.gmtInfo ? {version:state.gmtInfo.version,path:state.gmtInfo.path} : null,
     savedAt: new Date().toISOString(),
     parsed,
     allRecords: state.allRecords,
@@ -1184,6 +1189,7 @@ async function refreshStatus() {
   if (el.versionText) el.versionText.textContent = `v${status.version || ""}`;
   renderOutputDirectory();
   renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
+  renderEngineChoices(status);
   updateTerrainEstimate();
 }
 
@@ -1199,14 +1205,15 @@ async function chooseOutputDirectory() {
   updateTerrainEstimate();
 }
 
-async function recheckGMT() {
+async function recheckGMT(showNotice=true) {
   el.recheckBtn.disabled = true;
   el.recheckBtn.textContent = "检测中...";
   el.appStatus.textContent = "正在重新检测 GMT...";
   try {
     const status = await window.mtApp.recheckGMT();
     renderGMTStatus(status.gmtAvailable, status.installPlan, status.gmtInfo);
-    notify(status.gmtAvailable ? `已检测到 GMT：\n${status.gmtInfo.path}` : `仍未检测到 GMT。\n${status.installPlan.message}`);
+    renderEngineChoices(status);
+    if(showNotice) notify(status.gmtAvailable ? `已检测到 GMT：\n${status.gmtInfo.path}` : `仍未检测到 GMT。\n${status.installPlan.message}`);
   } finally {
     el.recheckBtn.disabled = false;
     el.recheckBtn.textContent = "重新检测 GMT";
@@ -1222,10 +1229,26 @@ function renderGMTStatus(available, plan, gmtInfo) {
     el.gmtStatusText.dataset.state = available ? "ready" : "error";
   }
   if (el.sidebarGMTVersion) el.sidebarGMTVersion.textContent = available ? `GMT ${gmtInfo.version || "已就绪"}` : "GMT 未就绪";
-  const downloadText = plan.download ? `将下载：${plan.download.fileName}` : "请参考官方安装文档";
-  el.installPlanText.textContent = `${plan.platform}：${downloadText}`;
-  el.installBtn.disabled = available || !plan.canAutoInstall;
-  el.installBtn.textContent = available ? "GMT 已安装" : "下载并安装 GMT";
+  state.gmtInfo=gmtInfo;
+  const downloadText=plan.method==='brew'?plan.message:plan.download?`将下载：${plan.download.fileName}`:plan.message;
+  el.installPlanText.textContent=`${plan.platform}：${downloadText}`;
+  el.engineInstallText.textContent=el.installPlanText.textContent;
+  el.engineStatusText.textContent=el.appStatus.textContent;
+  const ready=available&&/^6\.7\./.test(gmtInfo.version);
+  el.installBtn.disabled=!plan.canAutoInstall;
+  el.installBtn.textContent=ready?'安装/修复 GMT 6.7':'安装 GMT 6.7';
+}
+
+function renderEngineChoices(status){
+  if(!status.engines)return;
+  el.gmtEngineSelect.replaceChildren(new Option('自动选择（优先 GMT 6.7）',''));
+  for(const e of status.engines){const o=new Option(`GMT ${e.version||'?'} · ${e.path}${e.available?'':'（不可用）'}`,e.path);o.disabled=!e.available;el.gmtEngineSelect.add(o);}
+  if(status.preferred&&!status.engines.some(e=>e.path===status.preferred))el.gmtEngineSelect.add(new Option('指定路径不可用：'+status.preferred,status.preferred));
+  el.gmtEngineSelect.value=status.preferred||'';
+}
+async function selectGMTEngine(selected){
+  try{const status=await window.mtApp.selectGMTEngine(selected);if(!status)return;renderGMTStatus(status.gmtAvailable,status.installPlan,status.gmtInfo);renderEngineChoices(status);scheduleAutoPreview('GMT 引擎已切换');}
+  catch(error){notify(error.message);await recheckGMT(false);}
 }
 
 async function installGMT() {
@@ -1240,26 +1263,28 @@ async function installGMT() {
     notify(result.message);
   }
   await refreshStatus();
-  if (result.status && ["starting", "downloading", "paused"].includes(result.status.state)) {
+  if (result.status && ["starting", "downloading", "paused", "installing"].includes(result.status.state)) {
     renderDownloadProgress(result.status);
   }
 }
 
 function renderDownloadProgress(status) {
+  if(status.state==='completed')recheckGMT(false);
+  el.engineInstallText.textContent=status.message||'正在准备安装...';
   el.downloadPanel.classList.remove("hidden");
   const percent = Number.isFinite(status.percent) ? status.percent : 0;
-  const active = ["starting", "downloading", "paused"].includes(status.state);
+  const active = ["starting", "downloading", "paused", "installing"].includes(status.state);
   el.downloadTitle.textContent = status.fileName || "GMT 安装包下载";
   el.downloadStatus.textContent = status.message || "正在下载...";
   el.downloadProgress.value = percent;
   el.downloadBytes.textContent = `${formatBytes(status.downloaded || 0)} / ${status.total ? formatBytes(status.total) : "未知大小"}`;
-  el.downloadPercent.textContent = status.total ? `${percent.toFixed(percent < 10 ? 1 : 0)}%` : "等待大小";
+  el.downloadPercent.textContent = status.total ? `${percent.toFixed(percent < 10 ? 1 : 0)}%` : status.state==="installing"?"安装中":"等待大小";
   el.downloadSpeed.textContent = status.state === "downloading" ? `${formatBytes(status.speed || 0)}/s` : readableDownloadState(status.state);
-  el.pauseDownloadBtn.disabled = status.state !== "downloading";
+  el.pauseDownloadBtn.disabled = status.canPause===false || status.state !== "downloading";
   el.resumeDownloadBtn.disabled = status.state !== "paused";
   el.cancelDownloadBtn.disabled = !active;
   el.installBtn.disabled = active;
-  el.installBtn.textContent = active ? "正在下载 GMT..." : "下载并安装 GMT";
+  el.installBtn.textContent = active ? "正在安装 GMT..." : "安装 GMT 6.7";
   setRuntimeStatus(`${status.message || "GMT 下载"} ${status.total ? `${percent.toFixed(percent < 10 ? 1 : 0)}%` : ""}`.trim(), status.state === "failed" ? "error" : "busy");
 }
 

@@ -47,6 +47,7 @@ function runTask(payload) {
       serialization: "advanced",
       env: {
         ...process.env,
+        MT_GMT_PATH: mockGmt,
         PATH: `${tmp}${path.delimiter}${process.env.PATH || ""}`
       }
     });

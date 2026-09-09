@@ -1,6 +1,6 @@
 # 分发说明 / Distribution
 
-本地开发版本 **v1.9.0**（论文构造地形图）；此轮仅本地构建与验证，公开发行仍为下述 v1.8.1。
+本地开发版本 **v1.10.0**（GMT 6.7 引擎适配）；此轮仅本地构建与验证，公开发行仍为下述 v1.8.1。
 
 当前发布版本 **v1.8.1**，仓库与下载：[SC123667/mt-point-map-gmt](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)。这是 v1.1.3 之后的累积更新。
 
@@ -66,13 +66,13 @@ npm run dist:win
 
 The app automatically detects the local `gmt` command.
 
-- macOS：点击安装按钮会下载 GMT 官方 macOS `.dmg`。当前使用有 DMG 资产的 GMT 6.5.0，Apple Silicon 下载 `darwin-arm64`，Intel 下载 `darwin-x86_64`。
-- Windows：点击安装按钮会下载 GMT 官方 Windows 64 位安装器。当前使用 GMT 6.6.0。
+- macOS：使用现有 Homebrew 执行 `brew install gmt ghostscript`，先核对稳定版属于 6.7；不下载不存在的 6.7 macOS DMG，也不静默安装其他次版本。没有 Homebrew 时提供说明。缓存和日志位于全局目录“安装包/GMT-6.7”。
+- Windows：下载官方 GMT 6.7.0 win64 安装器。ARM64 Windows 的 x64 兼容运行以及 Windows 安装/运行本轮未做实机验证。
 - 如果下载失败，软件会提示网络或下载错误。
 - GMT 中文手册安装页和 GMT 官方下载页保留为备用帮助入口。
 
-- macOS: the install button downloads the official GMT macOS `.dmg`.
-- Windows: the install button downloads the official GMT Windows 64-bit installer.
+- macOS: install GMT and Ghostscript with existing Homebrew after checking that its stable GMT formula is 6.7.x.
+- Windows: download the official GMT 6.7.0 x64 installer.
 - If downloading fails, the app reports a network or download error.
 - GMT Chinese documentation and official download pages are kept as backup help links.
 

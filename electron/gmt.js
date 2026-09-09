@@ -9,8 +9,8 @@ const { nearestResponse, metricsForResponse } = require("./mt");
 const { DEFAULT_OVERLAY_FILE, buildFaultOverlay } = require("./faults");
 const { DEFAULT_LEGEND_FILE, buildLegendEntries, legendCommand, writeLegendFile } = require("./legend");
 
-const GMT_MAC_VERSION = "6.5.0";
-const GMT_WINDOWS_VERSION = "6.6.0";
+const GMT_MAC_VERSION = "6.7.0";
+const GMT_WINDOWS_VERSION = "6.7.0";
 const DEFAULT_TERRAIN_DATA_SERVER = "https://mirrors.ustc.edu.cn/gmtdata";
 const OFFICIAL_TERRAIN_DATA_SERVER = "oceania";
 const DEFAULT_PNG_DPI = 300;
@@ -35,92 +35,8 @@ function gmtAvailable() {
 }
 
 function resolveGMT() {
-  const pathCandidates = gmtPathCandidates();
-  for (const candidate of pathCandidates) {
-    const resolved = testGMTCandidate(candidate.path, candidate.source);
-    if (resolved.available) return resolved;
-  }
-  return {
-    available: false,
-    path: "",
-    binDir: "",
-    version: "",
-    source: "",
-    message: "未找到 GMT 命令。"
-  };
-}
-
-function gmtPathCandidates() {
-  const candidates = [];
-  const seen = new Set();
-  const add = (candidate, source) => {
-    if (!candidate || seen.has(candidate)) return;
-    seen.add(candidate);
-    candidates.push({ path: candidate, source });
-  };
-
-  for (const binDir of String(process.env.PATH || "").split(path.delimiter)) {
-    if (!binDir) continue;
-    add(path.join(binDir, process.platform === "win32" ? "gmt.exe" : "gmt"), "PATH");
-  }
-
-  if (process.platform === "darwin") {
-    add("/opt/homebrew/bin/gmt", "Homebrew Apple Silicon");
-    add("/usr/local/bin/gmt", "Homebrew Intel");
-    add("/opt/local/bin/gmt", "MacPorts");
-    add("/Applications/GMT-6.5.0.app/Contents/Resources/bin/gmt", "GMT macOS App");
-    add("/Applications/GMT-6.6.0.app/Contents/Resources/bin/gmt", "GMT macOS App");
-    try {
-      const appNames = fs.readdirSync("/Applications").filter((name) => /^GMT-.*\.app$/i.test(name));
-      for (const appName of appNames) {
-        add(path.join("/Applications", appName, "Contents", "Resources", "bin", "gmt"), "GMT macOS App");
-      }
-    } catch {
-      // /Applications can be unavailable on unusual systems.
-    }
-  }
-
-  if (process.platform === "win32") {
-    const roots = [
-      process.env.ProgramFiles,
-      process.env["ProgramFiles(x86)"],
-      process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Programs") : ""
-    ].filter(Boolean);
-    for (const root of roots) {
-      try {
-        const names = fs.readdirSync(root).filter((name) => /^GMT/i.test(name));
-        for (const name of names) add(path.join(root, name, "bin", "gmt.exe"), "Windows install directory");
-      } catch {
-        // Ignore inaccessible system folders.
-      }
-    }
-  }
-
-  return candidates;
-}
-
-function testGMTCandidate(candidatePath, source) {
-  if (!fs.existsSync(candidatePath)) {
-    return { available: false };
-  }
-  try {
-    const version = execFileSync(candidatePath, ["--version"], {
-      encoding: "utf8",
-      timeout: 8000,
-      stdio: ["ignore", "pipe", "ignore"]
-    }).trim();
-    return {
-      available: true,
-      path: candidatePath,
-      binDir: path.dirname(candidatePath),
-      version,
-      gsLib: ghostscriptLibraryPath(path.dirname(candidatePath)),
-      source,
-      message: `已找到 GMT ${version}：${candidatePath}`
-    };
-  } catch {
-    return { available: false };
-  }
+  const engine=require('./gmt-engine').resolve();
+  return {...engine,gsLib:engine.binDir?ghostscriptLibraryPath(engine.binDir):''};
 }
 
 function commandAvailable(name) {
@@ -136,18 +52,16 @@ function commandAvailable(name) {
 function installPlan() {
   const download = installerDownloadPlan();
   if (process.platform === "darwin") {
-    return {
-      platform: "macOS",
-      canAutoInstall: true,
-      autoCommand: "brew install gmt",
-      manualCommand: "brew install gmt",
-      download,
-      message: `可直接下载 GMT ${GMT_MAC_VERSION} 官方 macOS 安装包。`
-    };
+    const brew=require('./gmt-engine').brewPath();
+    return {platform:'macOS',version:GMT_MAC_VERSION,method:'brew',brew,canAutoInstall:!!brew,
+      manualCommand:'brew install gmt ghostscript',download:null,
+      message:brew?'通过 Homebrew 安装 GMT 6.7 和 Ghostscript；安装前核对版本。':'请先安装 Homebrew，然后在这里安装 GMT 6.7 与 Ghostscript。'};
   }
   if (process.platform === "win32") {
     return {
       platform: "Windows",
+      version: GMT_WINDOWS_VERSION,
+      method: "download",
       canAutoInstall: true,
       autoCommand: "winget install --id GenericMappingTools.gmt --exact --accept-package-agreements --accept-source-agreements",
       manualCommand: "winget install --id GenericMappingTools.gmt --exact",
@@ -164,19 +78,9 @@ function installPlan() {
   };
 }
 
-function installerDownloadPlan() {
-  if (process.platform === "darwin") {
-    const base = `https://github.com/GenericMappingTools/gmt/releases/download/${GMT_MAC_VERSION}`;
-    const arch = process.arch === "arm64" ? "arm64" : "x86_64";
-    const fileName = `gmt-${GMT_MAC_VERSION}-darwin-${arch}.dmg`;
-    return {
-      version: GMT_MAC_VERSION,
-      fileName,
-      url: `${base}/${fileName}`,
-      kind: "dmg"
-    };
-  }
-  if (process.platform === "win32") {
+function installerDownloadPlan(platform = process.platform) {
+  if (platform === "darwin") return null; // No official 6.7 macOS DMG.
+  if (platform === "win32") {
     const base = `https://github.com/GenericMappingTools/gmt/releases/download/${GMT_WINDOWS_VERSION}`;
     const fileName = `gmt-${GMT_WINDOWS_VERSION}-win64.exe`;
     return {
@@ -191,6 +95,9 @@ function installerDownloadPlan() {
 
 async function startGMTInstall(downloadDirectory) {
   const plan = installPlan();
+  if(plan.canAutoInstall&&plan.method==='brew')return new Promise(resolve=>{
+    const task=new (require('./gmt-installer').BrewInstallTask)(plan.brew,downloadDirectory,null,()=>resolve({ok:task.state==='completed',message:task.message,plan}));task.start();
+  });
   if (!plan.canAutoInstall || !plan.download) {
     return { ok: false, message: plan.message, plan };
   }
@@ -1241,12 +1148,14 @@ function gmtEnvironmentLines(gmt, shell, config = {}, outputDirectory = process.
   if (!gmt.available || !gmt.binDir) return [];
   if (shell === "bat") {
     return [
+      `rem Generated with GMT ${gmt.version}`,
       `set "PATH=${gmt.binDir};%PATH%"`,
       `set "GMT_DATA_SERVER=${dataServer}"`,
       gmt.gsLib ? `set "GS_LIB=${gmt.gsLib}"` : ""
     ].filter(Boolean);
   }
   return [
+    `# Generated with GMT ${gmt.version}`,
     `export PATH=${quote(gmt.binDir)}:"$PATH"`,
     `export GMT_DATA_SERVER=${quote(dataServer)}`,
     gmt.gsLib ? `export GS_LIB=${gmt.gsLib.split(path.delimiter).map(quote).join(":")}` : ""

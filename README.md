@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/version-v1.9.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
+[![Version](https://img.shields.io/badge/version-v1.10.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -12,9 +12,17 @@
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
 
-## 论文构造地形图（本地 v1.9.0）
+## GMT 6.7 引擎适配（本地 v1.10.0）
 
-本地源码版本 **v1.9.0**；GitHub 公开版本仍为 **v1.8.1**。打开“图层 → 本地构造库”，点击“论文构造地形图”；也可以在绘图预设中选择“论文浅灰底图”。浅色地形、弱阴影、分类构造线、较短比例尺与统一字体一起应用，构造类别选择、坐标、高程分辨率和工程数据保持原有设置。
+当前本地版本 **v1.10.0**，GitHub 公开版本仍为 **v1.8.1**。点击左下角 **GMT 设置**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
+
+默认安装 GMT **6.7.0**。macOS 使用现有 Homebrew 安装 GMT 与 Ghostscript，安装前核对 6.7 分支；没有 Homebrew 时提供安装说明。Windows 下载官方 6.7.0 x64 安装器。安装日志和缓存归入全局目录“安装包/GMT-6.7”。GMT 不内置于本 App。
+
+导出目录增加 `GMT运行信息.json`，生成脚本注明 GMT 版本。macOS GMT 6.7.0 已验证 Mercator/Lambert、全球 Robinson、南北极立体投影、跨日期变更线、中英文 PNG/PDF/EPS 和五类 MT 图件；旧 GMT 6.5 地形出图回归通过。Windows 实机及 GMT 6.6 本轮未验证。
+
+## 论文构造地形图（v1.9.0）
+
+打开“图层 → 本地构造库”，点击“论文构造地形图”；也可以在绘图预设中选择“论文浅灰底图”。浅色地形、弱阴影、分类构造线、较短比例尺与统一字体一起应用，构造类别选择、坐标、高程分辨率和工程数据保持原有设置。
 
 “图层 → 地点与构造”提供名称语言、自动排布和隐藏文件编号开关。排布根据投影后的图幅尺寸选择线上的标注位置与角度，去除重复名称，避免文字互相遮挡和越出图框。放不下或没有可靠名称的对象仍绘制几何；遗漏原因写入输出目录的 `标注排布报告.json`。手动标注锚点优先保留，过密图件仍需按来源/类别筛选及最终人工审阅。
 

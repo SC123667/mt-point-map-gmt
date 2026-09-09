@@ -28,10 +28,7 @@
           导出图件
         </button>
       </div>
-      <div class="gmt-header-actions">
-        <button id="recheckBtn">重新检测 GMT</button>
-        <button id="installBtn" class="primary">安装 GMT</button>
-      </div>
+
       <div id="windowControls" class="window-controls hidden" aria-label="窗口控制">
         <button id="exitFullscreenBtn" class="window-control exit-fullscreen hidden" type="button" title="退出全屏">退出全屏</button>
         <button id="minimizeWindowBtn" class="window-control" type="button" title="最小化">_</button>
@@ -192,6 +189,15 @@
           <h2>数据</h2>
           <p id="dataSummary">未导入点位文件</p>
         </div>
+        <fieldset class="map-settings" data-settings-panel="gmt">
+          <legend>GMT 绘图引擎</legend>
+          <p id="engineStatusText" class="field-note"></p>
+          <label>当前引擎<select id="gmtEngineSelect"><option value="">自动选择（优先 GMT 6.7）</option></select></label>
+          <div class="cart-actions"><button id="gmtEngineBrowse">选择 GMT 程序</button><button id="recheckBtn">重新检测 GMT</button><button id="installBtn" class="primary">安装 GMT 6.7</button></div>
+          <p id="engineInstallText" class="field-note"></p>
+          <p class="field-note">切换引擎立即生效。保留旧版用于回退；工程和导出记录实际 GMT 版本。需要结束当前绘图或地形任务后再切换。</p>
+          <button data-link="https://brew.sh/">Homebrew 安装说明（macOS）</button>
+        </fieldset>
         <fieldset data-settings-panel="fields">
           <legend>字段识别</legend>
           <label>测点名<select id="nameColumn"></select></label>
