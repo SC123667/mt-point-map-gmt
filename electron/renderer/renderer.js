@@ -203,6 +203,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   initCartography();
   populateColorControls();
   wireEvents();
+  initWorkbenchUI();
   renderLocalTerrainGrid();
   renderTerrainDataServerCustom();
   renderFaultLayers();
@@ -248,7 +249,7 @@ function wireEvents() {
   wireQuickInspector();
   bind(el.headerOpenProjectBtn, "click", openProjectFile);
   bind(el.headerSaveProjectBtn, "click", saveProjectFile);
-  bind(el.headerExportBtn, "click", () => exportMap(["png", "pdf", "eps"], true));
+  bind(el.headerExportBtn, "click", () => openSettingsPanel("export"));
   bind(el.sidebarGMTButton, "click", () => {openSettingsPanel("gmt");recheckGMT(false);});
   bind(el.gmtEngineSelect,"change",()=>selectGMTEngine(el.gmtEngineSelect.value));
   bind(el.gmtEngineBrowse,"click",()=>selectGMTEngine(null));
@@ -426,6 +427,7 @@ function closeToolbarMenus() {
 function wireQuickInspector() {
   const layout = document.querySelector(".layout");
   const setOpen = (open) => {
+    if (open) closeSettingsDialog();
     layout?.classList.toggle("quick-inspector-open", Boolean(open));
     el.quickInspector?.setAttribute("aria-hidden", String(!open));
     el.quickInspectorToggle?.classList.toggle("active", Boolean(open));
@@ -679,6 +681,7 @@ function showTableHelp() {
 }
 
 function openSettingsPanel(panel) {
+  if (panel === "__search") return openWorkbenchSearch();
   const panelKey = SETTINGS_PANELS[panel] ? panel : "frame";
   closeSettingsDialog();
   if (panelKey === "frame") syncRegionBounds();
@@ -694,14 +697,16 @@ function openSettingsPanel(panel) {
     el.settingsDialogBody.append(node);
     return { node, placeholder };
   });
-  if (typeof el.settingsDialog.showModal === "function") el.settingsDialog.showModal();
+  if (typeof el.settingsDialog.show === "function") el.settingsDialog.show();
   else el.settingsDialog.setAttribute("open", "");
+  showWorkbenchPanel(panelKey);
 }
 
 function closeSettingsDialog(options = {}) {
   restoreSettingsDialogNodes();
   state.settingsDialog.panel = "";
   if (!options.keepClosed && el.settingsDialog?.open) el.settingsDialog.close();
+  hideWorkbenchPanel();
 }
 
 function restoreSettingsDialogNodes() {
@@ -726,7 +731,7 @@ async function confirmSettingsDialog() {
     const applied = await applyMapping({ silent: true });
     if (!applied) return;
   }
-  closeSettingsDialog();
+  if (["gmt", "storage", "help", "export", "imports", "data", "quality"].includes(panel)) return closeSettingsDialog();
   scheduleAutoPreview(`${SETTINGS_PANELS[panel] || "设置"}已更新，正在自动绘制预览...`, { delay: 120 });
 }
 

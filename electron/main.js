@@ -232,17 +232,9 @@ function configureMenu(win) {
     {
       label: "设置",
       submenu: [
-        { label: "数据", click: () => sendMenuAction(win, "menu:openSettingsPanel", "data") },
-        { label: "字段识别", click: () => sendMenuAction(win, "menu:openSettingsPanel", "fields") },
-        { label: "MT 响应字段", click: () => sendMenuAction(win, "menu:openSettingsPanel", "mtFields") },
-        { type: "separator" },
-        { label: "图幅", click: () => sendMenuAction(win, "menu:openSettingsPanel", "frame") },
-        { label: "地形底图", click: () => sendMenuAction(win, "menu:openSettingsPanel", "terrain") },
-        { label: "叠加层与图例", click: () => sendMenuAction(win, "menu:openSettingsPanel", "overlay") },
-        { label: "点位符号", click: () => sendMenuAction(win, "menu:openSettingsPanel", "symbol") },
-        { label: "测点标签", click: () => sendMenuAction(win, "menu:openSettingsPanel", "labels") },
-        { label: "图件元素", click: () => sendMenuAction(win, "menu:openSettingsPanel", "elements") },
-        { label: "MT 图件参数", click: () => sendMenuAction(win, "menu:openSettingsPanel", "mtParams") }
+        {label:"搜索功能…",accelerator:"CmdOrCtrl+K",click:()=>sendMenuAction(win,"menu:openSettingsPanel","__search")},
+        {type:"separator"},
+        ...[...new Set(require("./workbench-panels").map(p=>p[0]))].map(group=>({label:group,submenu:require("./workbench-panels").filter(p=>p[0]===group).map(p=>({label:p[2],click:()=>sendMenuAction(win,"menu:openSettingsPanel",p[1])}))}))
       ]
     },
     {
@@ -258,8 +250,8 @@ function configureMenu(win) {
         },
         { type: "separator" },
         {
-          label: "地形缓存管理...",
-          click: () => sendMenuAction(win, "menu:openSettingsPanel", "terrain")
+          label: "目录与缓存...",
+          click: () => sendMenuAction(win, "menu:openSettingsPanel", "storage")
         },
         { type: "separator" },
         {
@@ -1059,6 +1051,7 @@ function loadRenderer(win) {
   const jsPath = path.join(rendererDir, "renderer.js");
   const bridge = `
     const { ipcRenderer } = require("electron");
+    window.WorkbenchPanels = require(${JSON.stringify(path.join(__dirname,"workbench-panels.js"))});
     window.MapNames = require(${JSON.stringify(path.join(__dirname,"map-names.js"))});
     window.PaperStyle = require(${JSON.stringify(path.join(__dirname,"paper-style.js"))});
     window.mtApp = {
@@ -1138,8 +1131,8 @@ function loadRenderer(win) {
   `;
 
   let html = fs.readFileSync(htmlPath, "utf8");
-  const css = fs.readFileSync(cssPath, "utf8");
-  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"local-library-ui.js"),"utf8");
+  const css = fs.readFileSync(cssPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"workbench.css"),"utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"local-library-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"workbench-ui.js"),"utf8");
   html = html
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);

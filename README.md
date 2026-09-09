@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/version-v1.10.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
+[![Version](https://img.shields.io/badge/version-v1.11.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -12,9 +12,20 @@
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
 
-## GMT 6.7 引擎适配（本地 v1.10.0）
+## 制图工作台（本地 v1.11.0）
 
-当前本地版本 **v1.10.0**，GitHub 公开版本仍为 **v1.8.1**。点击左下角 **GMT 设置**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
+左侧选择功能，右侧调整参数，中央保持地图预览。点右侧“更新预览”应用修改，面板保持打开；“展开”可加宽编辑区域。按 **⌘/Ctrl + K** 搜索功能。
+
+- **地图**：范围与投影、地形底图、等高线、制图样式。
+- **图层与标注**：本地构造库、地点与构造、查询地理数据、名称与语言、构造线与图例、标题与图件元素。
+- **测点与 MT**：展开后导入数据、设置字段、符号、标签及 MT 参数，查看表格和质检。
+- **输出与软件**：导出图件、目录与缓存、GMT 引擎、使用帮助。
+
+中英文开关位于 **名称与语言**；构造坐标、样式和来源分别位于构造编辑器的三个页签。右上角“导出图件”打开格式选择，可直接导出 PDF、PNG、EPS 或 GMT 脚本。旧工程继续可打开。详细入口与验证方法见 [工作台说明](docs/UI_WORKBENCH.md)。下文旧版本介绍中的菜单路径，以当前侧栏和功能搜索为准。
+
+## GMT 6.7 引擎适配（v1.10.0 起）
+
+当前本地版本 **v1.11.0**，GitHub 公开版本仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
 
 默认安装 GMT **6.7.0**。macOS 使用现有 Homebrew 安装 GMT 与 Ghostscript，安装前核对 6.7 分支；没有 Homebrew 时提供安装说明。Windows 下载官方 6.7.0 x64 安装器。安装日志和缓存归入全局目录“安装包/GMT-6.7”。GMT 不内置于本 App。
 

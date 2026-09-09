@@ -2,7 +2,17 @@
 
 > 最后核对日期 / Last verified: 2026-09-09 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
-## 2026-09-09 v1.10.0 GMT 6.7 适配（优先于下方历史记录）
+## 2026-09-09 v1.11.0 工作台改版（优先于下方历史记录）
+
+- 当前源码 1.11.0；23 个设置入口迁入分组左侧导航与非模态右侧参数栏。新增 ⌘/Ctrl + K 搜索，原生菜单与 renderer 共用 electron/workbench-panels.js。
+- 名称与语言、目录与缓存、导出均独立；构造编辑分为对象、样式、来源与锚点。更新预览保留当前参数栏，宽度可切换；静态说明集中到帮助，错误和运行状态保留。
+- 新增 renderer/workbench-ui.js 与 workbench.css，通过移动已有 DOM 保留所有 ID、事件和工程配置。未改 MT 数学、worker 边界及 GMT 6.7 支持。
+- 源码 17 组 Node 测试通过。tests/workbench_ui_integration.cjs 隐藏不可聚焦窗口验证 69 个面板/尺寸组合，以及搜索、构造线编辑、译名跳转、工程恢复、真实预览、PDF 导出、PNG 取消和样例导入。Windows CSS 检查不等于 Windows 实机验证。
+- v1.11.0 候选位于全局目录 安装包/v1.11.0/mac-arm64，严格深度验签通过，42 个 Electron 文件与源码一致；ASAR SHA-256：`fa103731439e5396c03e7802f828bb21c0b9a83f5ad3047e96750d7ecac2b897`。包内 UI 验证通过（69 个面板/尺寸组合、23 个 Windows CSS 面板及真实预览/PDF）。18 个真实 GMT 出图和 18 份 PDF 内容检查通过。
+- **尚未替换实用app**：当前入口仍为 v1.10.0（ASAR 已复核与下方基线一致），进程仍运行，需要用户保存工程后确认更新与后台重启。核验记录：全局目录 验证/v1.11.0/交付核验.json。此次不上传 GitHub；公开版本仍为 v1.8.1。
+- 新布局维护和入口见 docs/UI_WORKBENCH.md。用户要求测试不得打扰其他 App，继续采用隐藏窗口与后台命令。
+
+## 2026-09-09 v1.10.0 GMT 6.7 适配（历史安装基线）
 
 - 源码版本 1.10.0，默认推荐 GMT 6.7。gmt-engine.js 集中发现、按版本排序和保存选择；gmt-engine-worker.js 在后台检测，GMT 设置支持切换旧版、自动模式及指定路径。绘图和地形任务期间禁止切换；每次导出固定实际引擎并记录 GMT运行信息.json。
 - 本机已安装 /opt/homebrew/bin/gmt 6.7.0 与 /opt/homebrew/bin/gs 10.08.0，保留 /Applications/GMT-6.5.0.app。Homebrew 下载缓存和安装日志位于全局目录的 安装包/GMT-6.7 与 验证/v1.10.0。并发安装曾遇到外置盘目录 EINTR，改为单下载并发后完成；安装器采用相同设置并保留日志。
