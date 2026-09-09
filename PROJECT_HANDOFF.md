@@ -9,6 +9,9 @@
 - “图层 → 本地构造库”与绘图预设都有样式入口；名称语言和避让开关在“图层 → 地点与构造”。原始名称模式应用论文预设后统一中文。
 - 本轮验证和安装包位于全局目录 验证/v1.9.0 与 安装包/v1.9.0；用户旧工程保留。使用隐藏且不可聚焦的 Electron 窗口验证，不模拟键鼠。
 - GitHub 公开版本仍为 v1.8.1；本地 1.9.0 未上传。实际安装路径版本、签名与交付状态单独核验。
+- 经用户确认保存工程后，已将“实用app”更新为 1.9.0 并通过 open -g 后台启动；目录内保持唯一 GMT App。候选与安装后严格深度验签通过，ASAR SHA-256：`1ad2c814b25b108a4f600d8396436e2b0766087c14ad192184375bf8a5b456d6`。复制附加的 FinderInfo 已备份后移除，仅处理本次新包元数据。
+- 旧版备份：`/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.8.0-20260909-191541-升级v1.9.0/MT点位图制作工具—GMT.app`。
+- 源码 16 组 Node 测试通过。真实 GMT 6.5.0 与隐藏 Electron 对 86/96/28/32 范围的全部类别、缝合带/边界组合分别输出 PNG/PDF/EPS，验证双语、灰色/浅色预设、工程恢复与前后几何一致。已检查 PNG，PDF 保留可提取中英文文字。候选 ASAR 的 36 个 Electron 文件与源码相同，ASAR 运行验证通过。此轮使用已有 30 秒预览网格，未重新计算整个区域的 1 秒导出，未进行 Windows 实机验证。
 
 ## 2026-09-09 v1.8.1 发布状态（优先于下方历史快照）
 
@@ -34,7 +37,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - 当前本地源码版本：`v1.9.0`（论文构造地形图与名称排布）
 - 当前分支基于已发布的 `b40c16a` / v1.8.1，另含本地 v1.9.0。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.8.0`。2026-09-08 已更新；“实用app”内只有这一个 GMT 绘图应用。ASAR SHA-256：`84cb67a1843d93a0a5431a8c92292f827bc56beaf39028ddaa07345dd6c2734f`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.9.0`。2026-09-09 已更新；目录内只有这一个 GMT 绘图应用。ASAR SHA-256：`1ad2c814b25b108a4f600d8396436e2b0766087c14ad192184375bf8a5b456d6`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机安装了 `/Applications/GMT-6.5.0.app`。普通 shell 的 `PATH` 中没有 `gmt`，但应用自己的检测逻辑能够找到该路径。
@@ -50,7 +53,7 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 | 远端 `main` 基线 | `b40c16a` / `v1.8.1` |
 | 本地功能标签 | v1.9.0 为本地版本；v1.8.1 已发布 |
 | GitHub 最新 Release | `v1.8.1`，Latest、非草稿、非预发布 |
-| 本机 App | 权威入口为桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.8.0`，从该路径验证运行 |
+| 本机 App | 桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.9.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
