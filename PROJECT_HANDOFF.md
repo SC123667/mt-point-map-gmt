@@ -1,6 +1,6 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-09 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 最后核对日期 / Last verified: 2026-09-10 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
 ## 2026-09-09 v1.11.0 工作台改版（优先于下方历史记录）
 
@@ -9,7 +9,8 @@
 - 新增 renderer/workbench-ui.js 与 workbench.css，通过移动已有 DOM 保留所有 ID、事件和工程配置。未改 MT 数学、worker 边界及 GMT 6.7 支持。
 - 源码 17 组 Node 测试通过。tests/workbench_ui_integration.cjs 隐藏不可聚焦窗口验证 69 个面板/尺寸组合，以及搜索、构造线编辑、译名跳转、工程恢复、真实预览、PDF 导出、PNG 取消和样例导入。Windows CSS 检查不等于 Windows 实机验证。
 - v1.11.0 候选位于全局目录 安装包/v1.11.0/mac-arm64，严格深度验签通过，42 个 Electron 文件与源码一致；ASAR SHA-256：`fa103731439e5396c03e7802f828bb21c0b9a83f5ad3047e96750d7ecac2b897`。包内 UI 验证通过（69 个面板/尺寸组合、23 个 Windows CSS 面板及真实预览/PDF）。18 个真实 GMT 出图和 18 份 PDF 内容检查通过。
-- **尚未替换实用app**：当前入口仍为 v1.10.0（ASAR 已复核与下方基线一致），进程仍运行，需要用户保存工程后确认更新与后台重启。核验记录：全局目录 验证/v1.11.0/交付核验.json。此次不上传 GitHub；公开版本仍为 v1.8.1。
+- **已安装至实用app**：复核旧 v1.10.0 主进程和全部辅助进程均退出后，核验候选与备份，再替换为 v1.11.0，并通过 open -g 后台启动。首次启动已确认目标主进程 91361 与 Renderer 91364；2026-09-10 再次核对版本与 ASAR。目录内唯一 GMT App，普通深度验签通过；严格验签仍报告 FileProvider 附加 Finder 信息的已知提示，候选严格验签与目标 ASAR 完整性均正常，不反复清理元数据。
+- v1.10.0 备份位于全局目录 版本备份/v1.10.0-升级v1.11.0，ASAR 与旧版基线一致。交付记录：全局目录 验证/v1.11.0/交付核验.json。源码提交/标签 cd44cdb / v1.11.0；此次未上传 GitHub，公开发行基线仍为 v1.8.1。
 - 新布局维护和入口见 docs/UI_WORKBENCH.md。用户要求测试不得打扰其他 App，继续采用隐藏窗口与后台命令。
 
 ## 2026-09-09 v1.10.0 GMT 6.7 适配（历史安装基线）
@@ -55,10 +56,10 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 - GitHub 默认分支：`main`
 - GitHub 最新正式版：`v1.8.1`，发布页：<https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1>
 - 当前本地开发分支：`codex/method-colored-stations`
-- 当前本地源码版本：`v1.10.0`（GMT 6.7 引擎适配）
-- 当前分支基于已发布的 `b40c16a` / v1.8.1，另含本地 v1.9.0 与 v1.10.0。
+- 当前本地源码版本：`v1.11.0`（工作台重设计及 GMT 6.7 引擎适配）
+- 当前分支基于已发布的 `b40c16a` / v1.8.1，另含本地 v1.9.0、v1.10.0 与 v1.11.0。
 - 本地 `v1.2.1` 功能基线：`385e170`、`b432e6a`；不要误认为这些已经进入公开 `main`。
-- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.10.0`。ASAR SHA-256：`fdd8717457ea238d5794ede1eafd037146c7c4da4c0a294898c186744be9963a`。
+- 当前权威用户入口：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 `1.11.0`。ASAR SHA-256：`fa103731439e5396c03e7802f828bb21c0b9a83f5ad3047e96750d7ecac2b897`。
 - 原 `1.1.3`、三个 `1.2.0`、`1.2.1`、本次替换的两个 `1.2.3` App 和旧分发包目录已移到可恢复的 `/Users/cwn/.Trash/MT点位图制作工具—GMT旧版本-20260904-本次替换/`。`/Users/cwn/Applications/MT点位图制作工具—GMT.app` 保留为同哈希的 `1.3.0` 来源副本，但日常应从“实用app”路径打开。2026-09-07 替换的桌面 `1.3.0` App 另保存在 `/Users/cwn/Applications/MT-GMT-Backups/v1.3.0-20260907-174340/`，不得未经授权清理。
 - Electron 是正式分发路线；`mt_gmt_tool/` 和 `run.py` 是早期 Python/Tkinter 原型，不是当前正式安装包入口。
 - 当前工作机默认使用 `/opt/homebrew/bin/gmt` 6.7.0，保留 `/Applications/GMT-6.5.0.app` 作为回退。
@@ -68,13 +69,13 @@ The application is a cross-platform MT/AMT/LMT mapping workbench. Electron provi
 
 | 项目 | 当前状态 |
 | --- | --- |
-| 本地源码版本 | `1.10.0` |
+| 本地源码版本 | `1.11.0` |
 | 当前分支 | `codex/method-colored-stations` |
 | 远端默认分支 | `origin/main` |
 | 远端 `main` 基线 | `b40c16a` / `v1.8.1` |
-| 本地功能标签 | v1.9.0 与 v1.10.0 为本地版本；v1.8.1 已发布 |
+| 本地功能标签 | v1.9.0、v1.10.0、v1.11.0 为本地版本；v1.8.1 已发布 |
 | GitHub 最新 Release | `v1.8.1`，Latest、非草稿、非预发布 |
-| 本机 App | 桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.10.0`，从该路径验证运行 |
+| 本机 App | 桌面“实用app”内唯一的 `MT点位图制作工具—GMT.app`，已更新到 `1.11.0`，从该路径验证运行 |
 
 版本号必须同步维护：
 
