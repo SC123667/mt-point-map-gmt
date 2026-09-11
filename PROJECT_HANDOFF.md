@@ -2,6 +2,12 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
+## 2026-09-11 v1.14.1 源码发布（不含安装包）
+
+- 用户明确授权“上传到github，但是安装包不用上传”。目标为既有 origin/main：SC123667/mt-point-map-gmt；仅上传当前源码、文档及 v1.14.1 标签，不创建 Release，不上传任何安装包。
+- 发布前远端 main 是当前本地历史的祖先，可普通快进；待上传历史已扫描，未包含 release/、outputs/、node_modules/、App/ASAR/DMG/EXE/ZIP 等安装或导出产物。仓库没有发布工作流。
+- 当前源码及本机安装版本 v1.14.1；GitHub Latest Release/可下载安装包仍为 v1.8.1。README、DISTRIBUTION 区分源码与安装包状态。源码 19 组 Node 测试、真实 GMT/Illustrator 导出和安装包验证见下文；本次发布不重新打包或重启本机 App。
+
 ## 2026-09-11 v1.14.1 工作台 AI 入口修复（已安装并后台重启）
 
 - 用户截图证实 v1.14.0 实际导出面板没有 AI 按钮。根因：workbench-ui.js 初始化隐藏旧 toolbar，但 outputs 的 wbMove 清单遗漏 exportAiDirectBtn/exportAiBtn；上一轮仅验证隐藏 DOM 的按钮与绑定，不足以证明真实界面可用。

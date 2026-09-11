@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/version-v1.14.1_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
+[![Version](https://img.shields.io/badge/source-v1.14.1-0d8584)](https://github.com/SC123667/mt-point-map-gmt/tree/v1.14.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -20,7 +20,7 @@ PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对
 
 在 **构造线与图例 → 位置 → 图外下方（两列）** 开启。新建工程默认此位置，旧工程保留原位置；图例自动扩展页面，不缩小地图。PNG/PDF/EPS 一致，原生图外图例不在图中拖动。论文样式增加 2 mm 外边距，并在 GMT 只有两端数字时补上比例尺中点。独立 GMT 脚本保留 GMT 自己的图例排版和比例尺刻度，原生双列样式以应用导出为准。
 
-## 制图工作台（本地 v1.14.1）
+## 制图工作台（源码 v1.14.1）
 
 左侧选择功能，右侧调整参数，中央保持地图预览。点右侧“更新预览”应用修改，面板保持打开；“展开”可加宽编辑区域。按 **⌘/Ctrl + K** 搜索功能。
 
@@ -33,7 +33,7 @@ PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对
 
 ## GMT 6.7 引擎适配（v1.10.0 起）
 
-当前本地源码版本 **v1.14.1**，GitHub 公开版本仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
+当前源码版本 **v1.14.1**；此次仅更新源码和版本标签，不上传安装包、不创建新 Release。GitHub 可下载安装包仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
 
 默认安装 GMT **6.7.0**。macOS 使用现有 Homebrew 安装 GMT 与 Ghostscript，安装前核对 6.7 分支；没有 Homebrew 时提供安装说明。Windows 下载官方 6.7.0 x64 安装器。安装日志和缓存归入全局目录“安装包/GMT-6.7”。GMT 不内置于本 App。
 
@@ -79,7 +79,7 @@ The offline tectonic library copies and checksums local datasets, indexes geomet
 
 ## 项目接手 / Developer Handoff
 
-完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前发布版本为 **v1.8.1**，包含此前本地 v1.2.0–v1.8.0 的累积更新。
+完整的架构、版本状态、模块职责、数据流、测试、打包、发布和技术债务说明见 [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md)。当前安装包发布版本为 **v1.8.1**，包含此前本地 v1.2.0–v1.8.0 的累积更新。
 
 See [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the complete architecture, branch state, module ownership, runtime flows, testing, packaging, release process, and known technical debt. The current release is **v1.8.1**, including the cumulative v1.2.0–v1.8.0 updates.
 
@@ -168,9 +168,9 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 
 ## 正式版下载 / Stable Release
 
-当前版本 **v1.8.1**。下载与你电脑架构对应的安装包，安装 GMT 6.x 后即可绘图。新用户默认数据目录为 `~/Documents/GMT工作区`；缓存、导出和工程在其中分类保存，无需开发者的外接硬盘。
+当前可下载安装包为 **v1.8.1**（源码已更新至 v1.14.1）。下载与你电脑架构对应的安装包，安装 GMT 6.x 后即可绘图。新用户默认数据目录为 `~/Documents/GMT工作区`；缓存、导出和工程在其中分类保存，无需开发者的外接硬盘。
 
-Current version: **v1.8.1**. Choose the matching installer and install GMT 6.x separately. New users store generated files under their own `~/Documents/GMT工作区`.
+Latest installer: **v1.8.1**; source code: **v1.14.1**. This source-only update does not include new installers. Choose the matching installer and install GMT 6.x separately. New users store generated files under their own `~/Documents/GMT工作区`.
 
 macOS 包采用 ad-hoc 签名，未做 Apple 公证。如系统阻止打开，可在“系统设置 → 隐私与安全性”中确认允许此应用。Windows 包未作商业代码签名；本次没有 Windows 实机安装/升级验证。个人构造库、地形缓存、工程和用户名称词典不随安装包分发；可自行导入或通过软件的公开数据入口获取。
 
