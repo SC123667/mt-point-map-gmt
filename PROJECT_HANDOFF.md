@@ -2,6 +2,18 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
+## 2026-09-11 v1.14.0 直接导出 AI（候选完成，等待安装确认）
+
+- 新按钮：导出图件 → 直接导出 AI（.ai），真实传入 formats:["ai"]；main 转为 GMT PDF 工作流，生成完整文字编辑包，再通过异步 Illustrator 桥接保存原生 AI。保留手动 AI 编辑包，不以重命名 PDF 代替原生 AI。
+- electron/illustrator-direct.js：macOS Launch Services 查找 Illustrator、osascript 后台调用；Windows reg 检查 COM 注册、UTF-16 VBScript 调用 Illustrator.Application.DoJavaScriptFile。支持缺失软件、权限拒绝、失败、无效结果提示和协作取消；不强杀 Illustrator。Windows 尚未实机验证。
+- JSX 自动模式独立于 GMT_QA，保存完成后关闭本次文档、恢复原有文档及 PDF 页码/交互设置，返回实际输出路径；已存在同名 AI 时追加时间标记。中间包保存在全局目录/临时文件/ai-export-*/，实际 AI 在区域导出目录。失败包保留，取消由文件标记协作完成。
+- macOS 包增加 NSAppleEventsUsageDescription 和 automation.apple-events 权限，保留 Electron JIT/内存/库验证权限。首次自动化仍可能需要用户在系统对话框允许。
+- 19 组 npm run test:node 全通过。真实隐藏 Electron/GMT/Illustrator 直接导出（含合成地形和透明区域）、原论文工程、候选 ASAR、空标注空图例场景通过；实际按钮点击捕获为 ["ai"], true。取消测试未生成目标 AI、用户原文档不变。
+- 原论文工程重新打开 AI：200 paths、23 textFrames、1 raster、5 个命名图层；Qulong 整段文字可编辑并独立移动，恢复后关闭。导出前后用户文档及设置一致。AI 预览已目视检查；地形保持影像，线条与文字保持可编辑。
+- 验证文件：全局目录/验证/v1.14.0/原工程/publication-results.json、AI重开验证.txt、AI预览.png。PDF/EPS 页面 494.88×289.60 pt，七个地名齐全；Poppler 对普通 PDF 的 Type3 halo 提示仍存在，直接 AI 不使用该 halo，实际 AI 重开编辑验证通过。
+- 源候选 /tmp/gmt-ai114-build/packaged/mac-arm64 严格深度验签通过，49 个有效 Electron 文件与 ASAR 一致。全局目录/安装包/v1.14.0/mac-arm64/MT点位图制作工具—GMT.app 深度验签通过，ASAR SHA-256：76c240cc04412497e562336d28059533fb4c580a502d953bf0daf6b1bfa07e6d。
+- 实用app 仍运行 v1.13.0（本轮核对 PID 15543），未关闭或替换。已备份至 全局目录/版本备份/v1.13.0-升级v1.14.0，旧 ASAR 58edabdf6573db04f2d15116b10f8b6ae16931a54ec9492a16c3af0a8f811b0e。等待用户确认工程已保存后再更新并后台重启；安装后仍需检查实际路径、版本、ASAR 和签名。未上传 GitHub。
+
 ## 2026-09-11 v1.13.0 AI 编辑修复（已安装并后台启动）
 
 - **恢复后的最终核验**：用户确认文件访问恢复后，读取 171691 字节论文工程成功；使用候选 ASAR、GMT 6.7 和实际地形重新导出。PNG/PDF/EPS 与 AI 编辑包均通过；页面 494.88 × 289.60 pt，七个核心名称齐全。

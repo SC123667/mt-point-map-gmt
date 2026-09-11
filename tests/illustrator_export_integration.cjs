@@ -10,6 +10,8 @@ mod._compile(fs.readFileSync(entry,'utf8').replace('width: 1280,','show: false, 
 app.whenReady().then(async()=>{try{
  let win;for(let i=0;i<240;i++){win=BrowserWindow.getAllWindows()[0];if(win&&await win.webContents.executeJavaScript('typeof state!=="undefined"&&!!state.gmtInfo').catch(()=>false))break;await new Promise(r=>setTimeout(r,250));}
  const js=s=>win.webContents.executeJavaScript(s),model=require(path.join(root,'electron/cartography'));
+ const click=await js('(()=>{const original=exportMap;let captured;try{exportMap=(...args)=>captured=args;el.exportAiDirectBtn.click();return captured;}finally{exportMap=original;}})()');
+ assert.deepEqual(click,[["ai"],true],"Direct AI button must trigger a full export");
  const config=await js('clearTimeout(state.preview.autoTimer);readConfig()');
  Object.assign(config,{plotType:'baseMap',region:'86/96/28/32',projection:'M18c',title:'Editable map',showTitle:true,showTerrain:false,showScale:true,pngDpi:150,illustratorPackage:true,outputName:'AI导出验证',faultLayers:[],legend:{show:true,position:'JBC',title:'Legend',labelFontSize:8}});
  config.cartography={paperStyle:true,language:'en',localLibrary:{enabled:false},features:[
@@ -25,7 +27,12 @@ app.whenReady().then(async()=>{try{
   config.cartography.features.push(model.feature({name:'测试地名 Test',category:'Test area',geometry:{type:'Polygon',coordinates:[[[88,29],[93,29],[93,30],[88,30],[88,29]]]},style:{opacity:25,fill:'#dea965',fontSize:9}}));
  }
  if(process.env.QA_EMPTY){config.cartography.features=[];config.legend.show=false;config.showTitle=false;config.showScale=false;}
- const r=await js(`window.mtApp.exportMap(${JSON.stringify({records:[],config,formats:['png','pdf','eps']})})`);assert(r.ok,r.message);
+ const r=await js(`window.mtApp.exportMap(${JSON.stringify({records:[],config,formats:process.env.QA_DIRECT?['ai']:['png','pdf','eps']})})`);assert(r.ok,r.message);
+ if(process.env.QA_DIRECT){
+  assert.equal(r.files.length,1);assert(r.files[0].endsWith('.ai'));assert(fs.statSync(r.files[0]).size>10000);
+  assert(BrowserWindow.getAllWindows().every(w=>!w.isVisible()));
+  fs.writeFileSync(path.join(out,'ai-results.json'),JSON.stringify({files:r.files},null,2));console.log('AI_DIRECT_EXPORT_OK',r.files[0]);app.exit(0);return;
+ }
  const script=r.files.find(f=>f.endsWith('.jsx'));assert(script);const dir=path.dirname(script);
  const svg=fs.readFileSync(path.join(dir,'labels.svg'),'utf8');
  for(const label of (process.env.QA_EMPTY?[]:['Xiongcun (XC)','Qulong (QL)','Jiama (JM)','Legend','Editable map']))assert(svg.includes(label),label);

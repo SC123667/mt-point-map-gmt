@@ -18,7 +18,8 @@ app.whenReady().then(async()=>{try{
  config.illustratorPackage=Boolean(process.env.QA_AI);
  config.terrainAllowDownload=false;config.terrainCacheDirectory=path.join(out,'地形缓存');
  if(process.env.QA_FAST){config.showTerrain=false;config.pngDpi=120;}
- const r=await js(`window.mtApp.exportMap(${JSON.stringify({records:[],config,formats:['png','pdf','eps']})})`);assert(r.ok,r.message);
+ const r=await js(`window.mtApp.exportMap(${JSON.stringify({records:[],config,formats:process.env.QA_DIRECT?['png','pdf','eps','ai']:['png','pdf','eps']})})`);assert(r.ok,r.message);
+ if(process.env.QA_DIRECT){const ai=r.files.find(f=>f.endsWith('.ai'));assert(ai&&fs.statSync(ai).size>10000);}
  for(const name of ['Xiongcun','Qulong','Jiama','Bangong','Indus','Lhasa Terrane','Gangdese magmatic arc'])assert(r.annotationLayout.labels.some(l=>l.name.includes(name)),name);
  const {PDFDocument}=require(path.join(root,'node_modules/pdf-lib'));
  const pdf=await PDFDocument.load(fs.readFileSync(r.files.find(f=>f.endsWith('.pdf'))));const size=pdf.getPage(0).getSize();assert(size.width>450&&size.width<530);assert(size.height<300);

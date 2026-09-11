@@ -1,6 +1,6 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/version-v1.13.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
+[![Version](https://img.shields.io/badge/version-v1.14.0_local-0d8584)](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -12,13 +12,15 @@
 
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
 
-v1.13.0 新增 **AI 编辑包**：在 Illustrator 的“文件 → 脚本 → 其他脚本”运行包内 JSX，生成分层 `.ai`。名称和图例为完整文字；底图、构造线和符号为矢量，地形晕渲仍为影像。编辑版不加文字描边，可在 AI 中重新设置外观。
+v1.14.0 新增 **导出图件 → 直接导出 AI（.ai）**：本机安装 Illustrator 后自动生成原生分层 `.ai`，不再需要手动运行脚本。输出在全局目录的“导出图件/区域”下，同名 AI 会加时间标记，避免覆盖已编辑文件。macOS 首次可能需要允许自动化权限。生成后关闭本次转换文档，恢复 Illustrator 原有文档；耗时绘图继续使用后台 worker。Windows 使用 Illustrator COM 调用，尚未进行 Windows 实机验证。
+
+保留 **AI 编辑包**：在 Illustrator 的“文件 → 脚本 → 其他脚本”运行包内 JSX，生成分层 `.ai`。名称和图例为完整文字；底图、构造线和符号为矢量，地形晕渲仍为影像。编辑版不加文字描边，可在 AI 中重新设置外观。
 
 PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对象。EPS 优先通过 Poppler 的 `pdftocairo` 转换；透明区域可能局部栅格化，缺少该工具时会阻止可能导致整页栅格化的转换。普通 PDF/PNG 导出不受此依赖影响。
 
 在 **构造线与图例 → 位置 → 图外下方（两列）** 开启。新建工程默认此位置，旧工程保留原位置；图例自动扩展页面，不缩小地图。PNG/PDF/EPS 一致，原生图外图例不在图中拖动。论文样式增加 2 mm 外边距，并在 GMT 只有两端数字时补上比例尺中点。独立 GMT 脚本保留 GMT 自己的图例排版和比例尺刻度，原生双列样式以应用导出为准。
 
-## 制图工作台（本地 v1.13.0）
+## 制图工作台（本地 v1.14.0）
 
 左侧选择功能，右侧调整参数，中央保持地图预览。点右侧“更新预览”应用修改，面板保持打开；“展开”可加宽编辑区域。按 **⌘/Ctrl + K** 搜索功能。
 
@@ -31,7 +33,7 @@ PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对
 
 ## GMT 6.7 引擎适配（v1.10.0 起）
 
-当前本地源码版本 **v1.13.0**，GitHub 公开版本仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
+当前本地源码版本 **v1.14.0**，GitHub 公开版本仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
 
 默认安装 GMT **6.7.0**。macOS 使用现有 Homebrew 安装 GMT 与 Ghostscript，安装前核对 6.7 分支；没有 Homebrew 时提供安装说明。Windows 下载官方 6.7.0 x64 安装器。安装日志和缓存归入全局目录“安装包/GMT-6.7”。GMT 不内置于本 App。
 
@@ -193,7 +195,7 @@ The macOS package is ad-hoc signed, not notarized. Windows packages are unsigned
 1. 点击顶部 **区域底图**，或左侧 **制图 → 按经纬度范围绘图**。
 2. 填写西、东、南、北四个边界，例如经度 `115–125°`、纬度 `20–30°`，点击 **确认并更新预览**。无需导入测点。
 3. 可继续设置投影、经纬网、地形、构造线、标题和比例尺，也可保存为 `.mtgmt` 工程。
-4. 点击 **导出 → 矢量 PDF（AI 编辑）**，在 Adobe Illustrator 中选择 **文件 → 打开**，随后可另存为 `.ai`。线条、图框、文字和填充保留为矢量对象；可能需要取消编组或进入剪切组编辑。字体编辑取决于本机字体。
+4. 点击 **导出图件 → 直接导出 AI（.ai）**，软件会调用已安装的 Illustrator 保存分层文件。也可导出矢量 PDF，在 Illustrator 中选择 **文件 → 打开**，随后另存为 `.ai`。线条、图框、文字和填充保留为矢量对象；可能需要取消编组或进入剪切组编辑。字体编辑取决于本机字体。
 
 区域底图模式不绘制已导入测点，但会保留数据，切回点位图即可继续使用。坐标采用十进制度，西经/南纬为负数；跨日期变更线可使用 `170/190/-10/10`，墨卡托投影不包含南北极。
 

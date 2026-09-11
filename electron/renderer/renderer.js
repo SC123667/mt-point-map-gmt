@@ -161,7 +161,7 @@ const ids = [
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "curvePreviousBtn", "curveNextBtn", "curveStationPosition", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
   "exportEpsBtn", "rangeMapBtn", "regionWestInput", "regionEastInput", "regionSouthInput", "regionNorthInput", "regionValidationMessage",
-  "exportAiBtn", "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
+  "exportAiBtn", "exportAiDirectBtn", "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
@@ -294,6 +294,7 @@ function wireEvents() {
   bind(el.previewBtn, "click", () => exportMap(["png"], false));
   bind(el.cancelRenderBtn, "click", cancelCurrentRender);
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
+  bind(el.exportAiDirectBtn, "click", () => exportMap(["ai"], true));
   bind(el.exportAiBtn, "click", () => exportMap(["pdf"], true, {illustrator:true}));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
   bind(el.exportEpsBtn, "click", () => exportMap(["eps"], true));

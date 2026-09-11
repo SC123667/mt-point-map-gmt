@@ -1,6 +1,8 @@
 #target illustrator
 (function () {
   var info=/*GMT_METADATA*/;
+  var automation=/*GMT_AUTOMATION*/null;
+  function checkCancelled(){if(automation&&new File(automation.cancelPath).exists)throw new Error("AI export cancelled");}
   var folder=new File($.fileName).parent;
   var previous=app.documents.length?app.activeDocument:null;
   var interaction=app.userInteractionLevel, doc=null, overlay=null;
@@ -17,6 +19,7 @@
     var b=item.visibleBounds;return b[0]>=bounds[0]&&b[1]<=bounds[1]&&b[2]<=bounds[2]&&b[3]>=bounds[3];
   }
   function flatten(item, layer, masks) {
+    checkCancelled();
     masks=masks||[];
     if(++operationCount>100000)throw new Error('图件对象过多，已停止自动拆组。原始 PDF/SVG 保留在编辑包中。');
     if(item.typename==='GroupItem'&&item.opacity===100&&item.blendingMode===BlendModes.NORMAL) {
@@ -41,6 +44,7 @@
     }
   }
   try {
+    checkCancelled();
     app.userInteractionLevel=UserInteractionLevel.DONTDISPLAYALERTS;
     var baseFile=new File(folder.fsName+'/base-map.pdf'),labelFile=new File(folder.fsName+'/labels.svg');
     if(!baseFile.exists||!labelFile.exists)throw new Error('请保留完整编辑包：缺少底图 PDF 或标注 SVG。');
@@ -76,10 +80,18 @@
     }
     doc.activate();
     var options=new IllustratorSaveOptions();options.pdfCompatible=true;options.compressed=true;
-    var output=new File(folder.fsName+'/可编辑图件.ai');
-    if(output.exists)output=new File(folder.fsName+'/可编辑图件_'+new Date().getTime()+'.ai');
+    var output=new File(automation?automation.outputPath:folder.fsName+'/可编辑图件.ai');
+    if(output.exists)output=new File(output.fsName.replace(/\.ai$/i,'')+'_'+new Date().getTime()+'.ai');
+    checkCancelled();
     doc.saveAs(output,options);
-    if(typeof GMT_QA!=='undefined'&&GMT_QA){
+    if(automation){
+      doc.close(SaveOptions.DONOTSAVECHANGES);doc=null;
+      try{if(previous)previous.activate();}catch(ignored){}
+      var result=new File(automation.resultPath);result.encoding="UTF-8";
+      if(!result.open("w"))throw new Error("Cannot write AI result");
+      result.write(output.fsName);result.close();
+    }
+    if(!automation&&typeof GMT_QA!=='undefined'&&GMT_QA){
       var frame=doc.textFrames.length?doc.textFrames[0]:null;
       if(frame){var before=frame.contents,position=frame.position;frame.contents=before+' QA';if(frame.contents!==before+' QA')throw new Error('Text edit failed');frame.contents=before;frame.translate(3,2);frame.position=position;}
       var report=[];report.push('paths='+doc.pathItems.length,'rasters='+doc.rasterItems.length,'texts='+doc.textFrames.length);

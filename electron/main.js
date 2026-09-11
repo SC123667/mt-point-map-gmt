@@ -452,11 +452,14 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
 });
 
 ipcMain.handle("gmt:export", async (event, payload) => {
+  const directAI=(payload.formats||[]).includes("ai");
+  const illustrator=directAI?await require("./illustrator-direct").findIllustrator():null;
   payload=await resolveLocalLibrary(event.sender,payload);
   payload={...payload,config:require("./map-names").plotConfig(payload.config)};
+  if(directAI)payload.config={...payload.config,illustratorPackage:true,illustratorDirect:true};
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
-  const formats = payload.formats || ["png"];
+  const formats = [...new Set((payload.formats || ["png"]).map(f=>f==="ai"?"pdf":f))];
   const outputName = safeName(payload.config?.outputName || "mt_point_map");
   const result = await runGMTWorker(event.sender, {
     mode: "export",
@@ -467,6 +470,14 @@ ipcMain.handle("gmt:export", async (event, payload) => {
   });
   if (result.ok && result.needsNativeDecorations) {
     await overlayNativeDecorations(result, payload.config, outputName, formats);
+  }
+  if(directAI&&result.ok){
+    const script=result.illustratorScript;
+    if(!script)throw new Error("未能准备 AI 编辑内容，请改用 AI 编辑包检查图件。");
+    event.sender.send("gmt:progress",{message:"正在调用 Illustrator 生成分层 AI 文件…",percent:95});
+    const output=await require("./illustrator-direct").exportNativeAI(script,path.join(outputDirectory,`${outputName}.ai`),illustrator);
+    result.files=result.files.filter(f=>payload.formats.includes(path.extname(f).slice(1)));
+    result.files.push(output);
   }
   result.localLibrary=payload.localLibrary;
   return result;
@@ -570,6 +581,7 @@ ipcMain.handle("gmt:downloadCancel", () => {
   return { ok: true };
 });
 ipcMain.handle("gmt:cancelRender", () => {
+  if(require("./illustrator-direct").cancelIllustrator())return {ok:true,message:"已请求取消 AI 导出，正在恢复原文档。"};
   if (!currentGMTRenderTask?.child || currentGMTRenderTask.child.killed) return { ok: false, message: "当前没有正在运行的 GMT 绘图任务。" };
   const cancelledRenderChild=currentGMTRenderTask.child;
   try {
@@ -734,9 +746,11 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
   const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, mapPageWidth:result.mapFrame?.width, annotationLayout: result.annotationLayout}, needsPDF);
   if (config.illustratorPackage) {
-    const script = await require('./illustrator-export').writeIllustratorPackage(result.outputDirectory, outputName,
+    const packageRoot=config.illustratorDirect?await fs.promises.mkdtemp(path.join(workspaceDirectory('临时文件'),'ai-export-')):result.outputDirectory;
+    const script = await require('./illustrator-export').writeIllustratorPackage(packageRoot, outputName,
       await fs.promises.readFile(path.join(result.outputDirectory, `${outputName}.pdf`)), rendered);
-    result.files.push(script);
+    result.illustratorScript=script;
+    if(!config.illustratorDirect)result.files.push(script);
   }
   if (result.mapFrame && (rendered.titleHeight || rendered.footerHeight)) {
     const unitsPerPixel = result.mapFrame.height / rendered.imageSize.height;
