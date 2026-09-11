@@ -2,6 +2,8 @@
 
 本地开发版本 **v1.12.0**（图外双列图例、EPS 画板与论文排版改进，保留 GMT 6.7 引擎适配）；此轮仅本地构建与验证，公开发行仍为下述 v1.8.1。
 
+本机“实用app”已安装 **v1.12.0** 并后台运行；候选严格深度验签通过，安装目标深度验签与 ASAR 一致性通过。安装目标严格检查仍提示 FileProvider 的已知 Finder 元数据问题。旧版保存在全局目录 `版本备份/v1.11.1-升级v1.12.0`。
+
 当前发布版本 **v1.8.1**，仓库与下载：[SC123667/mt-point-map-gmt](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)。这是 v1.1.3 之后的累积更新。
 
 Current release: **v1.8.1**, a cumulative update after v1.1.3.
