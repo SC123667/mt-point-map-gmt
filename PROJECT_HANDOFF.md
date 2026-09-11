@@ -2,7 +2,15 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
-## 2026-09-11 v1.13.0 AI 编辑修复候选（尚未安装/交付）
+## 2026-09-11 v1.13.0 AI 编辑修复（已安装并后台启动）
+
+- **恢复后的最终核验**：用户确认文件访问恢复后，读取 171691 字节论文工程成功；使用候选 ASAR、GMT 6.7 和实际地形重新导出。PNG/PDF/EPS 与 AI 编辑包均通过；页面 494.88 × 289.60 pt，七个核心名称齐全。
+- 实际 Illustrator 从全局中文目录执行 JSX 成功；生成 AI 后再次打开，确认 200 paths、23 textFrames、1 raster，5 个命名图层。Qulong 完整文字可改写、可独立移动；验证后恢复并关闭测试文档，用户既有文档名称和保存状态一致。AI预览.png 已目视核对地形、透明示意区域、所有矿床符号、缝合带、比例尺和图外图例。编辑版去掉文字 halo，地图地理范围与位置保留。
+- 用户可直接打开：全局目录/导出图件/研究区地质图概况_AI可编辑版_20260911/可编辑图件.ai。此目录包含配套 base-map.pdf、labels.svg、生成可编辑AI.jsx、使用说明及普通 PDF/EPS/PNG。
+- 升级前实用app 中旧 App 已退出，无需关闭未保存工程；已备份至 全局目录/版本备份/v1.12.0-升级v1.13.0（复制备份与实际安装旧包均保留）。旧 ASAR 备份比对为 e6d208602cbbff70a38f2cdc952b55532c6abcf3d0391238ecb288859449f0a5。
+- 实用app 已更新到 1.13.0，ASAR 58edabdf6573db04f2d15116b10f8b6ae16931a54ec9492a16c3af0a8f811b0e，与候选一致，深度验签通过。open -g -j 后实际主进程 PID 15543 来自唯一实用app路径。未上传 GitHub；未做 Windows Illustrator 实机验证。
+
+以下保留上一阶段诊断记录，文件访问阻塞与待验证事项已由上面的最终核验解决。
 
 - 用户确认旧图通过 Illustrator“置入/拖入”，图像和文字整体移动。实际检查旧 EPS 只有一个整页 raster、无 paths/text；Ghostscript eps2write 遇 PDF 透明度整页栅格化。旧 PDF 仍有路径与地形影像，但原生文字常被拆为单字。v1.12.0 画板验证不足以证明 EPS 可编辑。
 - 新增 electron/illustrator-export.js、illustrator-template.jsx 及“AI 编辑包”按钮：raw GMT PDF + 全页 semantic SVG + Illustrator JSX，保留整段文字和分层图形，编辑版移除文字 halo。JSX 拆分安全分组，给跨框对象保留单独裁剪；保留透明组；按实测位置修正 Illustrator 跨文档 duplicate 自动居中的偏移。空组可省略；重复执行不覆盖已生成 AI。
