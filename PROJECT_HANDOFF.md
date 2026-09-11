@@ -2,6 +2,15 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
+## 2026-09-11 v1.14.1 工作台 AI 入口修复（已安装并后台重启）
+
+- 用户截图证实 v1.14.0 实际导出面板没有 AI 按钮。根因：workbench-ui.js 初始化隐藏旧 toolbar，但 outputs 的 wbMove 清单遗漏 exportAiDirectBtn/exportAiBtn；上一轮仅验证隐藏 DOM 的按钮与绑定，不足以证明真实界面可用。
+- 两个原按钮现移入工作台导出面板，直接 .ai 居首并突出显示；保留 Illustrator 依赖说明，不再被 compactWorkbenchCopy 移去帮助。“全部格式”改为明确的 PNG + PDF + EPS。
+- 隐藏 Electron 回归先在未修复代码复现 inPanel:false / visible:false / 零尺寸，再在修复后验证 1100×720、1280×820 的顶部、侧栏及搜索命令入口；检查面板归属、CSS 可见性、点击命中，随后执行实际 GMT/Illustrator 导出。截图已目视核对两个 AI 按钮与说明。19 组 Node 测试通过；合成地形、空标注及候选 ASAR 直接 AI 导出通过。无 MT 算法改动。
+- 验证目录：全局目录/验证/v1.14.1，候选App/AI导出面板.png 为实际渲染截图。测试窗口均隐藏且禁止激活，不操作其他应用的用户文档。
+- 源候选 /tmp/gmt-ai1141-build/packaged-final/mac-arm64 严格深度验签通过；49 个有效 Electron 文件与 ASAR 一致。全局目录/安装包/v1.14.1/mac-arm64/MT点位图制作工具—GMT.app 深度验签通过。ASAR：cdbfc7ac83bbe864574405828a19f8b32dfc742af46a73feade7412a1a17f22a。
+- 沿用本轮连续修复前用户已给出的“更新并后台重启”授权，正常退出 v1.14.0、备份到 全局目录/版本备份/v1.14.0-升级v1.14.1（含实际安装旧包），更新唯一实用app 至 v1.14.1。安装后版本、ASAR、普通深度验签通过；open -g -j 后主进程 PID 27145 来自实际实用app路径。未上传 GitHub。
+
 ## 2026-09-11 v1.14.0 直接导出 AI（已安装并后台重启）
 
 - 新按钮：导出图件 → 直接导出 AI（.ai），真实传入 formats:["ai"]；main 转为 GMT PDF 工作流，生成完整文字编辑包，再通过异步 Illustrator 桥接保存原生 AI。保留手动 AI 编辑包，不以重命名 PDF 代替原生 AI。

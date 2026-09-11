@@ -10,6 +10,19 @@ mod._compile(fs.readFileSync(entry,'utf8').replace('width: 1280,','show: false, 
 app.whenReady().then(async()=>{try{
  let win;for(let i=0;i<240;i++){win=BrowserWindow.getAllWindows()[0];if(win&&await win.webContents.executeJavaScript('typeof state!=="undefined"&&!!state.gmtInfo').catch(()=>false))break;await new Promise(r=>setTimeout(r,250));}
  const js=s=>win.webContents.executeJavaScript(s),model=require(path.join(root,'electron/cartography'));
+ // Exercise the actual workbench, not a hidden legacy toolbar node.
+ for(const [width,height] of [[1100,720],[1280,820]]){
+  win.setSize(width,height);
+  for(const open of ['el.headerExportBtn.click()', 'document.querySelector("#workbenchNav [data-panel=export]").click()', 'wb.commands.find(c=>c.key==="export").run()']){
+   await js(open);await new Promise(r=>setTimeout(r,80));
+   assert(await js('!!el.settingsDialogBody.querySelector(".wb-export-note")'), 'Illustrator requirement must stay beside export buttons');
+   const visible=await js(`['exportAiDirectBtn','exportAiBtn'].map(id=>{const b=document.getElementById(id);b.scrollIntoView({block:'nearest'});const r=b.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {id,inPanel:el.settingsDialogBody.contains(b),visible:b.checkVisibility({checkVisibilityCSS:true,checkOpacity:true}),hit:top===b||b.contains(top),width:r.width,height:r.height};})`);
+   assert(visible.every(b=>b.inPanel&&b.visible&&b.hit&&b.width>100&&b.height>=28),JSON.stringify({width,open,visible}));
+   await js('closeSettingsDialog()');
+  }
+ }
+ await js('el.headerExportBtn.click()');await new Promise(r=>setTimeout(r,150));
+ fs.writeFileSync(path.join(out,'AI导出面板.png'),(await win.webContents.capturePage()).toPNG());
  const click=await js('(()=>{const original=exportMap;let captured;try{exportMap=(...args)=>captured=args;el.exportAiDirectBtn.click();return captured;}finally{exportMap=original;}})()');
  assert.deepEqual(click,[["ai"],true],"Direct AI button must trigger a full export");
  const config=await js('clearTimeout(state.preview.autoTimer);readConfig()');

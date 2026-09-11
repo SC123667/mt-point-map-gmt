@@ -36,8 +36,8 @@ function initWorkbenchUI(){
   wbMove(imports,['sidebarImportFileBtn','sidebarImportEdiBtn','sidebarLoadSampleBtn','rangeMapBtn']);
   const outputs=wbPanel('export','输出文件');
   wbMoveLabel(outputs,'outputNameInput');wbMoveLabel(outputs,'pngDpiInput');
-  outputs.append(wbElement('p','wb-intro','PDF 可在 Illustrator 中编辑文字与矢量线条；地形晕渲保持为影像。'));
-  wbMove(outputs,['exportPdfBtn','exportPngBtn','exportEpsBtn','exportAllBtn','saveScriptBtn']);
+  outputs.append(wbElement('p','wb-export-note','直接导出 .ai 需要本机安装 Illustrator。AI 编辑包可在另一台电脑运行包内脚本；地形晕渲仍为影像。'));
+  wbMove(outputs,['exportAiDirectBtn','exportAiBtn','exportPdfBtn','exportPngBtn','exportEpsBtn','exportAllBtn','saveScriptBtn']);
   const files=wbPanel('storage','工作目录');wbMove(files,['workspacePathText','openWorkspaceBtn']);wbMoveLabel(files,'terrainRegionNameInput');
   const terrain=document.querySelector('fieldset[data-settings-panel="terrain"]');
   const cache=we('terrainCacheSummaryText').closest('details');files.append(cache);
@@ -144,14 +144,14 @@ function compactWorkbenchCopy(help){
   // Keep operational state and errors in place; move static instructions to Help.
   for(const [,key,title] of WORKBENCH_PANELS){
     if(key==='help')continue;
-    const notes=[...document.querySelectorAll(`[data-settings-panel="${key}"] p:not([id])`)].filter(p=>!p.querySelector('input,button,select'));
+    const notes=[...document.querySelectorAll(`[data-settings-panel="${key}"] p:not([id]):not(.wb-export-note)`)].filter(p=>!p.querySelector('input,button,select'));
     if(!notes.length)continue;
     const detail=wbElement('details','wb-section');detail.append(wbElement('summary','',title));notes.forEach(p=>detail.append(p));help.append(detail);
   }
   const text={
     'sidebarImportFileBtn':'点位表 · TXT / CSV / Excel','sidebarImportEdiBtn':'EDI 文件夹','sidebarLoadSampleBtn':'示例数据',
     'rangeMapBtn':'按经纬度绘图','exportPdfBtn':'PDF · 可编辑矢量','exportPngBtn':'PNG · 图像','exportEpsBtn':'EPS · 矢量',
-    'exportAllBtn':'导出全部格式','saveScriptBtn':'GMT 脚本',
+    'exportAllBtn':'PNG + PDF + EPS','saveScriptBtn':'GMT 脚本',
     'cart-draw-line':'绘制线','cart-draw-polygon':'绘制区域','cart-edit-vertices':'编辑节点',
     'cart-new':'新增','cart-import':'导入','cart-export':'导出 GeoJSON','cart-delete':'移除',
     'library-import':'同步文件夹','library-refresh':'刷新索引','library-open':'打开目录','library-cancel':'取消',
