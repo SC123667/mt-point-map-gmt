@@ -54,8 +54,19 @@ async function handleTask(payload) {
     const page = await pdfPageSize(await fs.promises.readFile(payload.pdfPath));
     const gmt=resolveGMT(),exe=process.platform==='win32'?'gswin64c.exe':'gs';
     const bundled=path.join(gmt.binDir||'',exe),command=fs.existsSync(bundled)?bundled:exe;
-    await new Promise((resolve,reject)=>{let stderr='';currentChild=spawn(command,['-dBATCH','-dNOPAUSE','-dSAFER','-dUseCropBox','-dFIXEDMEDIA',`-dDEVICEWIDTHPOINTS=${page.width}`,`-dDEVICEHEIGHTPOINTS=${page.height}`,'-sDEVICE=eps2write',`-sOutputFile=${payload.epsPath}`,payload.pdfPath],{env:{...process.env,...(gmt.gsLib?{GS_LIB:gmt.gsLib}:{})}});currentChild.stderr.on('data',c=>stderr+=c);currentChild.on('error',reject);currentChild.on('close',code=>{currentChild=null;code?reject(new Error(stderr||'EPS 转换失败')):resolve();});});
-    await fs.promises.writeFile(payload.epsPath, setEPSPageBounds(await fs.promises.readFile(payload.epsPath), page));
+    const {findCairo,hasTransparency}=require('./eps-export');
+    const cairo=findCairo(gmt.binDir);
+    if (!cairo && await hasTransparency(await fs.promises.readFile(payload.pdfPath))) {
+      throw new Error('EPS 不支持此图的透明叠加。请导出 PDF 或 AI 编辑包；如必须导出 EPS，请安装 Poppler（pdftocairo）。已阻止整页转成图片。');
+    }
+    const temp=payload.epsPath+'.partial';
+    const args=cairo ? ['-eps','-r',String(Math.max(150,Math.min(1200,Number(payload.dpi)||450))),payload.pdfPath,temp]
+      : ['-dBATCH','-dNOPAUSE','-dSAFER','-dUseCropBox','-dFIXEDMEDIA',`-dDEVICEWIDTHPOINTS=${page.width}`,`-dDEVICEHEIGHTPOINTS=${page.height}`,'-sDEVICE=eps2write',`-sOutputFile=${temp}`,payload.pdfPath];
+    try {
+      await new Promise((resolve,reject)=>{let stderr='';currentChild=spawn(cairo||command,args,{env:{...process.env,...(gmt.gsLib?{GS_LIB:gmt.gsLib}:{})}});currentChild.stderr.on('data',c=>stderr+=c);currentChild.on('error',reject);currentChild.on('close',code=>{currentChild=null;code?reject(new Error(stderr||'EPS 转换失败')):resolve();});});
+      await fs.promises.writeFile(temp,setEPSPageBounds(await fs.promises.readFile(temp),page));
+      await fs.promises.rename(temp,payload.epsPath);
+    } finally {await fs.promises.rm(temp,{force:true});}
     return {ok:true};
   }
   if (payload.mode === "composeVectorPDF") {
@@ -78,13 +89,14 @@ async function exportGMTMap(payload) {
   const nativeLegend = shouldOverlayLegend(payload.config);
   const nativeAnnotations = payload.config?.plotType !== "responseCurve" && ((payload.config?.showScale && payload.config?.cartography?.paperStyle && !payload.config?.swapAxes) || (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel));
   const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
-  const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations);
-  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || nativeLegend || payload.config?.interactiveMap) ? ["eps"] : [])])];
+  const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations || Boolean(payload.config?.illustratorPackage));
+  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage) ? ["eps"] : [])])];
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
     ...gmtWorkspace.config,
     legend: nativeLegend ? { ...(gmtWorkspace.config.legend || {}), show: false } : gmtWorkspace.config.legend,
+    showTitle: nativeTitle ? false : gmtWorkspace.config.showTitle,
     forceGMTTitle: includesVector && nativeTitle && !needsNativeDecorations
   };
   sendProgress("script", 22, `正在生成 GMT 脚本和 ${payload.records?.length || 0} 个测点数据文件...`);
@@ -92,7 +104,7 @@ async function exportGMTMap(payload) {
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
-  if (result.ok && (nativeAnnotations || nativeLegend || payload.config?.interactiveMap)) {
+  if (result.ok && (nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage)) {
     const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName, payload.config);
     result.mapFrame = {width:layout.width,height:layout.height,ox:layout.ox,oy:layout.oy};
     if(layout.labels.length || layout.scaleLabel || layout.placement?.enabled) result.annotationLayout = layout;
@@ -305,7 +317,7 @@ function copyIfExists(source, target) {
 function shouldOverlayTitle(config) {
   if (config?.showTitle === false) return false;
   const title = String(config?.title || "").trim();
-  return title && needsNativeTextRendering(title);
+  return title && (config.illustratorPackage || needsNativeTextRendering(title));
 }
 
 function shouldOverlayLegend(config) {
@@ -314,7 +326,7 @@ function shouldOverlayLegend(config) {
   const entries = buildLegendEntries(config);
   if (!entries.length) return false;
   const labels = [config.legend.title, ...entries.map((entry) => entry.label)];
-  return require('./legend').normalizeLegendConfig(config.legend).position === 'JBC' || labels.some((label) => needsNativeTextRendering(label));
+  return config.illustratorPackage || require('./legend').normalizeLegendConfig(config.legend).position === 'JBC' || labels.some((label) => needsNativeTextRendering(label));
 }
 
 function isVectorFormat(format) {

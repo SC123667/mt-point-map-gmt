@@ -733,6 +733,11 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
   const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
   const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, mapPageWidth:result.mapFrame?.width, annotationLayout: result.annotationLayout}, needsPDF);
+  if (config.illustratorPackage) {
+    const script = await require('./illustrator-export').writeIllustratorPackage(result.outputDirectory, outputName,
+      await fs.promises.readFile(path.join(result.outputDirectory, `${outputName}.pdf`)), rendered);
+    result.files.push(script);
+  }
   if (result.mapFrame && (rendered.titleHeight || rendered.footerHeight)) {
     const unitsPerPixel = result.mapFrame.height / rendered.imageSize.height;
     result.mapFrame.oy += rendered.footerHeight * unitsPerPixel;
@@ -754,7 +759,7 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   if (needsPDF) {
     fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), vectorPDF);
   }
-  if ((result.generatedFormats || requestedFormats).includes("eps")) await runForkWorker("gmt-worker.js",{mode:"pdfToEPS",pdfPath:path.join(result.outputDirectory,`${outputName}.pdf`),epsPath:path.join(result.outputDirectory,`${outputName}.eps`)});
+  if (requestedFormats.includes("eps")) await runForkWorker("gmt-worker.js",{mode:"pdfToEPS",pdfPath:path.join(result.outputDirectory,`${outputName}.pdf`),epsPath:path.join(result.outputDirectory,`${outputName}.eps`),dpi:config.pngDpi});
   if (!requestedFormats.includes("png")) {
     try {
       fs.unlinkSync(pngPath);
@@ -769,7 +774,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const size = image.getSize();
   if (!size.width || !size.height) throw new Error("中文图名/图例叠加失败：无法读取 GMT PNG 尺寸。");
   const requestedTitle = config.showTitle === false ? "" : String(config.title || "").trim();
-  const title = needsNativeTextRendering(requestedTitle) ? requestedTitle : "";
+  const title = (config.illustratorPackage || needsNativeTextRendering(requestedTitle)) ? requestedTitle : "";
   const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
   const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
@@ -913,6 +918,8 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
       win.setContentSize(size.width, totalHeight + footerHeight);
       await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
     }
+    const editable = config.illustratorPackage ? await win.webContents.executeJavaScript(
+      `(${require('./illustrator-export').collectEditableSVG.toString()})(${Number(config.mapPageWidth || config.annotationLayout?.width || projectionWidthCm(config.projection)*72/2.54)})`) : null;
     const png = (await win.webContents.capturePage()).toPNG();
     let pdf;
     if (includePDF) {
@@ -925,7 +932,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
         margins: { marginType: "none" }
       });
     }
-    return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight, footerHeight };
+    return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight, footerHeight, editingSVG:editable?.svg, editingGroups:editable?.groups };
   } finally {
     if (win && !win.isDestroyed()) win.destroy();
     // Windows may release the file handle shortly after the hidden window closes.

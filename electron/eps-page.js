@@ -19,9 +19,10 @@ function setEPSPageBounds(bytes, { width, height }) {
   const text = Buffer.from(bytes).toString('latin1'), end = text.indexOf('%%EndComments');
   if (end < 0) throw new Error('EPS 缺少页面声明，已停止导出。');
   const header = text.slice(0, end);
-  if (!/^%%BoundingBox:.*$/m.test(header) || !/^%%HiResBoundingBox:.*$/m.test(header)) throw new Error('EPS 缺少边界声明，已停止导出。');
+  if (!/^%%BoundingBox:.*$/m.test(header)) throw new Error('EPS 缺少边界声明，已停止导出。');
   const number = v => Number(v.toFixed(6));
-  return Buffer.from(header
+  const sizedHeader = /^%%HiResBoundingBox:.*$/m.test(header) ? header : header + '%%HiResBoundingBox: 0 0 0 0\n';
+  return Buffer.from(sizedHeader
     .replace(/^%%BoundingBox:.*$/m, `%%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}`)
     .replace(/^%%HiResBoundingBox:.*$/m, `%%HiResBoundingBox: 0 0 ${number(width)} ${number(height)}`) + text.slice(end), 'latin1');
 }

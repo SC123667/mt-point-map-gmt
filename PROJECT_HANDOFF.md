@@ -2,6 +2,18 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
+## 2026-09-11 v1.13.0 AI 编辑修复候选（尚未安装/交付）
+
+- 用户确认旧图通过 Illustrator“置入/拖入”，图像和文字整体移动。实际检查旧 EPS 只有一个整页 raster、无 paths/text；Ghostscript eps2write 遇 PDF 透明度整页栅格化。旧 PDF 仍有路径与地形影像，但原生文字常被拆为单字。v1.12.0 画板验证不足以证明 EPS 可编辑。
+- 新增 electron/illustrator-export.js、illustrator-template.jsx 及“AI 编辑包”按钮：raw GMT PDF + 全页 semantic SVG + Illustrator JSX，保留整段文字和分层图形，编辑版移除文字 halo。JSX 拆分安全分组，给跨框对象保留单独裁剪；保留透明组；按实测位置修正 Illustrator 跨文档 duplicate 自动居中的偏移。空组可省略；重复执行不覆盖已生成 AI。
+- EPS worker 优先 pdftocairo，补充缺少的 HiResBoundingBox；无 Cairo 且 PDF 有透明内容时阻止整页位图退化。只在用户请求 EPS 时做该转换，PDF 不依赖 Cairo。耗时转换仍在 worker。
+- 本轮 18 组 Node 测试通过（最终版本 1.13.0）。隐藏 Electron 原生 12.6 MB PNG、双语图例、透明叠加、尺寸与清理通过。新增 tests/illustrator_export_integration.cjs：真实 GMT 普通/合成地形+透明区/空标注空图例三种导出通过；EPS 回读有字体，AI 包 SVG 保留完整标签且没有底图图片。
+- /tmp/gmt-ai113 中实际 Illustrator 测试成功生成 174 paths、19 textFrames 的例图，完整 XC/QL/JM 名称与图外图例可编辑，拆组后图形和位置已视觉检查。这是合成测试图，不是用户论文工程；不要拿它覆盖论文图。最新 AI预览.png 可用于比对。新增临时输入复制后的 JSX 尚需在正常文件访问环境中复核。
+- **当前阻塞**：/Volumes/MacBook Pro SSD/GMT-缓存 的目录 stat 可返回，但读工程正文、列目录、创建子目录会长期等待；用户原论文工程无法重新导出。已异步询问是否移动目录/重连，尚未收到回复。测试临时改用仓库 outputs/*-qa 与 /tmp；正式文件仍需在磁盘恢复后放回全局目录。
+- Illustrator 后台直接读取 Documents 中文目录或 File.copy 也出现等待；ASCII /tmp 输入曾成功。后续 QA 新增脚本复制输入到自身临时目录、恢复 PDF 页码设置并清理，但中文目录后台调用仍未完成。当前 AI 测试可能仍等待文件访问（pid 32301），临时目录 /var/folders/ws/bblmcn61599f4pkt6k10v2g40000gn/T/gmt-ai-1789126156886 为空。不要强杀用户 App；不要连续重复后台 AI 调用。需要先排除系统文件访问等待。用户其他文档未修改。
+- 候选构建完成：仓库 release/local-1.13.0/mac-arm64/MT点位图制作工具—GMT.app。源包 /tmp/gmt-ai113-build/packaged/mac-arm64 严格深度验签通过，47 个 Electron 文件与候选 ASAR 一致；复制到 Documents 后普通深度验签通过，严格检查出现已知 Finder 信息警告。ASAR SHA-256：58edabdf6573db04f2d15116b10f8b6ae16931a54ec9492a16c3af0a8f811b0e。候选 ASAR 包内实际 GMT AI/PDF/EPS 导出通过。构建使用仓库已安装 electron-builder 26.15.3 与 Electron 35.7.5；生产依赖没有 .node/binding.gyp，跳过无关 native rebuild 等待。
+- 实用app 版本本轮再次核对仍为 1.12.0；源码候选 1.13.0。未推送、未创建远端 Release；不应宣称安装升级完成。后续必须补正常目录下的 AI/原工程验证，再决定安装。打包情况见后续记录。
+
 ## 2026-09-11 v1.12.0 图外图例与论文区域图（当前维护状态）
 
 - 新建工程图例默认 JBC（图外下方两列），旧工程已有位置保留。renderer 禁止对图外图例做图内拖动。隐藏 Electron 按实际内容测量 footer，高 DPI PNG 与 PDF 采用同一尺寸；PDF 仍按 GMT 物理尺寸合成，地图坐标原点增加 footer 偏移。

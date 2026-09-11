@@ -15,6 +15,7 @@ app.whenReady().then(async()=>{try{
  assert(config.cartography.features.find(f=>f.abbreviation==='XC').style.bold);
  assert.equal(config.cartography.features.find(f=>f.abbreviation==='XC').style.haloWidth,.5);
  assert.equal(config.legend.position,'JBC','Outside legend must survive save/open');
+ config.illustratorPackage=Boolean(process.env.QA_AI);
  config.terrainAllowDownload=false;config.terrainCacheDirectory=path.join(out,'地形缓存');
  if(process.env.QA_FAST){config.showTerrain=false;config.pngDpi=120;}
  const r=await js(`window.mtApp.exportMap(${JSON.stringify({records:[],config,formats:['png','pdf','eps']})})`);assert(r.ok,r.message);
@@ -29,6 +30,8 @@ app.whenReady().then(async()=>{try{
  assert.equal(r.annotationLayout.scaleLabel?.text,'50');
  const roundtrip=path.join(out,'EPS回读.pdf');
  cp.execFileSync('/opt/homebrew/bin/gs',['-q','-dBATCH','-dNOPAUSE','-dEPSCrop','-sDEVICE=pdfwrite',`-sOutputFile=${roundtrip}`,r.files.find(f=>f.endsWith('.eps'))]);
+ const fonts=cp.execFileSync('/opt/homebrew/bin/pdffonts',[roundtrip],{encoding:'utf8'});
+ assert(fonts.trim().split(/\n/).length>2,'EPS must retain fonts rather than flatten the entire page');
  const back=(await PDFDocument.load(fs.readFileSync(roundtrip))).getPage(0).getSize();
  assert(Math.abs(back.width-size.width)<1&&Math.abs(back.height-size.height)<1,'EPS importer must see a normal physical artboard');
  // Text extraction alone misses Chromium's lost inline-flex symbols. Render

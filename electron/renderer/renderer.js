@@ -161,7 +161,7 @@ const ids = [
   "zyyrColumn", "zyyiColumn", "txrColumn", "txiColumn", "tyrColumn", "tyiColumn", "strikeColumn", "ptAzimuthColumn",
   "ptMaxColumn", "ptMinColumn", "betaColumn", "mtPeriodInput", "curveStationInput", "curvePreviousBtn", "curveNextBtn", "curveStationPosition", "tableHelpBtn", "tableHelpDialog", "closeTableHelpBtn",
   "exportEpsBtn", "rangeMapBtn", "regionWestInput", "regionEastInput", "regionSouthInput", "regionNorthInput", "regionValidationMessage",
-  "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
+  "exportAiBtn", "exportPngBtn", "exportPdfBtn", "exportBothBtn", "exportAllBtn", "saveScriptBtn", "installBtn", "recheckBtn",
   "downloadPanel", "downloadTitle", "downloadStatus", "downloadProgress", "downloadBytes", "downloadPercent",
   "downloadSpeed", "pauseDownloadBtn", "resumeDownloadBtn", "cancelDownloadBtn",
   "settingsDialog", "settingsDialogTitle", "settingsDialogBody", "settingsCloseBtn", "settingsCancelBtn", "settingsConfirmBtn",
@@ -294,6 +294,7 @@ function wireEvents() {
   bind(el.previewBtn, "click", () => exportMap(["png"], false));
   bind(el.cancelRenderBtn, "click", cancelCurrentRender);
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
+  bind(el.exportAiBtn, "click", () => exportMap(["pdf"], true, {illustrator:true}));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
   bind(el.exportEpsBtn, "click", () => exportMap(["eps"], true));
   bind(el.exportBothBtn, "click", () => exportMap(["png", "pdf"], true));
@@ -1692,6 +1693,7 @@ async function exportMap(formats, showAlert, options = {}) {
   setPreviewBusy(true, showAlert ? "正在导出图件..." : (options.auto ? "正在自动更新预览..." : "正在生成预览..."));
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
+  config.illustratorPackage = Boolean(options.illustrator);
   config.interactiveMap = config.plotType !== "responseCurve";
   if (isPreviewRender && config.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
     setRuntimeStatus(`快速预览地形 ${config.terrainResolution}；正式导出保持 ${baseConfig.terrainResolution}`, "busy");
