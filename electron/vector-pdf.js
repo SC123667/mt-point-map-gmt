@@ -1,7 +1,7 @@
 const { PDFDocument } = require("pdf-lib");
 
 // Composite PDF pages as vector Form XObjects; never embed the preview PNG.
-async function composeVectorPDF(baseBytes, overlayBytes, imageSize, titleHeight) {
+async function composeVectorPDF(baseBytes, overlayBytes, imageSize, titleHeight, footerHeight = 0) {
   const base = await PDFDocument.load(baseBytes);
   const overlay = await PDFDocument.load(overlayBytes);
   if (base.getPageCount() !== 1 || overlay.getPageCount() !== 1) {
@@ -18,9 +18,10 @@ async function composeVectorPDF(baseBytes, overlayBytes, imageSize, titleHeight)
   // Keep the physical GMT figure size, independent of PNG preview/export DPI.
   const width = bounds.width;
   const mapHeight = bounds.height;
-  const height = mapHeight * (imageSize.height + titleHeight) / imageSize.height;
+  const footer = mapHeight * footerHeight / imageSize.height;
+  const height = mapHeight * (imageSize.height + titleHeight + footerHeight) / imageSize.height;
   const page = result.addPage([width, height]);
-  page.drawPage(map, { x: 0, y: 0, width, height: mapHeight });
+  page.drawPage(map, { x: 0, y: footer, width, height: mapHeight });
   page.drawPage(decorations, { x: 0, y: 0, width, height });
   result.setCreator("MT Point Map GMT");
   result.setProducer("GMT + Electron + pdf-lib (vector composition)");

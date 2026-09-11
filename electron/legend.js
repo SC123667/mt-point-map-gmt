@@ -8,7 +8,7 @@ const DEFAULT_LEGEND_CONFIG = {
   titleFontSize: 11,
   labelFontSize: 8.5,
   textColor: "black",
-  position: "n0.98/0.98+jTR",
+  position: "JBC",
   width: "4.2c",
   borderWidth: 0.5,
   borderColor: "gray40",
@@ -35,8 +35,8 @@ function buildLegendEntries(config) {
   }
   const names = require('./map-names'), cart = require('./cartography');
   const categories = new Map();
-  for(const f of config.cartography?.features||[])if(f.visible!==false&&cart.inRegion(f,config.region)&&!categories.has(f.category))categories.set(f.category,f);
-  for(const [category,f] of categories){const style=cart.effectiveStyle(f,config.cartography);overlayEntries.push({label:category,category,symbol:f.geometry.type.includes('Point')?'point':'line',gmtSymbol:style.symbol==='none'?'c':style.symbol,fill:style.fill,size:`${style.size}c`,pen:`${style.width}p,${style.color}${style.dash==='dash'?',-':style.dash==='dot'?',.':''}`});}
+  for(const f of config.cartography?.features||[])if(f.visible!==false&&cart.inRegion(f,config.region)&&!(f.geometry.type.includes('Point')&&cart.effectiveStyle(f,config.cartography).symbol==='none')&&!categories.has(f.category))categories.set(f.category,f);
+  for(const [category,f] of categories){const style=cart.effectiveStyle(f,config.cartography);overlayEntries.push({label:category,category,symbol:f.geometry.type.includes('Point')?'point':f.geometry.type.includes('Polygon')?'area':'line',opacity:style.opacity,gmtSymbol:style.symbol==='none'?'c':style.symbol,fill:style.fill,size:`${style.size}c`,pen:`${style.width}p,${style.color}${style.dash==='dash'?',-':style.dash==='dot'?',.':''}`});}
   const language=config.cartography?.language;
   for(const entry of [...stationEntries,...overlayEntries])entry.label=entry.category?names.categoryLabel(entry.category,config.cartography):names.translated(entry.label,language);
   return (config.legend?.order === "overlay-first" ? [...overlayEntries, ...stationEntries] : [...stationEntries, ...overlayEntries]).filter(e=>e.label);
@@ -76,6 +76,8 @@ function buildLegendSpec(entries, config = {}) {
     if (!label) continue;
     if (entry.symbol === "point") {
       lines.push(`S 0.14c ${entry.gmtSymbol || "c"} ${entry.size || "0.20c"} ${entry.fill || "#2f6f8f"} ${entry.pen || "0.45p,#263238"} 0.45c ${label}`);
+    } else if (entry.symbol === "area") {
+      lines.push(`S 0.14c r 0.42c/0.18c ${entry.fill || "white"}@${100-Number(entry.opacity??100)} ${entry.pen || "0.5p,black"} 0.45c ${label}`);
     } else {
       lines.push(`S 0.14c - 0.42c - ${entry.pen || "0.8p,black"} 0.45c ${label}`);
     }
@@ -96,7 +98,7 @@ function legendCommand(legendPath, region, projection, shell, config = {}) {
   const settings = normalizeLegendConfig(config);
   const prefix = shell === "bat" ? "" : "  ";
   const frame = settings.frame ? ` -F${settings.frame}+c${settings.clearance}` : "";
-  return `${prefix}gmt legend ${quote(legendPath, shell)} -D${settings.position}+w${settings.width}${frame} -R${region} -J${projection}`;
+  return `${prefix}gmt legend ${quote(legendPath, shell)} -D${settings.position}+w${settings.width}${frame} -R${region} -J${projection} --FONT_ANNOT_PRIMARY=${settings.labelFont}`;
 }
 
 function normalizeLegendConfig(config = {}) {

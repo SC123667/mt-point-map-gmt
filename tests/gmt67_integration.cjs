@@ -29,11 +29,13 @@ app.whenReady().then(async()=>{try{
   const features=[{name:'Test site',nameEn:'Test site',nameZh:'测试地点',category:'地点',geometry:{type:'Point',coordinates:[cx,cy]},style:{showLabel:true}},
    {name:'Test line',nameEn:'Test line',nameZh:'测试构造线',category:'断层',geometry:{type:'LineString',coordinates:[[w+(e-w)*.3,s+(n-s)*.35],[w+(e-w)*.6,s+(n-s)*.55]]},style:{showLabel:true}}];
   for(const language of ['zh','en']){
-   const config={plotType:'baseMap',region,projection,showTerrain:false,showTitle:false,showScale:name.startsWith('europe'),showNorthArrow:false,showGrid:true,frame:'af',pngDpi:120,terrainAllowDownload:false,interactiveMap:true,outputName:name+'_'+language,cartography:{language,features,localLibrary:{enabled:false},contours:{show:false}}};
+   const config={plotType:'baseMap',region,projection,showTerrain:false,showTitle:false,showScale:name.startsWith('europe'),showNorthArrow:false,showGrid:true,frame:'af',pngDpi:120,terrainAllowDownload:false,interactiveMap:true,outputName:name+'_'+language,legend:{show:true,position:'JBC'},cartography:{language,features,paperStyle:true,localLibrary:{enabled:false},contours:{show:false}}};
    const r=await js(`(async()=>{applyConfigToUI(${JSON.stringify(config)});clearTimeout(state.preview.autoTimer);const c=readConfig();c.interactiveMap=true;return window.mtApp.exportMap({records:[],config:c,formats:['png','pdf','eps']});})()`);
    assert(r.ok,name+': '+r.message);assert(r.gmtEngine.version.startsWith('6.7.'));assert(r.mapFrame);
    assert(fs.readFileSync(path.join(r.outputDirectory,config.outputName+'.gmt'),'utf8').includes('-J'+projection),name+' actual projection');
    for(const file of r.files)assert(fs.statSync(file).size>100,file);
+   const text=require('child_process').execFileSync('/opt/homebrew/bin/pdftotext',[r.files.find(f=>f.endsWith('.pdf')),'-'],{encoding:'utf8'});
+   assert(text.includes(language==='zh'?'图例':'Legend'),'Outside legend must survive global/polar/date-line PDF export');
    assert(r.annotationLayout?.labels.length,name+' labels');assert(!win.isVisible());
    results.push({name,language,files:r.files,engine:r.gmtEngine,labels:r.annotationLayout.labels.length});
   }

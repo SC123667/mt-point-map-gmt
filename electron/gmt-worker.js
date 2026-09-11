@@ -50,14 +50,17 @@ function send(payload) {
 
 async function handleTask(payload) {
   if (payload.mode === "pdfToEPS") {
+    const { pdfPageSize, setEPSPageBounds } = require('./eps-page');
+    const page = await pdfPageSize(await fs.promises.readFile(payload.pdfPath));
     const gmt=resolveGMT(),exe=process.platform==='win32'?'gswin64c.exe':'gs';
     const bundled=path.join(gmt.binDir||'',exe),command=fs.existsSync(bundled)?bundled:exe;
-    await new Promise((resolve,reject)=>{let stderr='';currentChild=spawn(command,['-dBATCH','-dNOPAUSE','-dSAFER','-sDEVICE=eps2write',`-sOutputFile=${payload.epsPath}`,payload.pdfPath],{env:{...process.env,...(gmt.gsLib?{GS_LIB:gmt.gsLib}:{})}});currentChild.stderr.on('data',c=>stderr+=c);currentChild.on('error',reject);currentChild.on('close',code=>{currentChild=null;code?reject(new Error(stderr||'EPS 转换失败')):resolve();});});
+    await new Promise((resolve,reject)=>{let stderr='';currentChild=spawn(command,['-dBATCH','-dNOPAUSE','-dSAFER','-dUseCropBox','-dFIXEDMEDIA',`-dDEVICEWIDTHPOINTS=${page.width}`,`-dDEVICEHEIGHTPOINTS=${page.height}`,'-sDEVICE=eps2write',`-sOutputFile=${payload.epsPath}`,payload.pdfPath],{env:{...process.env,...(gmt.gsLib?{GS_LIB:gmt.gsLib}:{})}});currentChild.stderr.on('data',c=>stderr+=c);currentChild.on('error',reject);currentChild.on('close',code=>{currentChild=null;code?reject(new Error(stderr||'EPS 转换失败')):resolve();});});
+    await fs.promises.writeFile(payload.epsPath, setEPSPageBounds(await fs.promises.readFile(payload.epsPath), page));
     return {ok:true};
   }
   if (payload.mode === "composeVectorPDF") {
     const { composeVectorPDF } = require("./vector-pdf");
-    return composeVectorPDF(payload.baseBytes, payload.overlayBytes, payload.imageSize, payload.titleHeight);
+    return composeVectorPDF(payload.baseBytes, payload.overlayBytes, payload.imageSize, payload.titleHeight, payload.footerHeight);
   }
   if (payload.mode === "saveScript") return saveGMTScript(payload);
   return exportGMTMap(payload);
@@ -73,10 +76,10 @@ async function exportGMTMap(payload) {
   const includesVector = formats.some(isVectorFormat);
   const nativeTitle = shouldOverlayTitle(payload.config);
   const nativeLegend = shouldOverlayLegend(payload.config);
-  const nativeAnnotations = payload.config?.plotType !== "responseCurve" && (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel);
+  const nativeAnnotations = payload.config?.plotType !== "responseCurve" && ((payload.config?.showScale && payload.config?.cartography?.paperStyle && !payload.config?.swapAxes) || (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel));
   const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
   const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations);
-  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || payload.config?.interactiveMap) ? ["eps"] : [])])];
+  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || nativeLegend || payload.config?.interactiveMap) ? ["eps"] : [])])];
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
@@ -89,10 +92,10 @@ async function exportGMTMap(payload) {
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
-  if (result.ok && (nativeAnnotations || payload.config?.interactiveMap)) {
-    const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName);
+  if (result.ok && (nativeAnnotations || nativeLegend || payload.config?.interactiveMap)) {
+    const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName, payload.config);
     result.mapFrame = {width:layout.width,height:layout.height,ox:layout.ox,oy:layout.oy};
-    if(layout.labels.length || layout.placement?.enabled) result.annotationLayout = layout;
+    if(layout.labels.length || layout.scaleLabel || layout.placement?.enabled) result.annotationLayout = layout;
   }
   finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
@@ -306,11 +309,12 @@ function shouldOverlayTitle(config) {
 }
 
 function shouldOverlayLegend(config) {
+  if (config?.plotType === 'responseCurve') return false; // Curve keys belong to their GMT subplots.
   if (!config?.legend?.show) return false;
   const entries = buildLegendEntries(config);
   if (!entries.length) return false;
   const labels = [config.legend.title, ...entries.map((entry) => entry.label)];
-  return labels.some((label) => needsNativeTextRendering(label));
+  return require('./legend').normalizeLegendConfig(config.legend).position === 'JBC' || labels.some((label) => needsNativeTextRendering(label));
 }
 
 function isVectorFormat(format) {

@@ -28,7 +28,7 @@ function candidates(f,region,fallback){
  const at=(p,d)=>{let i=1;while(i<p.ds.length-1&&p.ds[i]<d)i++;const t=(d-p.ds[i-1])/(p.ds[i]-p.ds[i-1]||1);return p.line[i-1].map((v,j)=>v+(p.line[i][j]-v)*t);};
  return paths.slice(0,3).flatMap(p=>[.5,.3,.7,.15,.85].map(t=>({anchor:at(p,p.length*t),before:at(p,p.length*Math.max(0,t-.035)),after:at(p,p.length*Math.min(1,t+.035)),length:p.length})));
 }
-function textSize(name,fontSize){const lines=String(name).split(/\n|\\n/);return {width:Math.max(...lines.map(line=>[...line].reduce((n,c)=>n+(/[\u2e80-\uffff]/.test(c)?1:/[MW@%]/.test(c)?.9:/[ilI.,' ]/.test(c)?.32:.62),0)))*fontSize+4,height:lines.length*fontSize*1.22+3};}
+function textSize(name,fontSize,bold=false){const lines=String(name).split(/\n|\\n/);return {width:Math.max(...lines.map(line=>[...line].reduce((n,c)=>n+(/[\u2e80-\uffff]/.test(c)?1:/[MW@%]/.test(c)?.9:/[ilI.,' ]/.test(c)?.32:.62),0)))*fontSize*(bold?1.08:1)+4,height:lines.length*fontSize*1.22+3};}
 function overlaps(a,b){return a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;}
 function place(layout,options={}){
  const cfg=settings(options);if(!cfg.enabled)return {...layout,placement:{enabled:false,shown:layout.labels.length,hidden:[]}};
@@ -42,7 +42,7 @@ function place(layout,options={}){
   if(cfg.hideGeneric&&(l.generic||genericName(l.name))){hidden.push({id:l.id,name:l.name,reason:'generic'});continue;}
   if(!l.pinned&&seen.has(key)){hidden.push({id:l.id,name:l.name,reason:'duplicate'});continue;}
   if(!l.pinned&&labels.length>=cfg.maxLabels){hidden.push({id:l.id,name:l.name,reason:'density'});continue;}
-  const s=l.style,box=textSize(l.name,s.fontSize),candidates=l.candidates?.length?l.candidates:[{x:l.x,y:l.y}];let placed;
+  const s=l.style,box=textSize(l.name,s.fontSize,s.bold),candidates=l.candidates?.length?l.candidates:[{x:l.x,y:l.y}];let placed;
   for(const p of candidates){
    const angle=l.pinned?-s.rotation:(p.angle??-s.rotation),r=angle*Math.PI/180;
    const width=Math.abs(box.width*Math.cos(r))+Math.abs(box.height*Math.sin(r)),height=Math.abs(box.width*Math.sin(r))+Math.abs(box.height*Math.cos(r));

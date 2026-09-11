@@ -21,6 +21,15 @@ const { composeVectorPDF } = require("../electron/vector-pdf");
   }
   const highDPI = await composeVectorPDF(await base.save(), await overlay.save(), { width: 1840, height: 1280 }, 160);
   assert.deepStrictEqual((await PDFDocument.load(highDPI)).getPage(0).getSize(), { width: 460, height: 360 });
+  const footerOverlay = await PDFDocument.create();
+  footerOverlay.addPage([920, 800]).drawText('Outside legend', { x: 20, y: 20 });
+  const withFooter = await PDFDocument.load(await composeVectorPDF(await base.save(), await footerOverlay.save(), {width:920,height:640}, 80, 80));
+  assert.deepStrictEqual(withFooter.getPage(0).getSize(), {width:460,height:400});
+  const {decodePDFRawStream}=require('pdf-lib');
+  const stream=withFooter.getPage(0).node.Contents().asArray().map(ref=>Buffer.from(decodePDFRawStream(withFooter.context.lookup(ref)).decode()).toString()).join('');
+  assert(stream.includes('1 0 0 1 0 40 cm'), 'GMT map must move up by the footer height, preserving map coordinates');
+  const twiceDPI = await PDFDocument.load(await composeVectorPDF(await base.save(), await footerOverlay.save(), {width:1840,height:1280}, 160, 160));
+  assert.deepStrictEqual(twiceDPI.getPage(0).getSize(), {width:460,height:400});
   base.addPage();
   await assert.rejects(composeVectorPDF(await base.save(), await overlay.save(), { width: 920, height: 640 }, 80), /单页/);
   console.log("Vector PDF tests passed");

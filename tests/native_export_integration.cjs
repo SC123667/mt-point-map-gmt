@@ -10,7 +10,7 @@ if(root.endsWith('.asar')){app.setAppPath(root);Object.defineProperty(process,'r
 const entry=path.join(root,'electron/main.js');
 const source=fs.readFileSync(process.env.QA_SOURCE_MAIN||entry,'utf8');
 const mod=new Module(entry,module);mod.filename=entry;mod.paths=Module._nodeModulePaths(path.dirname(entry));
-mod._compile(source.replace('width: 1280,','show: false, focusable: false, width: 1280,')+'\nmodule.exports={renderDecoratedMap};',entry);
+mod._compile(source.replace('width: 1280,','show: false, focusable: false, width: 1280,')+'\nmodule.exports={renderDecoratedMap,nativeLegendMarkup};',entry);
 app.whenReady().then(async()=>{try{
  const input=path.join(out,'中文 地形 #% &.png');
  if(process.env.QA_PNG)fs.copyFileSync(process.env.QA_PNG,input);
@@ -31,7 +31,19 @@ app.whenReady().then(async()=>{try{
  const {PDFDocument,PDFName}=require(path.join(root,'node_modules/pdf-lib'));
  const doc=await PDFDocument.load(r.pdfBuffer);let images=0;
  for(const [,obj]of doc.context.enumerateIndirectObjects())if(obj.dict?.get(PDFName.of('Subtype'))?.toString()==='/Image')images++;
- assert.equal(images,0,'Native overlay must remain vector-only');
+  assert.equal(images,0,'Native overlay must remain vector-only');
+ for(const language of ['en','zh']) {
+  const cfg={...config,projection:'M16c',plotType:'baseMap',region:'86/96/28/32',legend:{show:true,position:'JBC',labelFontSize:8},cartography:{language,features:[{visible:true,category:language==='en'?'Study locality':'研究地点',geometry:{type:'Point',coordinates:[88,29]},style:{symbol:'a',fill:'#c23b32'}}]}};
+  assert(mod.exports.nativeLegendMarkup(cfg,{width:3022,height:1391}).includes('<polygon'), 'Star symbol must match the map');
+  const outside=await mod.exports.renderDecoratedMap(input,cfg,true);
+  assert(outside.footerHeight>0);
+  const printed=await PDFDocument.load(outside.pdfBuffer), page=printed.getPage(0).getSize();
+  assert.equal(printed.getPageCount(),1);
+  assert(Math.abs(page.height/page.width-(outside.imageSize.height+outside.titleHeight+outside.footerHeight)/outside.imageSize.width)<.002,'Print page must include footer without vertical stretching');
+  const output=path.join(out,`outside-${language}.pdf`);fs.writeFileSync(output,outside.pdfBuffer);
+  const text=require('child_process').execFileSync(process.env.QA_PDFTOTEXT||'/opt/homebrew/bin/pdftotext',[output,'-'],{encoding:'utf8'});
+  assert(text.includes(language==='en'?'Study locality':'研究地点'),'Outside legend must actually be printed, not clipped');
+ }
  const noPDF=await mod.exports.renderDecoratedMap(input,{showTitle:false,legend:{show:false}},false);
  assert.equal(noPDF.pdfBuffer,undefined);assert.equal(noPDF.titleHeight,0);
  const tmp=path.join(out,'临时文件','原生叠加');assert.deepEqual(fs.readdirSync(tmp),[]);

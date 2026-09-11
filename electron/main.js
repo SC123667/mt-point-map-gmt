@@ -732,8 +732,12 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
   const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
-  const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, annotationLayout: result.annotationLayout}, needsPDF);
-  if (result.mapFrame && rendered.titleHeight) result.mapFrame.height *= (rendered.imageSize.height + rendered.titleHeight) / rendered.imageSize.height;
+  const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, mapPageWidth:result.mapFrame?.width, annotationLayout: result.annotationLayout}, needsPDF);
+  if (result.mapFrame && (rendered.titleHeight || rendered.footerHeight)) {
+    const unitsPerPixel = result.mapFrame.height / rendered.imageSize.height;
+    result.mapFrame.oy += rendered.footerHeight * unitsPerPixel;
+    result.mapFrame.height += (rendered.titleHeight + rendered.footerHeight) * unitsPerPixel;
+  }
   if (result.annotationLayout) fs.writeFileSync(path.join(result.outputDirectory,"自定义标注.svg"),require("./cartography-gmt").labelSVG(result.annotationLayout));
   let vectorPDF;
   if (needsPDF) {
@@ -742,7 +746,8 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
       baseBytes: fs.readFileSync(path.join(result.outputDirectory, `${outputName}.pdf`)),
       overlayBytes: rendered.pdfBuffer,
       imageSize: rendered.imageSize,
-      titleHeight: rendered.titleHeight
+      titleHeight: rendered.titleHeight,
+      footerHeight: rendered.footerHeight
     });
   }
   fs.writeFileSync(pngPath, rendered.pngBuffer);
@@ -768,9 +773,11 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
   const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
+  let footerHeight = 0;
   // Keep high-DPI terrain bytes out of the navigation URL and HTML document.
   const imageUrl = pathToFileURL(path.resolve(pngPath)).href;
   const legend = nativeLegendMarkup(config, size);
+  const outsideLegend = Boolean(legend && normalizeLegendConfig(config.legend).position === 'JBC');
   const mapElements = nativeMapElementsMarkup(config, size);
   const annotations = require("./cartography-gmt").labelSVG(config.annotationLayout).replace("<svg ", `<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" `);
   const html = `<!doctype html>
@@ -863,10 +870,11 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   ${title ? `<div class="title">${escapeHTML(title)}</div>` : ""}
   <div class="map-wrap">
     <img src="${escapeHTML(imageUrl)}" />
-    ${legend}
+    ${outsideLegend ? '' : legend}
     ${mapElements}
     ${annotations}
   </div>
+  ${outsideLegend ? `<div id="map-footer" style="padding:1% 2%;box-sizing:border-box">${legend}</div>` : ''}
 </body>
 </html>`;
   const temporaryDirectory = await fs.promises.mkdtemp(path.join(workspaceDirectory("临时文件/原生叠加"), "render-"));
@@ -893,6 +901,18 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
         ...Array.from(document.images).map((image) => image.decode ? image.decode() : Promise.resolve())
       ]).then(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     `);
+    if (outsideLegend) {
+      footerHeight = await win.webContents.executeJavaScript('Math.ceil(document.getElementById("map-footer").getBoundingClientRect().height)');
+      // Update the author stylesheet itself: insertCSS uses a different cascade
+      // origin, and Chromium may retain the original print @page dimensions.
+      await win.webContents.executeJavaScript(`{
+        const style = document.createElement('style');
+        style.textContent = ${JSON.stringify(`html, body { height:${totalHeight + footerHeight}px !important; } @page { size:${size.width}px ${totalHeight + footerHeight}px; margin:0; }`)};
+        document.head.appendChild(style);
+      }`);
+      win.setContentSize(size.width, totalHeight + footerHeight);
+      await win.webContents.executeJavaScript('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    }
     const png = (await win.webContents.capturePage()).toPNG();
     let pdf;
     if (includePDF) {
@@ -905,7 +925,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
         margins: { marginType: "none" }
       });
     }
-    return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight };
+    return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight, footerHeight };
   } finally {
     if (win && !win.isDestroyed()) win.destroy();
     // Windows may release the file handle shortly after the hidden window closes.
@@ -973,6 +993,13 @@ function nativeLegendMarkup(config, imageSize) {
   const entries = buildLegendEntries(config);
   if (!entries.length) return "";
   const settings = normalizeLegendConfig(config.legend);
+  if (settings.position === 'JBC') {
+    const pxPerPoint = imageSize.width / (config.mapPageWidth || config.annotationLayout?.width || projectionWidthCm(config.projection) * 72 / 2.54);
+    const labelSize = settings.labelFontSize * pxPerPoint, titleSize = settings.titleFontSize * pxPerPoint;
+    const gap = labelSize * 0.25, symbolBox = labelSize * 1.25;
+    const rows = entries.map(entry => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap)).join('');
+    return `<div class="native-legend" style="position:relative;width:100%;font-family:Arial,'Microsoft YaHei','PingFang SC',sans-serif;color:${escapeHTML(settings.textColor)}"><div class="native-legend-title" style="font-size:${titleSize}px;margin-bottom:${gap}px">${escapeHTML(settings.title || 'Legend')}</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:${labelSize * 2}px;overflow-wrap:anywhere">${rows}</div></div>`;
+  }
   const position = parseNativeLegendPosition(settings.position);
   const projectionWidth = projectionWidthCm(config.projection);
   const pxPerCm = imageSize.width / projectionWidth;
@@ -990,22 +1017,26 @@ function nativeLegendMarkup(config, imageSize) {
 }
 
 function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
-  const penColor = String(entry.pen || "").split(",")[1] || "black";
-  const fill = entry.fill || "#2f6f8f";
-  let symbol;
-  if (entry.symbol === "line") {
-    symbol = `<span class="native-legend-line" style="width:${Math.round(symbolBox * 0.78)}px;border-top:${Math.max(2, Math.round(symbolBox * 0.08))}px ${String(entry.pen).endsWith(",-")?"dashed":String(entry.pen).endsWith(",.")?"dotted":"solid"} ${escapeHTML(penColor)}"></span>`;
+  const penColor = escapeHTML(String(entry.pen || '').split(',')[1] || 'black');
+  const fill = escapeHTML(entry.fill || '#2f6f8f');
+  const dash = String(entry.pen).endsWith(',-') ? 'stroke-dasharray="14 8"' : String(entry.pen).endsWith(',.') ? 'stroke-dasharray="3 6"' : '';
+  let shape;
+  if (entry.symbol === 'line') {
+    shape = `<line x1="8" y1="50" x2="92" y2="50" stroke="${penColor}" stroke-width="5" ${dash}/>`;
+  } else if (entry.symbol === 'area') {
+    shape = `<rect x="8" y="25" width="84" height="50" fill="${fill}" fill-opacity="${Number(entry.opacity ?? 100)/100}" stroke="${penColor}" stroke-width="3" ${dash}/>`;
   } else {
-    const gmtSymbol = entry.gmtSymbol || "c";
-    const size = Math.round(symbolBox * 0.48);
-    if (gmtSymbol === "t") {
-      symbol = `<span class="native-legend-symbol triangle" style="border-left:${Math.round(size * 0.55)}px solid transparent;border-right:${Math.round(size * 0.55)}px solid transparent;border-bottom:${size}px solid ${escapeHTML(fill)}"></span>`;
-    } else {
-      const shape = gmtSymbol === "d" ? "diamond" : (gmtSymbol === "c" ? "circle" : "square");
-      symbol = `<span class="native-legend-symbol ${shape}" style="width:${size}px;height:${size}px;background:${escapeHTML(fill)};border:${Math.max(1, Math.round(symbolBox * 0.04))}px solid ${escapeHTML(penColor)}"></span>`;
-    }
+    const style = `fill="${fill}" stroke="${penColor}" stroke-width="3"`;
+    const type = entry.gmtSymbol || 'c';
+    if (type === 'a') shape = `<polygon points="50,20 57,41 79,41 61,55 68,77 50,63 32,77 39,55 21,41 43,41" ${style}/>`;
+    else if (type === 't') shape = `<polygon points="50,23 78,75 22,75" ${style}/>`;
+    else if (type === 'd') shape = `<polygon points="50,20 80,50 50,80 20,50" ${style}/>`;
+    else if (type === 'c') shape = `<circle cx="50" cy="50" r="24" ${style}/>`;
+    else shape = `<rect x="26" y="26" width="48" height="48" ${style}/>`;
   }
-  return `<div class="native-legend-entry" style="font-size:${labelSize}px;margin-top:${gap}px"><span class="native-legend-symbol-wrap" style="width:${symbolBox}px;height:${symbolBox}px;margin-right:${gap}px">${symbol}</span><span>${escapeHTML(entry.label)}</span></div>`;
+  // A direct SVG flex item prints reliably in Chromium; nested inline-flex
+  // spans can lose their painted symbols on a dynamically extended PDF page.
+  return `<div class="native-legend-entry" style="font-size:${labelSize}px;margin-top:${gap}px;break-inside:avoid"><svg xmlns="http://www.w3.org/2000/svg" width="${symbolBox}" height="${symbolBox}" viewBox="0 0 100 100" style="display:block;flex:0 0 ${symbolBox}px;margin-right:${gap}px;overflow:visible">${shape}</svg><span style="min-width:0">${escapeHTML(entry.label)}</span></div>`;
 }
 
 function parseNativeLegendPosition(value) {

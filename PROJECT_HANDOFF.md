@@ -2,7 +2,27 @@
 
 > 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
 
-## 2026-09-11 v1.11.1 导出与名称遗漏修复（当前维护状态）
+## 2026-09-11 v1.12.0 图外图例与论文区域图（当前维护状态）
+
+- 新建工程图例默认 JBC（图外下方两列），旧工程已有位置保留。renderer 禁止对图外图例做图内拖动。隐藏 Electron 按实际内容测量 footer，高 DPI PNG 与 PDF 采用同一尺寸；PDF 仍按 GMT 物理尺寸合成，地图坐标原点增加 footer 偏移。
+- EPS 导出在 worker 中读取单页 PDF CropBox/旋转尺寸，固定 Ghostscript 页面并规范 DSC BoundingBox/HiResBoundingBox，保留 PostScript 正文；修复数百厘米画板。electron/eps-page.js 负责边界声明，binary-preservation 与 EPS 实际回读分别验证。
+- 地点与构造增加 bold / haloWidth；label-layout 根据粗体扩展碰撞框。纯文字对象不生成点图例；区域图例保留填色，五角星正确显示。图外英文图例优先 Arial，避免系统可变字体影响编辑。
+- 论文样式留 2 mm 外边距；electron/gmt-scale-label.js 从 GMT 比例尺实际两端坐标补中点（仅 paperStyle、非互换轴、无既有中点的明确情形），不重估地理长度；未识别时保留 GMT 原刻度。独立 GMT 脚本仍采用 GMT 自身图例及刻度排版。
+- 用户论文图另存 全局目录/工程文件/研究区地质图概况_论文区域图_20260911.mtgmt。保留 86/96/28/32 范围与三矿床代表点，修正 BNSZ / Indus–Yarlung Zangbo 英文，增加 Lhasa Terrane、Gangdese 标签，雄村红星、对比矿床蓝圆，不添加无数据依据的 MT/model 边界或局部放大。
+- 用户明确允许近似圈定后，手工概括冈底斯岩浆弧示意带，依据 Ma et al. (2021), DOI 10.3389/feart.2021.772374 的区域分布背景；不是该图配准数字化或精确地质边界。单独 GeoJSON 与来源/限制说明保存在 全局目录/构造数据/自绘示意图层，图例必须保留 schematic。原始用户工程、构造库未覆盖。
+- 测试使用隔离全局子目录、隐藏不可聚焦窗口，不操作用户其他 App。包与最终交付结果见下方后续核验记录；当前实用app 安装基线仍 v1.11.1，未上传 GitHub，公开基线 v1.8.1。
+
+### v1.12.0 候选与交付核验
+
+- `npm run test:node` 18 组通过。既有 MT 脚本断言要求临时路径无空格，测试使用 /tmp ASCII 符号链接指向全局 验证/v1.12.0/单元测试临时；实际产物仍在全局目录。Unicode/空格/%/# 路径另由真实 Electron 导出验证。
+- 隐藏 UI 69 个面板/尺寸组合、23 个 Windows CSS 面板、保存恢复、预览、导出通过；实际 GMT 6.7 欧洲/全球/极区/日期变更线双语及 5 类 MT 图件共 17 次导出通过。Windows CSS 不等于 Windows 实机。
+- 最终候选 ASAR 包内使用已有 03s 地形、450 DPI 生成论文工程 PNG/PDF/EPS，页面约 494.88 × 289.60 pt，三矿床、BNSZ/IYZS、拉萨地体、冈底斯示意范围及图外图例齐全。PDF 保留单个 450 DPI 地形影像与矢量文字/图形；EPS 经 Ghostscript 回读尺寸匹配。tests/publication_export_integration.cjs 检查实际 PDF/EPS 下方红、蓝符号像素，避免仅文字存在、图例符号丢失的打印回归。
+- 图外图例符号改为直接 SVG 节点，避免 Chromium 动态扩页时嵌套 inline-flex 符号丢失；英文图例使用可嵌入 Arial。包内原生大 PNG、双语图例、透明矢量叠加、清理验证通过。
+- 候选 全局目录/安装包/v1.12.0/mac-arm64/MT点位图制作工具—GMT.app 严格深度验签通过，44 个 Electron 文件与源码一致。ASAR SHA-256：`e6d208602cbbff70a38f2cdc952b55532c6abcf3d0391238ecb288859449f0a5`。
+- 已导出至 全局目录/导出图件/研究区地质图概况_论文区域图_20260911；原工程未覆盖，配套工程另存。GeoJSON 重新导入验证通过（105 个闭合节点），只作为示意数据。
+- 旧安装包 v1.11.1 已复制并验证至 全局目录/版本备份/v1.11.1-升级v1.12.0，ASAR 与旧基线一致。当前旧 App 仍在运行；候选已就绪，替换需当前用户确认工程已保存。未推送 GitHub 或创建 Release。
+
+## 2026-09-11 v1.11.1 导出与名称遗漏修复（历史安装基线）
 
 - 源码 1.11.1；旧版用真实 5,245,064 字节 PNG 复现 ERR_INVALID_URL。main.js 原生叠加改用全局目录临时 HTML 与 file URL 图片，隐藏且不可聚焦，finally 回收目录；PDF 保留原 GMT 矢量底图与透明文字叠加。
 - label-layout.js 为普通 Point 标签增加其他方位候选并避开邻点符号；长旋转线名称增加基于文字高度的图框间距。保留手动锚点、原始坐标、语言设置与关闭避让行为。

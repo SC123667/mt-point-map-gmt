@@ -51,7 +51,7 @@ function contourCommand(config,grid,region,quote,prefix='  '){const c=m.contours
  return `${base} -C${c.interval} -Gd8c+r${c.labelSpacing}c -A${major}+f${c.fontSize}p,Helvetica,${c.color}+gwhite -Wc${c.width}p,${c.color} -Wa${c.major>0?c.majorWidth:c.width}p,${c.color} -Q${c.minLength}C --PROJ_LENGTH_UNIT=cm`;
 
 }
-function readLayout(directory,outputName){
+function readLayout(directory,outputName,config={}){
  const labelFile=path.join(directory,'map_label_styles.json');
  const eps=fs.readFileSync(path.join(directory,outputName+'.eps'),'utf8');
  // GMT's EPS crop translation is in PostScript points; PSL drawing coordinates
@@ -64,7 +64,9 @@ function readLayout(directory,outputName){
  const ox=Number(origin[1])*Number(scale[1])+Number(trans?.[1]||0)-Number(bb[1]);
  const oy=Number(origin[2])*Number(scale[2])+Number(trans?.[2]||0)-Number(bb[2]);
  const width=Number(bb[3])-Number(bb[1]),height=Number(bb[4])-Number(bb[2]);
- if(!fs.existsSync(labelFile))return {width,height,ox,oy,labels:[]};
+ const scaleLabel=config.showScale&&config.cartography?.paperStyle&&!config.swapAxes
+  ? require('./gmt-scale-label').scaleMidpoint(eps,{ox,oy,height,sx:Number(scale[1]),sy:Number(scale[2])}):null;
+ if(!fs.existsSync(labelFile))return {width,height,ox,oy,labels:[],scaleLabel};
  const projected=fs.readFileSync(path.join(directory,'map_label_projected.tsv'),'utf8').trim().split(/\r?\n/).map(x=>x.trim().split(/\s+/).map(Number));
  const metadata=JSON.parse(fs.readFileSync(labelFile,'utf8'));
  const convert=i=>({x:ox+(projected[i]?.[0]??NaN)*72/2.54,y:height-oy-(projected[i]?.[1]??NaN)*72/2.54});
@@ -74,18 +76,20 @@ function readLayout(directory,outputName){
  const obstacles=[];
  const reserve=(position,w,h,fallback)=>{const corner=String(position||fallback).replace(/^j/,'');const p=require('./native-position').parseNativePosition(position)||{x:corner.includes('R')?.97:.03,y:corner.includes('T')?.97:.03,justify:corner};const cx=frame.x+p.x*frame.width,cy=frame.y+(1-p.y)*frame.height;obstacles.push({x:cx-(p.justify.includes('R')?w:p.justify.includes('L')?0:w/2),y:cy-(p.justify.includes('B')?h:p.justify.includes('T')?0:h/2),width:w,height:h});};
  if(metadata.showScale)reserve(metadata.scalePosition,frame.width*.3+18,38,'BR');
- if(metadata.showLegend)reserve(metadata.legendPosition,115,48,'TR');
- const result=placement.place({width,height,ox,oy,frame,obstacles,labels},metadata.options||{enabled:false});
+ if(metadata.showLegend&&metadata.legendPosition!=='JBC')reserve(metadata.legendPosition,115,48,'TR');
+ const result=placement.place({width,height,ox,oy,frame,obstacles,labels,scaleLabel},metadata.options||{enabled:false});
  fs.writeFileSync(path.join(directory,'标注排布报告.json'),JSON.stringify(result.placement,null,2));
  return result;
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 function labelSVG(layout){if(!layout)return '';const texts=layout.labels.map(l=>{const s=l.style,lines=l.name.split(/\n|\\n/),fs=s.fontSize,em=fs*1.22;
  if(l.placed){const {x,y,angle}=l.placed,firstY=y-em*(lines.length-1)/2+fs*.34;
- return `<text x="${x}" y="${firstY}" text-anchor="middle" font-family="${escape(s.font)},PingFang SC,Microsoft YaHei,sans-serif" font-size="${fs}" fill="${s.labelColor}" ${s.halo?'stroke="white" stroke-width="1.1" stroke-linejoin="round" paint-order="stroke"':''} transform="rotate(${angle} ${x} ${y})">${lines.map((t,i)=>`<tspan x="${x}" dy="${i?em:0}">${escape(t)}</tspan>`).join('')}</text>`;}
+ return `<text x="${x}" y="${firstY}" text-anchor="middle" font-family="${escape(s.font)},PingFang SC,Microsoft YaHei,sans-serif" font-size="${fs}" font-weight="${s.bold?700:400}" fill="${s.labelColor}" ${s.halo?'stroke="white" stroke-width="'+(s.haloWidth??1.1)+'" stroke-linejoin="round" paint-order="stroke"':''} transform="rotate(${angle} ${x} ${y})">${lines.map((t,i)=>`<tspan x="${x}" dy="${i?em:0}">${escape(t)}</tspan>`).join('')}</text>`;}
  let x=l.x+s.dx*72/25.4,y=l.y-s.dy*72/25.4;const pad=s.size*72/2.54/2+2;
  const pos=s.position,align=pos==='left'?'end':pos==='right'?'start':'middle';if(pos==='left')x-=pad;if(pos==='right')x+=pad;
  if(pos==='above')y-=pad+em*(lines.length-1)+fs*.25;else if(pos==='below')y+=pad+fs;else y-=em*(lines.length-1)/2-fs*.33;
- return `<text x="${x}" y="${y}" text-anchor="${align}" font-family="${escape(s.font)},PingFang SC,Microsoft YaHei,sans-serif" font-size="${fs}" fill="${s.labelColor}" ${s.halo?'stroke="white" stroke-width="1.6" stroke-linejoin="round" paint-order="stroke"':''} transform="rotate(${-s.rotation} ${x} ${y})">${lines.map((t,i)=>`<tspan x="${x}" dy="${i?em:0}">${escape(t)}</tspan>`).join('')}</text>`;
- }).join('\n');return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}pt" height="${layout.height}pt" viewBox="0 0 ${layout.width} ${layout.height}">${texts}</svg>`;}
+ return `<text x="${x}" y="${y}" text-anchor="${align}" font-family="${escape(s.font)},PingFang SC,Microsoft YaHei,sans-serif" font-size="${fs}" font-weight="${s.bold?700:400}" fill="${s.labelColor}" ${s.halo?'stroke="white" stroke-width="'+(s.haloWidth??1.6)+'" stroke-linejoin="round" paint-order="stroke"':''} transform="rotate(${-s.rotation} ${x} ${y})">${lines.map((t,i)=>`<tspan x="${x}" dy="${i?em:0}">${escape(t)}</tspan>`).join('')}</text>`;
+ }).join('\n');const tick=layout.scaleLabel;
+ const scaleText=tick?`<text x="${tick.x}" y="${tick.y}" text-anchor="middle" dominant-baseline="hanging" font-family="Helvetica,Arial,sans-serif" font-size="${tick.fontSize}" fill="#404040">${escape(tick.text)}</text>`:'';
+ return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}pt" height="${layout.height}pt" viewBox="0 0 ${layout.width} ${layout.height}">${texts}${scaleText}</svg>`;}
 module.exports={scriptParts,contourCommand,readLayout,labelSVG};

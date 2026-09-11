@@ -385,3 +385,14 @@ try {
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
+const c=require('../electron/cartography');
+const annotations=c.normalize({features:[
+ {name:'Terrane',category:'Text only',geometry:{type:'Point',coordinates:[90,30]},style:{symbol:'none'}},
+ {name:'XC',category:'Study deposit',geometry:{type:'Point',coordinates:[88.425,29.375]},style:{symbol:'a'}}]});
+const rows=buildLegendEntries({plotType:'baseMap',region:'86/96/28/32',cartography:annotations});
+assert.equal(rows.length,1);assert.equal(rows[0].gmtSymbol,'a');
+assert(legendCommand('legend.txt','86/96/28/32','M16c','sh',{position:'JBC',labelFontSize:7.5}).includes('-DJBC'));
+assert(legendCommand('legend.txt','86/96/28/32','M16c','sh',{labelFontSize:7.5}).includes('--FONT_ANNOT_PRIMARY=7.5p'));
+const areas=buildLegendEntries({plotType:'baseMap',region:'86/96/28/32',cartography:c.normalize({features:[{name:'Arc',category:'Schematic arc',geometry:{type:'Polygon',coordinates:[[[88,29],[90,29],[90,30],[88,29]]]},style:{opacity:10,fill:'#d7b875',dash:'dash'}}]})});
+assert.equal(areas[0].symbol,'area');assert.equal(areas[0].opacity,10);
+assert(buildLegendSpec(areas).includes('r 0.42c/0.18c #d7b875@90'));

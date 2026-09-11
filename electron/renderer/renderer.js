@@ -2659,6 +2659,7 @@ function parseElementPosition(value, fallback = "BR") {
 }
 
 function legendPositionValue() {
+  if (el.legendPositionInput.value === "JBC") return "JBC";
   if (el.legendPositionInput.value !== "custom") {
     const selected = parseLegendPosition(el.legendPositionInput.value);
     if (selected) {
@@ -2785,7 +2786,7 @@ function updateLegendPositionFromPreviewPoint(point) {
 }
 
 function renderLegendDragHandle() {
-  if (!state.preview.hasImage || !el.showLegendInput.checked || state.plotType === "responseCurve") {
+  if (!state.preview.hasImage || !el.showLegendInput.checked || state.plotType === "responseCurve" || el.legendPositionInput.value === "JBC") {
     el.legendDragHandle.classList.add("hidden");
     el.legendPositionHint.classList.add("hidden");
     return;

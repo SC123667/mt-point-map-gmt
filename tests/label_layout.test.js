@@ -48,3 +48,16 @@ const longSuture=p.place({width:500,height:240,frame:{x:20,y:20,width:460,height
 assert.equal(longSuture.labels.length,1,'A long English suture name must gain clearance from the upper frame');
 assert(longSuture.labels[0].placed.bounds.y>=24);assert(longSuture.labels[0].placed.bounds.x+longSuture.labels[0].placed.bounds.width<=476);
 assert(require('../electron/cartography-gmt').labelSVG(longSuture).includes('Bangong–Nujiang Suture Zone (BNS)'));
+const weighted=m.style({bold:true,haloWidth:.5});
+assert(p.textSize('Xiongcun',9,true).width>p.textSize('Xiongcun',9).width);
+const styled=require('../electron/cartography-gmt').labelSVG({width:200,height:100,labels:[{...label('xc','Xiongcun',80,50),style:weighted}]});
+assert(styled.includes('font-weight="700"'));assert(styled.includes('stroke-width="0.5"'));
+assert.equal(m.normalize({features:[{name:'XC',geometry:{type:'Point',coordinates:[88.425,29.375]},style:weighted}]}).features[0].style.haloWidth,.5);
+const {scaleMidpoint}=require('../electron/gmt-scale-label');
+const tickContext={ox:12,oy:8,height:240,sx:.06,sy:.06};
+const tickPS='%@GMT: gmt basemap -R86/96/28/32 -JM16c -LjBR+w100k+f\n100 50 M PSL_font_encode 0 get something\n125 F0\n(0) tc Z\n500 50 M (100) tc Z\n%%EndObject';
+assert.deepEqual(scaleMidpoint(tickPS,tickContext),{x:30,y:229,text:'50',fontSize:7.5});
+assert.equal(scaleMidpoint(tickPS.replace('500 50','500 51'),tickContext),null);
+assert.equal(scaleMidpoint(tickPS.replace('%%EndObject','300 50 M (50) tc Z\n%%EndObject'),tickContext),null);
+assert.equal(scaleMidpoint('no scale',tickContext),null);
+assert(require('../electron/cartography-gmt').labelSVG({width:100,height:80,labels:[],scaleLabel:{x:10,y:10,text:'50',fontSize:7.5}}).includes('>50</text>'));

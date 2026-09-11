@@ -920,7 +920,7 @@ function psconvertOptionsForFormats(formats, config = {}) {
     const base = format.split("+")[0];
     return ["bmp", "jpg", "png", "PNG", "ppm", "tif"].includes(base);
   });
-  return hasRaster ? `E${pngDpi(config.pngDpi)}` : "";
+  return [config.cartography?.paperStyle ? 'A+m0.2c' : '', hasRaster ? `E${pngDpi(config.pngDpi)}` : ''].filter(Boolean).join(',');
 }
 
 function pngDpi(value) {

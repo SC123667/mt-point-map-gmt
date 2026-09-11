@@ -1,0 +1,20 @@
+const assert=require('assert');
+const {PDFDocument,degrees}=require('pdf-lib');
+const {pdfPageSize,setEPSPageBounds}=require('../electron/eps-page');
+(async()=>{
+ const doc=await PDFDocument.create(),p=doc.addPage([500,250]);
+ assert.deepEqual(await pdfPageSize(await doc.save()),{width:500,height:250});
+ p.setCropBox(10,20,480.25,220.75);p.setRotation(degrees(90));
+ assert.deepEqual(await pdfPageSize(await doc.save()),{width:220.75,height:480.25});
+ const body=Buffer.from('%%EndComments\n%%EndProlog\n\x00\xff\x80binary image\n%%EOF','latin1');
+ const eps=Buffer.concat([Buffer.from('%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: -2445 -16530 17350 5920\n%%HiResBoundingBox: -2444.2 -16529.2 17349.1 5919.1\n'),body]);
+ const fixed=setEPSPageBounds(eps,{width:483.52,height:222.56});
+ assert(fixed.toString('latin1').includes('%%BoundingBox: 0 0 484 223\n'));
+ assert(fixed.toString('latin1').includes('%%HiResBoundingBox: 0 0 483.52 222.56\n'));
+ assert(fixed.subarray(fixed.indexOf('%%EndComments')).equals(body),'Do not rewrite PostScript or image bytes');
+ assert(setEPSPageBounds(fixed,{width:483.52,height:222.56}).equals(fixed),'Idempotent normalization');
+ assert.throws(()=>setEPSPageBounds(Buffer.from('not EPS'),{width:50,height:20}),/声明/);
+ assert.throws(()=>setEPSPageBounds(eps,{width:NaN,height:20}),/尺寸/);
+ doc.addPage();await assert.rejects(pdfPageSize(await doc.save()),/单页/);
+ console.log('EPS physical page: cropped/rotated PDF, oversized bounds, binary preservation and invalid inputs passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});
