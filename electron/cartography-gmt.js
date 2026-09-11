@@ -27,7 +27,7 @@ function scriptParts(config,outputDirectory,region,shell,quote){
    if(!groups.has(key))groups.set(key,{options,parts:[]});groups.get(key).parts.push(text);
   }
   const label=m.labelText(f,s,c),a=m.anchor(f,config.region);
-  if(label&&s.showLabel&&a){const cs=c.labelLayout.enabled?placement.candidates(f,config.region,a):[{anchor:a}];if(cs.length)labels.push({id:f.id,name:label,generic:placement.genericLabel(f,label),anchor:cs[0].anchor,candidates:cs,style:s,line:g.type.includes('Line'),pinned:!!f.labelAnchor,priority:g.type.includes('Point')?30:f.category==='缝合带'?20:10});}
+  if(label&&s.showLabel&&a){const cs=c.labelLayout.enabled?placement.candidates(f,config.region,a):[{anchor:a}];if(cs.length)labels.push({id:f.id,name:label,generic:placement.genericLabel(f,label),anchor:cs[0].anchor,candidates:cs,style:s,line:g.type.includes('Line'),point:g.type==='Point',pinned:!!f.labelAnchor,priority:g.type.includes('Point')?30:f.category==='缝合带'?20:10});}
  });
  for(const [i,group] of [...groups.values()].entries()){
   const p=file(`map_features_${String(i+1).padStart(3,'0')}.gmt`,group.parts.join('\n')+'\n');

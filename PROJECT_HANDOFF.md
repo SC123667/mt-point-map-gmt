@@ -1,6 +1,16 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-10 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+
+## 2026-09-11 v1.11.1 导出与名称遗漏修复（当前维护状态）
+
+- 源码 1.11.1；旧版用真实 5,245,064 字节 PNG 复现 ERR_INVALID_URL。main.js 原生叠加改用全局目录临时 HTML 与 file URL 图片，隐藏且不可聚焦，finally 回收目录；PDF 保留原 GMT 矢量底图与透明文字叠加。
+- label-layout.js 为普通 Point 标签增加其他方位候选并避开邻点符号；长旋转线名称增加基于文字高度的图框间距。保留手动锚点、原始坐标、语言设置与关闭避让行为。
+- 班公湖—怒江缝合带原有英文元数据完整，遗漏原因是 collision-or-edge；不需要重译或修改原始构造库。雄村/驱龙/甲玛同样保留已有代表点与来源。
+- 验证入口 tests/native_export_integration.cjs 与 tests/project_export_integration.cjs：隔离 MT_GMT_WORKSPACE，QA_MODULE_ROOT 支持候选 ASAR。前者验证大图、Unicode/空格/%/#路径、矢量叠加与异常清理；后者读取工程及已解析图层，关闭下载，验证双语 PNG/PDF/EPS。测试不操作用户窗口。
+- 源码 17 组 Node 测试通过；真实工程使用已有 03s 地形、86/96/28/32 范围、450 DPI 输出，中文和英文均包含三矿床及 BNS/IYZS 名称。包内真实 GMT 6.7 双语 PNG/PDF/EPS 回归通过；PDF 文本可提取，地形保留 450 DPI 影像，透明原生叠加无栅格图片。
+- 候选位于全局目录 安装包/v1.11.1/mac-arm64，严格深度验签通过，42 个 Electron 文件与源码一致；ASAR SHA-256：`d0a6c5e99c41b813640df4cc1e867c7fade6d77b60a098579f32b549715c7b1d`。目前实用app 仍运行 v1.11.0，等待用户确认保存后替换并后台重启，不能把候选验证当作安装完成。
+- 旧 App 已备份并验证至全局目录 版本备份/v1.11.0-升级v1.11.1。用户工程与个人库未覆盖；已导出的双语文件另存 导出图件/研究区地质图概况_修复导出_20260911。未上传 GitHub，公开基线仍 v1.8.1；未做 Windows 实机验证。
 
 ## 2026-09-09 v1.11.0 工作台改版（优先于下方历史记录）
 

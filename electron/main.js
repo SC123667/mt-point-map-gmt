@@ -768,7 +768,8 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
   const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
-  const imageUrl = image.toDataURL();
+  // Keep high-DPI terrain bytes out of the navigation URL and HTML document.
+  const imageUrl = pathToFileURL(path.resolve(pngPath)).href;
   const legend = nativeLegendMarkup(config, size);
   const mapElements = nativeMapElementsMarkup(config, size);
   const annotations = require("./cartography-gmt").labelSVG(config.annotationLayout).replace("<svg ", `<svg style="position:absolute;inset:0;width:100%;height:100%;overflow:visible" `);
@@ -868,19 +869,24 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   </div>
 </body>
 </html>`;
-  const win = new BrowserWindow({
-    show: false,
-    width: size.width,
-    height: totalHeight,
-    useContentSize: true,
-    webPreferences: {
-      offscreen: true,
-      contextIsolation: true,
-      sandbox: true
-    }
-  });
+  const temporaryDirectory = await fs.promises.mkdtemp(path.join(workspaceDirectory("临时文件/原生叠加"), "render-"));
+  let win;
   try {
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const htmlPath = path.join(temporaryDirectory, "overlay.html");
+    await fs.promises.writeFile(htmlPath, html, "utf8");
+    win = new BrowserWindow({
+      show: false,
+      focusable: false,
+      width: size.width,
+      height: totalHeight,
+      useContentSize: true,
+      webPreferences: {
+        offscreen: true,
+        contextIsolation: true,
+        sandbox: true
+      }
+    });
+    await win.loadFile(htmlPath);
     await win.webContents.executeJavaScript(`
       Promise.all([
         Promise.resolve(document.fonts && document.fonts.ready),
@@ -901,7 +907,11 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
     }
     return { pngBuffer: png, pdfBuffer: pdf, imageSize: size, titleHeight };
   } finally {
-    win.destroy();
+    if (win && !win.isDestroyed()) win.destroy();
+    // Windows may release the file handle shortly after the hidden window closes.
+    await fs.promises.rm(temporaryDirectory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }).catch(error => {
+      console.warn("原生叠加临时文件清理失败：", error.code);
+    });
   }
 }
 

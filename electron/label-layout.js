@@ -34,6 +34,8 @@ function place(layout,options={}){
  const cfg=settings(options);if(!cfg.enabled)return {...layout,placement:{enabled:false,shown:layout.labels.length,hidden:[]}};
  const frame=layout.frame||{x:0,y:0,width:layout.width,height:layout.height};
  const used=[...(layout.obstacles||[])],seen=new Set(),hidden=[],labels=[];
+ // Reserve actual point symbols so a neighbour's name cannot cover them.
+ const symbols=layout.labels.filter(l=>l.point&&!l.pinned&&l.style.symbol!=='none').map(l=>{const r=l.style.size*72/2.54/2+1;return {id:l.id,x:l.x-r,y:l.y-r,width:r*2,height:r*2};});
  const ordered=[...layout.labels].sort((a,b)=>(Number(b.pinned)-Number(a.pinned))||((b.priority||0)-(a.priority||0))||String(a.id).localeCompare(String(b.id)));
  for(const l of ordered){
   const key=nameKey(l.name);
@@ -46,15 +48,20 @@ function place(layout,options={}){
    const width=Math.abs(box.width*Math.cos(r))+Math.abs(box.height*Math.sin(r)),height=Math.abs(box.width*Math.sin(r))+Math.abs(box.height*Math.cos(r));
    // Keep short cartographic ticks from acquiring a long fault-name label.
    if(!l.pinned&&p.span!==undefined&&p.span<box.width*.65)continue;
-   const shifts=l.line&&!l.pinned?[s.fontSize+3,-s.fontSize-3,s.fontSize*2+4,-s.fontSize*2-4]:[0];
-   for(const shift of shifts){
+   // Long rotated names need more frame clearance than a short Chinese name.
+   // A final bounded offset uses their actual rotated height, preserving text.
+   const clearance=Math.max(s.fontSize*2+4,height/2+s.fontSize+4);
+   const shifts=l.line&&!l.pinned?[s.fontSize+3,-s.fontSize-3,s.fontSize*2+4,-s.fontSize*2-4,clearance,-clearance]:[0];
+   const positions=l.point&&!l.pinned?[...new Set([s.position,'right','left','above','below','upper-right','upper-left','lower-right','lower-left'])]:[s.position];
+   for(const position of positions){for(const shift of shifts){
     let x=p.x+s.dx*72/25.4-shift*Math.sin(r),y=p.y-s.dy*72/25.4+shift*Math.cos(r);
-    if(!l.line||l.pinned){const pad=s.size*72/2.54/2+3;if(s.position==='right')x+=box.width/2+pad;if(s.position==='left')x-=box.width/2+pad;if(s.position==='above')y-=box.height/2+pad;if(s.position==='below')y+=box.height/2+pad;}
+    if(!l.line||l.pinned){const pad=s.size*72/2.54/2+3;if(position.includes('right'))x+=box.width/2+pad;if(position.includes('left'))x-=box.width/2+pad;if(position==='above'||position.startsWith('upper'))y-=box.height/2+pad;if(position==='below'||position.startsWith('lower'))y+=box.height/2+pad;}
     const bounds={x:x-width/2-2,y:y-height/2-2,width:width+4,height:height+4};
     if(bounds.x<frame.x+4||bounds.y<frame.y+4||bounds.x+bounds.width>frame.x+frame.width-4||bounds.y+bounds.height>frame.y+frame.height-4)continue;
     if(!l.pinned&&used.some(b=>overlaps(bounds,b)))continue;
+    if(!l.pinned&&symbols.some(b=>b.id!==l.id&&overlaps(bounds,b)))continue;
     placed={...l,placed:{x,y,angle,bounds}};break;
-   }if(placed)break;
+   }if(placed)break;}if(placed)break;
   }
   if(placed){labels.push(placed);seen.add(key);used.push(placed.placed.bounds);}else hidden.push({id:l.id,name:l.name,reason:'collision-or-edge'});
  }

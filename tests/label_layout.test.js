@@ -22,3 +22,29 @@ const c=paper.applyCartography({language:'zh',features:[line],localLibrary:{enab
 assert.deepEqual(m.normalize(JSON.parse(JSON.stringify(c))).labelLayout,c.labelLayout);assert(m.normalize(c).paperStyle);assert(paper.terrainCPT('paper').includes('9000'));
 const svg=require('../electron/cartography-gmt').labelSVG(r);assert(svg.includes('rotate(12'));assert(!svg.includes('suturezone'));assert(svg.includes('<text'));
 console.log('Publication style and label layout: collision, duplicate, generic, edge, manual priority, date line and persistence tests passed');
+
+// Close mineral localities: keep the configured side if it fits, try other
+// directions before hiding a name, and never move its geographic point.
+const pointStyle=m.style({fontSize:7,position:'right',dx:1.2,dy:0,size:.16});
+const minerals={width:500,height:240,frame:{x:20,y:20,width:460,height:200},labels:[
+ {...label('jiama','甲玛 (JM)',310,120),point:true,style:pointStyle},
+ {...label('qulong','驱龙 (QL)',303,124),point:true,style:pointStyle},
+ {...label('xiongcun','雄村 (XC)',180,150),point:true,style:pointStyle}]};
+const before=JSON.stringify(minerals),mineralLayout=p.place(minerals);
+assert.equal(mineralLayout.labels.length,3);assert.equal(JSON.stringify(minerals),before);
+assert(mineralLayout.labels.find(l=>l.id==='qulong').placed.x<303,'Conflicting right label should fit on the left');
+for(const [i,l]of mineralLayout.labels.entries())for(const other of mineralLayout.labels.slice(i+1))assert(!p.overlaps(l.placed.bounds,other.placed.bounds));
+assert.deepEqual(p.place(minerals),mineralLayout);
+const edge=p.place({...minerals,labels:[{...minerals.labels[0],x:468,y:100}]});assert.equal(edge.labels.length,1);assert(edge.labels[0].placed.x<468);
+const pinnedPoint={...minerals.labels[0],pinned:true};
+assert.deepEqual(p.place({...minerals,labels:[pinnedPoint]}).labels[0].placed,p.place({...minerals,labels:[{...pinnedPoint,point:false}]}).labels[0].placed,'Explicit anchors retain their requested placement');
+assert.equal(p.place(minerals,{enabled:false}).labels[0].placed,undefined);
+const rotatedPin={...pinnedPoint,style:{...pointStyle,rotation:35}};
+const pinPosition=p.place({...minerals,labels:[rotatedPin]}).labels[0].placed;
+assert(Math.abs(pinPosition.x-(rotatedPin.x+pointStyle.dx*72/25.4+p.textSize(rotatedPin.name,pointStyle.fontSize).width/2+pointStyle.size*72/2.54/2+3))<1e-9,'Rotated manual anchors keep the existing horizontal offset');
+console.log('Nearby point names: alternate sides, edges, unchanged coordinates, manual anchors and disabled layout passed');
+const longSuture=p.place({width:500,height:240,frame:{x:20,y:20,width:460,height:200},labels:[
+ {...label('bns','Bangong–Nujiang Suture Zone (BNS)',360,30),style:m.style({fontSize:7.5,position:'center',dx:0,dy:0}),line:true,candidates:[{x:360,y:30,angle:18,span:180}]}]});
+assert.equal(longSuture.labels.length,1,'A long English suture name must gain clearance from the upper frame');
+assert(longSuture.labels[0].placed.bounds.y>=24);assert(longSuture.labels[0].placed.bounds.x+longSuture.labels[0].placed.bounds.width<=476);
+assert(require('../electron/cartography-gmt').labelSVG(longSuture).includes('Bangong–Nujiang Suture Zone (BNS)'));
