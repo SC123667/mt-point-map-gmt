@@ -58,7 +58,9 @@ kbd {font:10px ui-monospace,monospace;color:#697982;border:1px solid #dce2e6;bor
 .preview-canvas-meta {min-height:36px;height:36px;padding:0 14px;border-bottom:1px solid #dce2e6;background:#f4f6f8;}
 .preview-canvas-meta b {font-size:11px;}
 .preview-canvas-meta small {font-size:10px;}
-.preview-canvas-meta .preview-meta-tools {display:none;}
+.preview-canvas-meta .preview-meta-tools {display:flex;}
+.preview-meta-tools > span,.preview-meta-tools > i {display:none;}
+#previewBtn {padding:4px 10px;font-size:11px;min-height:26px;white-space:nowrap;}
 .preview-synced {border:0;background:transparent;padding:0;font-size:10px;}
 .preview-box {margin:0;border:0!important;border-radius:0!important;box-shadow:none;background:#e7ebee!important;}
 .preview-box:before,.preview-box:after {display:none;}
@@ -149,3 +151,43 @@ kbd {font:10px ui-monospace,monospace;color:#697982;border:1px solid #dce2e6;bor
 .wb-editor-page>details:first-child>summary {display:none;}
 
 #settingsDialogBody .wb-export-note {font-size:11px;line-height:1.6;color:#607782;margin:10px 0;}
+
+/* Response plots always expose their station and component key beside the canvas. */
+body[data-plot-type="responseCurve"] .toolbar-context > label {display:none;}
+.curve-context-bar {flex:none;padding:10px 14px;background:#f8fbfc;border-bottom:1px solid #dce5e9;display:flex;flex-direction:column;gap:7px;}
+.curve-context-bar[hidden] {display:none;}
+.curve-context-controls,.curve-context-key {display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.curve-context-controls label {display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#293e4c;}
+.curve-context-controls select {width:180px;max-width:30vw;min-height:30px;}
+.curve-context-controls button {min-height:30px;padding:4px 10px;}
+.curve-context-controls > span {font-size:12px;color:#617582;}
+.curve-context-key {font-size:11px;color:#526875;gap:14px;}
+.curve-context-key b {font-size:15px;}
+.curve-key-xy {color:#b33d36;}.curve-key-yx {color:#276a9a;}
+
+/* Ordered response stations: compact lists remain usable in narrow panels. */
+.rc-list {max-height:240px;overflow:auto;margin:8px 0;padding:4px;border:1px solid #d9e1e5;border-radius:6px;}
+.rc-station {display:flex!important;align-items:center;gap:8px;margin:0!important;padding:5px 3px!important;font-size:12px;}
+.rc-station input[type=checkbox] {width:auto;flex:none;}
+.rc-station span {flex:1;min-width:0;overflow-wrap:anywhere;}
+.rc-station button {width:auto!important;padding:4px 7px!important;flex:none;}
+.rc-station[draggable=true] {cursor:grab;}
+#curveContextBar [hidden], #rc-options[hidden] {display:none!important;}
+#canvasDataMeta {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55vw;}
+
+.rc-station, #rc-options .check-row {flex-direction:row!important;align-items:center!important;}
+#rc-options .check-row {display:flex!important;gap:8px;}
+#rc-options .check-row input {width:auto;}
+#canvasCurveLayout {width:auto;align-self:flex-start;}
+
+.mtpy-controls{display:none}
+body[data-plot-type="phaseTensorMap"] .mtpy-controls,body[data-plot-type="tipperMap"] .mtpy-controls{display:block}
+.mtpy-controls .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.mtpy-controls label{display:flex;flex-direction:column;gap:6px;margin:8px 0;min-width:0}
+.mtpy-controls input,.mtpy-controls select{width:100%;min-width:0}
+body[data-plot-type="phaseTensorMap"] .toolbar-context>label,body[data-plot-type="tipperMap"] .toolbar-context>label{display:none}
+body[data-plot-type="phaseTensorMap"] #legendDragHandle,body[data-plot-type="tipperMap"] #legendDragHandle{display:none!important}
+
+body[data-plot-type="phaseTensorMap"] .analysis-settings>.analysis-only,body[data-plot-type="tipperMap"] .analysis-settings>.analysis-only,.analysis-settings [hidden]{display:none!important}
+body[data-plot-type="phaseTensorMap"] #scaleDragHandle,body[data-plot-type="tipperMap"] #scaleDragHandle,body[data-plot-type="phaseTensorMap"] #northDragHandle,body[data-plot-type="tipperMap"] #northDragHandle{display:none!important}
+body[data-plot-type="phaseTensorMap"] .section-title[data-settings-panel="mtParams"],body[data-plot-type="tipperMap"] .section-title[data-settings-panel="mtParams"]{display:none!important}

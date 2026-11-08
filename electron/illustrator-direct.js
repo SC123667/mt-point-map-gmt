@@ -38,6 +38,27 @@ async function verifyResult(resultPath,outputDirectory) {
   const stat=await fs.promises.stat(output);if(!stat.isFile()||stat.size<100)throw new Error('Illustrator 没有生成完整的 AI 文件。');
   return output;
 }
+async function publishAI(generated, output) {
+  const stat=await fs.promises.stat(generated);
+  if(!stat.isFile()||stat.size<100)throw new Error('Illustrator 没有生成完整的 AI 文件。');
+  // Prepare a complete sibling before replacing the destination. A failed
+  // conversion/copy leaves the previous export intact, including on Windows.
+  const stage=await fs.promises.mkdtemp(path.join(path.dirname(output),'.gmt-ai-'));
+  try {
+    const ready=path.join(stage,'ready.ai');
+    await fs.promises.copyFile(generated,ready);
+    let old;
+    try {old=await fs.promises.stat(output);} catch(error) {if(error.code!=='ENOENT')throw error;}
+    if(old) {
+      if(!old.isFile())throw new Error('AI 输出路径不是文件。');
+      const backups=require('./workspace').workspaceDirectory('版本备份/导出图件');
+      const backup=await fs.promises.mkdtemp(path.join(backups,path.basename(output,'.ai')+'-'));
+      await fs.promises.copyFile(output,path.join(backup,path.basename(output)));
+    }
+    await fs.promises.rename(ready,output);
+    return output;
+  } finally {await fs.promises.rm(stage,{recursive:true,force:true});}
+}
 async function exportNativeAI(script,output,target) {
   if(active)throw new Error('已有 Illustrator 导出正在进行，请稍后再试。');
   const job=path.dirname(script),resultPath=path.join(job,'ai-result.txt'),cancelPath=path.join(job,'cancel.txt');
@@ -46,7 +67,8 @@ async function exportNativeAI(script,output,target) {
   let timer;
   try{
     // Each export uses its own job directory; never reuse another job's result file.
-    const metadata={outputPath:output,resultPath,cancelPath};
+    const generated=path.join(job,'new-export.ai');
+    const metadata={outputPath:generated,resultPath,cancelPath};
     let source=await fs.promises.readFile(script,'utf8');
     source=source.replace('/*GMT_AUTOMATION*/null',JSON.stringify(metadata));
     await fs.promises.writeFile(run,source.replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0')));
@@ -55,7 +77,10 @@ async function exportNativeAI(script,output,target) {
     // Cooperative cancellation never terminates the user's Illustrator process.
     timer=setTimeout(()=>{try{fs.writeFileSync(cancelPath,'timeout');}catch{}},590000);
     await execute(command.file,command.args);
-    return await verifyResult(resultPath,path.dirname(output));
+    const actual=await verifyResult(resultPath,job);
+    if(path.resolve(actual)!==path.resolve(generated))throw new Error('Illustrator 返回的文件不是本次导出结果。');
+    if(fs.existsSync(cancelPath))throw new Error('AI 导出已取消。');
+    return await publishAI(actual,output);
   }catch(error){
     // Also stop a late-arriving script after an AppleEvent/helper timeout.
     try{await fs.promises.writeFile(cancelPath,'cancel');}catch{}
@@ -64,4 +89,4 @@ async function exportNativeAI(script,output,target) {
     throw new Error(`AI 导出未完成：${reason}\n编辑包已保留：${job}`);
   }finally{clearTimeout(timer);active=null;}
 }
-module.exports={findIllustrator,exportNativeAI,cancelIllustrator,bridge,verifyResult};
+module.exports={findIllustrator,exportNativeAI,cancelIllustrator,bridge,verifyResult,publishAI};

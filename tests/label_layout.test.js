@@ -8,7 +8,13 @@ const layout={width:500,height:240,frame:{x:20,y:20,width:460,height:200},labels
  label('e','Edge label would be clipped',490,5),label('f','Adjacent Fault',120,110,{line:true,candidates:[{x:120,y:110,angle:12,span:180},{x:310,y:130,angle:0,span:180}]})]};
 const r=p.place(layout);assert.equal(r.labels.length,2);assert.equal(r.placement.hidden.filter(x=>x.reason==='generic').length,2);assert(r.placement.hidden.some(x=>x.reason==='duplicate'));
 for(const [i,l]of r.labels.entries()){const b=l.placed.bounds;assert(b.x>=24&&b.x+b.width<=476&&b.y>=24&&b.y+b.height<=216);for(const other of r.labels.slice(i+1))assert(!p.overlaps(b,other.placed.bounds));}
-assert.deepEqual(p.place(layout),r,'deterministic output');assert.equal(p.place(layout,{enabled:false}).labels.length,layout.labels.length);
+assert.deepEqual(p.place(layout),r,'deterministic output');const manual=p.place(layout,{enabled:false,hideGeneric:true});
+assert.deepEqual(manual.labels.map(l=>l.id),['a','b','e','f']);
+assert.deepEqual(manual.placement.hidden.map(l=>l.reason),['generic','generic']);
+assert.equal(manual.placement.shown,4);
+assert.deepEqual(p.place(layout,{enabled:false,hideGeneric:false}).labels,layout.labels);
+const sourceNumber=label('auto','Future-data 42',150,120,{generic:true,pinned:true});
+assert.equal(p.place({...layout,labels:[sourceNumber]},{enabled:false}).labels.length,0);
 assert(p.genericName('CN-block-L2 17'));assert(!p.genericName('San Andreas Fault'));assert(p.meaningful({name:'suturezone 39'},'雅鲁藏布江缝合带'));
 for(const name of ['CN-faults 523','majorfaults 51','! 26','normal_faults 119','sinistral_faults 165','YZS 1'])assert(p.genericName(name),name);
 for(const name of ['YZS','BNS','Altyn Tagh Fault','雅鲁藏布江缝合带','North Fault 2'])assert(!p.genericName(name),name);
@@ -61,3 +67,11 @@ assert.equal(scaleMidpoint(tickPS.replace('500 50','500 51'),tickContext),null);
 assert.equal(scaleMidpoint(tickPS.replace('%%EndObject','300 50 M (50) tc Z\n%%EndObject'),tickContext),null);
 assert.equal(scaleMidpoint('no scale',tickContext),null);
 assert(require('../electron/cartography-gmt').labelSVG({width:100,height:80,labels:[],scaleLabel:{x:10,y:10,text:'50',fontSize:7.5}}).includes('>50</text>'));
+
+const {buildLayout}=require('../electron/mtpy-annotations');
+const generic=label('segment','未命名构造边界（线段 15）',250,220,{generic:true});
+for(const hideGeneric of [true,false]){
+ const background={box:{left:0,bottom:0,right:504,top:432},annotationLayout:{height:432,sourceLabels:[generic],hideGeneric}};
+ const mtpy=buildLayout(background,{axis:[0,0,1,1]});
+ assert.equal(mtpy.labels.length,hideGeneric?0:1);
+}

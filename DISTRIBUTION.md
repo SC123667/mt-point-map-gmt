@@ -1,123 +1,157 @@
-# 分发说明 / Distribution
+# 从源码构建 macOS / Windows 版本
 
-当前源码版本 **v1.14.1**（直接导出原生 AI，保留 AI 编辑包、EPS 矢量及 GMT 6.7 引擎适配）；本次仅向现有 GitHub 仓库更新源码与 v1.14.1 标签，不上传安装包、不创建新 Release；可下载安装包仍为下述 v1.8.1。
+当前源码版本为 **v1.33.2**。本文命令对应仓库锁定的 Electron 35.7.5 和 electron-builder 26.15.3。2026-11-08 的交付内容为源码、版本标签和构建说明。历史安装包可在 Releases 下载，最新安装包版本为 v1.8.1。
 
-本机“实用app”已安装 **v1.14.1** 并后台重启，修复了 v1.14.0 工作台未显示 AI 导出按钮的问题。候选在全局目录 `安装包/v1.14.1/mac-arm64`，源候选严格深度验签、候选 ASAR 实际面板可见性与真实 AI 导出通过；安装目标普通深度验签、版本、ASAR 一致性和实际启动路径已核对。旧 v1.14.0 保存在 `版本备份/v1.14.0-升级v1.14.1`。Windows 直接 AI COM 路径尚未实机验证；此次 GitHub 更新仅含源码和版本标签，安装包未上传。
+## 1. 获取源码和安装依赖
 
-当前发布版本 **v1.8.1**，仓库与下载：[SC123667/mt-point-map-gmt](https://github.com/SC123667/mt-point-map-gmt/releases/tag/v1.8.1)。这是 v1.1.3 之后的累积更新。
+准备 Git、Node.js 22.x 和随 Node.js 安装的 npm。在可写的本地目录中打开终端，Windows 使用 PowerShell。
 
-Current release: **v1.8.1**, a cumulative update after v1.1.3.
-
-发布包：macOS Apple Silicon DMG；Windows x64/ARM64 各有安装版和便携版；另附 SHA-256 校验文件。macOS 为 ad-hoc 签名、未公证，Windows 未签名。本轮 Windows 为交叉构建，未进行实机安装、升级和卸载验证。
-
-Packages: Apple Silicon DMG and Windows x64/ARM64 setup and portable executables, with SHA-256 checksums. macOS is ad-hoc signed and not notarized; Windows is unsigned and cross-built, without on-device install/upgrade/uninstall validation.
-
-发布构建：`./script/package_release.sh /absolute/output/path`。脚本在隔离目录使用锁定依赖和标准 electron-builder，保留 NSIS 补丁，不启动或替换正在使用的 App，也不自动上传。
-
-新用户默认全局目录：`~/Documents/GMT工作区`；可用 `MT_GMT_WORKSPACE` 或目录符号链接指定外接盘。链接目标磁盘断开时明确报错，不创建替代缓存。安装包不包含用户工程、地形缓存、本地构造库和个人名称词典。
-
-New users default to their own `~/Documents/GMT工作区`; an environment override or directory symlink can select another disk. User datasets and dictionaries are not distributed.
-
-## macOS
-
-在 macOS 上运行：
-
-```bash
-npm install
-npm run dist:mac
+```sh
+git clone https://github.com/SC123667/mt-point-map-gmt.git
+cd mt-point-map-gmt
+git switch --detach v1.33.2
+npm ci
 ```
 
-若 Documents/FileProvider 导致 electron-builder 读取卡顿，可使用本地构建入口（不替换或停止已安装 App）：
+`npm ci` 按 `package-lock.json` 安装固定依赖。Electron 和构建工具首次安装需要联网。下载 ZIP 时选择 v1.33.2 标签下的源码，解压后在包含 `package.json` 的目录执行 `npm ci`。
 
-```bash
-./script/package_mac_local.sh
+只运行源码时，安装下文所需绘图运行环境后执行 `npm start`。`npm run test:node` 是项目的 Node 回归入口，其中部分用例需要 GMT、Ghostscript 和 Poppler。部分集成测试还引用维护者本机的 EDI、工程和地形路径，运行前需准备对应测试输入。
+
+## 2. 在 macOS 构建
+
+在 Mac 上执行以下命令。按目标机器的处理器选择一种。
+
+Apple Silicon（M 系列），生成 `.app` 和 `.dmg`。
+
+```sh
+npm run dist:mac -- --arm64 --config.mac.identity=- --publish never
 ```
 
-默认产物为 `release/local-<version>/mac-arm64/MT点位图制作工具—GMT.app`，使用标准 electron-builder 和 ad-hoc 签名，仅适合本地使用；脚本先在临时目录严格深度验签，复制后再验证目标包；FileProvider 目标可能附加 Finder 元数据。
+Intel Mac，生成 x64 版本。
 
-当前源码常规构建产物：
-
-- `release/mac-arm64/MT点位图制作工具—GMT.app`
-- `release/MT点位图制作工具—GMT-<version>-mac-arm64.dmg`
-
-如果要公开分发给陌生用户，后续需要 Apple Developer ID 签名和 notarization。当前本地构建包适合自己或熟人测试使用。
-
-For broad public macOS distribution, Apple Developer ID signing and notarization are still recommended. Current local builds are suitable for personal use or trusted testing.
-
-## Windows
-
-在 Windows 或当前已验证可交叉打包的 macOS 环境运行：
-
-```bash
-npm install
-npm run dist:win
+```sh
+npm run dist:mac -- --x64 --config.mac.identity=- --publish never
 ```
 
-当前源码构建产物包括：
+一次生成两个独立架构的版本。
 
-- `release/MT点位图制作工具—GMT-<version>-win-x64-setup.exe`
-- `release/MT点位图制作工具—GMT-<version>-win-x64-portable.exe`
-- `release/MT点位图制作工具—GMT-<version>-win-arm64-setup.exe`
-- `release/MT点位图制作工具—GMT-<version>-win-arm64-portable.exe`
+```sh
+npm run dist:mac -- --arm64 --x64 --config.mac.identity=- --publish never
+```
 
-完整接手和发布检查清单见 [`PROJECT_HANDOFF.md`](PROJECT_HANDOFF.md)。
+仅需要 Apple Silicon 的 `.app` 目录时执行以下命令。
 
-## GMT 依赖 / GMT Dependency
+```sh
+npm run pack:mac -- --arm64 --config.mac.identity=- --publish never
+```
 
-软件会自动检测 `gmt` 命令。
+当前版本的主要产物如下。
 
-The app automatically detects the local `gmt` command.
+| 架构 | App 路径 | DMG 路径 |
+| --- | --- | --- |
+| Apple Silicon | `release/mac-arm64/MT点位图制作工具—GMT.app` | `release/MT点位图制作工具—GMT-1.33.2-mac-arm64.dmg` |
+| Intel | `release/mac/MT点位图制作工具—GMT.app` | `release/MT点位图制作工具—GMT-1.33.2-mac-x64.dmg` |
 
-- macOS：使用现有 Homebrew 执行 `brew install gmt ghostscript`，先核对稳定版属于 6.7；不下载不存在的 6.7 macOS DMG，也不静默安装其他次版本。没有 Homebrew 时提供说明。缓存和日志位于全局目录“安装包/GMT-6.7”。
-- Windows：下载官方 GMT 6.7.0 win64 安装器。ARM64 Windows 的 x64 兼容运行以及 Windows 安装/运行本轮未做实机验证。
-- 如果下载失败，软件会提示网络或下载错误。
-- GMT 中文手册安装页和 GMT 官方下载页保留为备用帮助入口。
+`--config.mac.identity=-` 使用本地 ad-hoc 签名。项目的 `electron/entitlements.mac.plist` 已配置 JIT 与库加载权限。面向其他用户正式分发时，配置 Apple Developer ID 签名和公证，构建命令去掉 `--config.mac.identity=-`，使用自己的证书配置。签名和架构选项依据 electron-builder 26 文档。[macOS 签名说明](https://www.electron.build/v26/docs/features/code-signing/code-signing-mac/)、[架构选项](https://www.electron.build/v26/docs/architecture/)
 
-- macOS: install GMT and Ghostscript with existing Homebrew after checking that its stable GMT formula is 6.7.x.
-- Windows: download the official GMT 6.7.0 x64 installer.
-- If downloading fails, the app reports a network or download error.
-- GMT Chinese documentation and official download pages are kept as backup help links.
+Documents/iCloud 目录读取缓慢时，可将源码移至普通本地目录后重新执行 `npm ci`。项目另提供 Apple Silicon 本地构建脚本，在临时目录构建、签名并验证 `.app`。
 
-GMT 不随本软件内置打包。这样可以避免把跨平台 GMT/GDAL/PROJ/Ghostscript 运行时塞进安装包导致体积、授权和维护复杂度大幅上升。软件本身会保存 GMT 脚本；安装 GMT 后即可直接导出 PNG、矢量 PDF 和 EPS。
+```sh
+bash script/package_mac_local.sh
+```
 
-GMT is not bundled inside this app. This avoids shipping large cross-platform GMT/GDAL/PROJ/Ghostscript runtimes and keeps licensing and maintenance simpler. The app can still save GMT scripts; after GMT is installed, PNG, vector PDF, and EPS export work directly.
+该脚本默认输出到 `release/local-1.33.2/mac-arm64/`。也可把绝对输出目录作为第一个参数传入。
 
-## v1.4.0 矢量导出 / Vector Export
+构建后可核对版本与签名。
 
-无需测点即可按经纬度范围出图。PDF 可在 Illustrator 中打开并编辑；中文标题/图例通过 PDF 页面合成保留底图矢量。地形晕渲仍是栅格影像，v1.6.0 起应用导出已增加原生中文 EPS 合成。
+```sh
+/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'release/mac-arm64/MT点位图制作工具—GMT.app/Contents/Info.plist'
+codesign --verify --deep --strict 'release/mac-arm64/MT点位图制作工具—GMT.app'
+hdiutil verify 'release/MT点位图制作工具—GMT-1.33.2-mac-arm64.dmg'
+```
 
-Region-only maps require no station import. PDF composition preserves vector paths beneath native Chinese decorations. Shaded relief remains raster; app exports since v1.6.0 support native Chinese EPS composition. `pdf-lib` is a bundled pure-JavaScript runtime dependency used by the GMT worker.
+使用 Intel 构建或本地脚本时，将上述路径换成对应的产物路径。
 
-## v1.4.1 地形下载 / Terrain Downloads
+## 3. 在 Windows 构建
 
-新增 `@cornerstonejs/codec-openjpeg@1.3.5`（JS + WASM，约 2 MB 包文件）生产依赖，随 App 打包并由 SRTM worker 读取；无需本机 GDAL 的 JPEG2000 驱动，也不在运行时从 CDN 加载解码器。许可证见 `electron/THIRD_PARTY_NOTICES.txt`。USTC 与 AWS 下载格式不同，解码后复用现有 HGT 缓存与 GMT 流程。
+在 Windows PowerShell 中先完成第 1 步。普通 Intel/AMD 64 位电脑选择 x64。
 
-The bundled OpenJPEG WASM decoder is loaded by the SRTM worker from local package bytes, including inside ASAR. Packaging must retain both its JS and WASM files. Validate a real USTC download from the packaged App, not only source execution. Windows runtime validation remains separate from macOS validation.
+```powershell
+npm run dist:win -- --x64 --publish never
+```
 
-## v1.5.0 本地安装版与全局目录
+Windows ARM 电脑选择 arm64。
 
-v1.5.0 本机曾指定外接 SSD；v1.8.1 起默认目录以本文顶部为准。自动化验证可用 `MT_GMT_WORKSPACE` 隔离数据。GeoNames 城镇数据与许可证随 `electron/data/` 打包。
+```powershell
+npm run dist:win -- --arm64 --publish never
+```
 
-本次须分别核对源代码 12 组 Node 测试、真实 GMT 数值和速度、候选及实用app安装包、迁移 SHA-256 清单。实际交付结果见 PROJECT_HANDOFF.md 最新记录。
+一次生成两个架构的安装版和便携版。
 
-## v1.6.0 地理数据与标注
+```powershell
+npm run dist:win -- --x64 --arm64 --publish never
+```
 
-新增 `shpjs`（SHP 重投影）和 `fast-xml-parser`（WFS 能力文档），需随生产依赖打包。`cartography-ui.js` 由主进程内嵌加载；`geodata-worker.js` 负责后台下载和解析。公共构造数据不打入 ASAR，首次下载后存入全局目录，数据许可与应用 MIT 许可分别处理。
+仅需要解包后的程序目录时执行以下命令。
 
-本轮验证 macOS App、GMT 6.5.0 和 Windows 布局/ASCII 工作区代码路径；未在 Windows 实机执行。以上为该版本历史验证记录。
+```powershell
+npm run pack:win -- --x64 --publish never
+```
 
-## v1.7.0 构造编辑与名称
+`dist:win` 和 `pack:win` 会先执行项目的 NSIS 模板补丁，再运行 electron-builder。保留 `scripts/patch-nsis-install-section.js` 和 `build/installer.nsh`，使用上面的 npm 入口。
 
-新增 `map-names.js`、`map-project-worker.js` 和 `renderer/map-drawing-ui.js`，必须随 Electron 目录打包。投影转换在独立 worker 中执行，不改变 GMT/SRTM/导入边界。名称词典为运行数据，保存在全局目录下的 `名称词典`，不打入 ASAR；旧工程语言默认 original，新工程默认中文。
+| 类型 | x64 产物 | ARM64 产物 |
+| --- | --- | --- |
+| 安装版 | `release/MT点位图制作工具—GMT-1.33.2-win-x64-setup.exe` | `release/MT点位图制作工具—GMT-1.33.2-win-arm64-setup.exe` |
+| 便携版 | `release/MT点位图制作工具—GMT-1.33.2-win-x64-portable.exe` | `release/MT点位图制作工具—GMT-1.33.2-win-arm64-portable.exe` |
+| 解包目录 | `release/win-unpacked/MTPointMapGMT.exe` | `release/win-arm64-unpacked/MTPointMapGMT.exe` |
 
-## v1.8.0 本地构造库
+正式分发可配置自己的 Windows 代码签名证书。生成安装包后，应在目标 Windows 架构上验证启动、文件导入、GMT 出图、升级和卸载。本项目已有 macOS 上交叉构建 Windows 的历史记录，当前版本的 Windows 实机验证仍待进行。
 
-新增 local-structures.js 和 renderer/local-library-ui.js，沿用 geodata worker。用户构造数据不打入 ASAR，不上传仓库；库保存在全局目录的 `构造数据/本地构造库`。换电脑需另行复制该目录，原始文件夹不是绘图时的依赖。安装包只包含解析、索引及界面代码。该功能包含于 v1.8.1 累积发布。
+macOS 的签名步骤需要 Mac。跨平台构建能力还取决于依赖和构建工具，按目标系统分别构建更便于核验。[electron-builder 跨平台构建说明](https://www.electron.build/v26/docs/features/multi-platform-build/)
 
-### v1.13.0 导出依赖
+## 4. 配置绘图运行环境
 
-AI 编辑包包含 base-map.pdf、labels.svg 和生成可编辑AI.jsx，需保持文件夹完整。在 Illustrator 中运行脚本生成原生 AI；重复运行另存新文件，不覆盖已有 AI 修改。脚本将输入复制到 Illustrator 系统临时目录，完成或失败后清理，最终文件写回编辑包。
+### GMT、Ghostscript 和 Poppler
 
-EPS 转换优先寻找 GMT bin、PATH、macOS Homebrew 的 pdftocairo。PDF 含透明内容但无 Cairo 时，返回清楚的 EPS 限制提示，不再输出整页位图伪装矢量。EPS 不能完整保留 PDF 透明度。Windows 的脚本/工具路径处理已实现，尚未在 Windows Illustrator 实机验证。
+制图需要 GMT 6.x。macOS 可使用 Homebrew 安装。
 
-2026-09-11 最终验证：实际论文工程 AI 重开后含 200 条路径、23 个文字对象、1 张地形影像，完整名称可改写和移动。实用app 已更新并后台启动；ASAR 为 58edabdf6573db04f2d15116b10f8b6ae16931a54ec9492a16c3af0a8f811b0e。未远端发布。
+```sh
+brew install gmt ghostscript poppler
+gmt --version
+gs --version
+pdftocairo -v
+```
+
+Windows 可在软件的“GMT 引擎”中下载官方安装器，安装 GMT 和 Ghostscript 后重新打开软件。手动安装时，在“GMT 引擎”里选择 `gmt.exe`。EPS 透明图件转换使用 Poppler 的 `pdftocairo.exe`，可将其所在目录加入 PATH。安装器来源见 [GMT 官方下载](https://www.generic-mapping-tools.org/download/)。
+
+### MTpy 相位张量和感应矢量
+
+MTpy 图件还需要 Python 3.11 与 `mtpy-v2==2.1.4` 的独立环境。每台运行这些功能的电脑都需配置。
+
+macOS 默认路径的安装命令如下。
+
+```sh
+python3.11 -m venv "$HOME/Library/Application Support/MTPointMapGMT/mtpy-v2.1.4"
+"$HOME/Library/Application Support/MTPointMapGMT/mtpy-v2.1.4/bin/python" -m pip install "mtpy-v2==2.1.4"
+```
+
+Windows 安装 Python 3.11 后，在 PowerShell 执行。
+
+```powershell
+$MtpyRuntime = Join-Path $env:LOCALAPPDATA 'MTPointMapGMT/mtpy-v2.1.4'
+py -3.11 -m venv "$MtpyRuntime"
+& "$MtpyRuntime/Scripts/python.exe" -m pip install 'mtpy-v2==2.1.4'
+```
+
+使用其他环境时，可将 `MT_GMT_MTPY_PYTHON` 指向该环境的 Python 可执行文件，并从设置了该变量的终端启动软件。包内的 Python worker 由 `asarUnpack` 放到 `app.asar.unpacked/electron/mtpy_backend.py`。运行机制和验证入口见 [MTpy 集成说明](docs/MTPY_INTEGRATION.md)。
+
+直接导出 `.ai` 还需要目标电脑安装 Adobe Illustrator。macOS 首次调用可能需要允许自动化权限。
+
+## 5. 数据目录与构建验证
+
+新用户的数据目录默认为 `~/Documents/GMT工作区`，Windows 对应当前用户的 Documents。工程、导出图、地形缓存和构造库存放于其中。需要另一个位置时设置 `MT_GMT_WORKSPACE`。源码构建所需文件由 `package.json` 的 `build.files`、依赖锁文件和脚本共同定义。
+
+构建完成后，建议用示例点位验证预览和 PDF 导出，再用 EDI 验证相位张量、感应矢量及曲线。最后检查工程保存、重新打开、色标开关和中文标签。
+
+v1.33.1 已完成 macOS Apple Silicon 的安装与实图验证。v1.33.2 更新构建文档和源码发布元数据，2026-11-08 按源码交付范围核对命令、依赖和文件完整性。Windows x64、Windows ARM64 和 Intel macOS 的当前版完整安装运行验证仍待在对应机器上完成。

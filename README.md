@@ -1,6 +1,8 @@
 # MT点位图制作工具-GMT / MT Point Map GMT
 
-[![Version](https://img.shields.io/badge/source-v1.14.1-0d8584)](https://github.com/SC123667/mt-point-map-gmt/tree/v1.14.1)
+当前源码 **v1.33.2**（2026-11-08），包含截至 v1.33.1 的功能与修复。macOS、Windows 的依赖安装、架构选择、打包命令和产物路径详见 [源码构建指南](DISTRIBUTION.md)。历史可下载安装包为 v1.8.1。
+
+[![Version](https://img.shields.io/badge/source-v1.33.2-0d8584)](https://github.com/SC123667/mt-point-map-gmt/tree/v1.33.2)
 [![Latest Release](https://img.shields.io/github/v/release/SC123667/mt-point-map-gmt?label=installer)](https://github.com/SC123667/mt-point-map-gmt/releases)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-334155)](#运行要求--requirements)
 [![GMT](https://img.shields.io/badge/GMT-6.x-2563eb)](https://www.generic-mapping-tools.org/)
@@ -10,9 +12,67 @@
 
 **MT Point Map GMT** is a cross-platform desktop application for magnetotelluric (MT/AMT/LMT) field-station mapping and GMT-based geophysical figure production. It turns common GMT plotting workflows into a graphical interface: import station tables or recursively scan EDI folders, preview figures, tune publication-style parameters, and export PNG, vector PDF, EPS, plus reproducible GMT scripts.
 
+<details>
+<summary>历史版本功能与验证记录</summary>
+
+> **v1.33.1** — 点位图可单独勾选“地形底图 → 点位图显示高程色标”。“隐藏未命名标签”也可在关闭名称避让时使用。
+
+> **v1.33.0：自动高程范围** — 默认按 EDI 测区及地形峰值设置整数上限与刻度间隔；手动修改可关闭自动，F 配色跟随分级。[说明](docs/ELEVATION_COLORBAR.md)。
+
+> **v1.32.1：默认 F 地形配色** — 新打开的工作台默认使用 F · 分级设色（500 m）；已有工程保存的配色继续保留，可随时切换 B / C / 其他色带。
+
+> **v1.32.0：B / C / F 地形配色可选** — “地形底图 → 色带”新增增强绿褐、经典分层地形、分级设色；随工程保存并支持撤销。F 默认每 500 m 分级，可通过高程色标的刻度间隔调整。[说明](docs/TERRAIN_PALETTES.md)。
+
+> **v1.31.1：高程色标显示范围** — 高程色标仅用于单独的“区域底图”；点位、走向、相位张量、感应矢量等图件不显示。预览和导出保持一致。
+
+> **v1.31.0：相位张量着色** — 增加最大相位 φmax 和“Φ₂ 等效相位（°）”，与最小相位共用色带及色标范围。图中注明 Φ₂ 定义，负行列式不填色。[说明](docs/PHASE_COLORING.md)。
+
+> **v1.30.0：图外高程色标** — 在“地形底图 → 高程色标”调整范围、单位、尺寸、字号和间距；默认在地图正下方居中，多周期组图共用一条。[使用说明](docs/ELEVATION_COLORBAR.md)。
+
+> **v1.29.1：SRTM 阴影修复** — 修复长中文缓存路径导致的地形阴影失败；已有高程瓦片与网格可以继续复用，保留原分辨率。
+
+> **v1.29.0：论文绘图默认参数** — 黑白交替边框、字体字号、β / φmin 色标、椭圆描边及组图宽度均可直接调整；MTpy 修改后点击“更新预览”，参数随工程保存。[使用说明](docs/PAPER_PARAMETERS.md)。
+
+> **v1.28.5：文件选择修复** — “地点与构造”及其他文件选择窗口绑定主窗口，避免重复打开；取消或失败后可直接重试。[修复与验证](docs/FILE_DIALOGS.md)。
+
+> **v1.28.1：MTpy 按需绘制** — 先修改所有参数，再点击侧栏或画布上的“更新预览”统一绘制。参数修改、关闭侧栏和绘制期间的后续编辑均不会自动重绘；界面显示“尚未绘制”时，当前图件仍是上次预览。
+
+> **v1.25.0：MTpy 官方分析** — 点击顶部“MTpy 分析”，直接读取原始 EDI，生成维性参数、不同周期的相位张量椭圆与感应箭头叠加图，并通过 Illustrator 直接导出单图/组图 AI。[使用与运行环境](docs/MTPY_INTEGRATION.md)。
+
+> **v1.28.4：海岸与水体** — 在“地形底图”中分别设置海岸线、河湖边界及海面填色；默认保留原地形配色，隐藏细碎水系描线。设置随工程保存，应用于普通地图及 MTpy 背景，AI 保留可编辑海面与边界。[说明与验证](docs/SHORELINES.md)。
+>
+> **v1.28.4: coast and water styling** — Independent coastline, inland-water outline and sea-fill controls in the existing terrain panel. Terrain colors and shading stay unchanged; settings persist with projects and are shared by GMT and MTpy backgrounds. AI retains editable water paths.
+
+**本地源码 v1.24.0：**“曲线组图与排版”新增“应用参考图样式与紧凑排版”：红蓝实心点、默认误差棒、图内名称与图例、向内刻度和虚线网格。原始有符号相位与旧折叠相位可切换；响应图 AI 西文统一 Times New Roman（需要本机字体，中文保持回退）。实用app 已备份旧版、更新至 v1.24.0 并后台启动；版本、ASAR、普通深度验签与启动路径已核对，未上传 GitHub。详见 [曲线样式说明](docs/RESPONSE_CURVE_STYLE.md)。
+
+**本地源码 v1.23.0：**新增“输出与软件 → EM3DVP 高程导出”。输入范围或使用当前图幅，自动匹配地形缓存，缺失时沿用底图下载设置准备数据；不需要选择 GRD。输出经度、纬度、高程米三列 `.xyz` 及来源说明，可设置抽样与缺测处理。见 [使用说明](docs/EM3DVP_ELEVATION.md)。外置盘未接入，真实缓存/EM3DVP 导入待接盘验证；实用app 仍为 v1.22.0，本版未打包、安装或上传。
+
+**本地源码 v1.22.0：**导入 EDI 后，在“曲线 → 组图 / 叠加与排版”或左侧“测点与 MT → 曲线组图与排版”选择独立面板/同轴叠加。勾选测点、拖动已选列表或用 ↑ / ↓ 排序，可设置每行/每列数量、全部横排/竖排、图格宽度、间距和字号。独立面板支持统一/各站自动坐标范围；叠加统一范围并以颜色区分测点、符号和虚实区分 XY/YX。设置随工程保存并支持撤销，直接 AI 和 AI 编辑包导出整张图。旧工程保持单测点模式。独立面板最多 100 站，叠加最多 20 站。实用app 已更新为 v1.22.0 并后台启动，旧版已备份；未上传 GitHub。
+
+**本地源码 v1.21.0：**“曲线”页画布上方直接选择/切换测点，并标出当前图中测点。红色空心方块为 XY（Ex/Hy），蓝色空心圆为 YX（Ey/Hx）；上图视电阻率、下图相位。默认采用论文排版、10 的幂刻度、细线误差棒与图外图例，关闭标题仍保留分量图例。此样式不平滑、不更改响应数值。实用app 已更新为 v1.21.0 并后台启动，旧 v1.20.0 已备份；安装版本、ASAR、普通深度验签和运行路径已核对，未上传 GitHub。
+
+**本地源码 v1.20.0：**导入 EDI → 选择“曲线” → “测点与 MT / MT 绘图参数”选择测点 → 点击“导出当前曲线 AI（.ai）”或“导出当前曲线 AI 编辑包”。视电阻率和相位同时导出，曲线、符号、误差棒、坐标轴为矢量；直接 .ai 需要本机 Illustrator，编辑包可在其他电脑运行“生成可编辑AI.jsx”。通过文件“打开”编辑，不要作为图片置入。输出仍归入全局目录/导出图件。实用app 已更新为 v1.20.0 并后台启动，旧版已备份，未上传 GitHub。
+
+**本地源码 v1.19.0：**在 **区域框** 中输入边界或拖拽画框，勾选 **显示局部放大图**，可直接拖动预览中的放大图位置（松手更新，Esc 取消），也可填写水平/垂直位置百分比或选择四角、居中预设；调整尺寸/边框后点击“保存区域框并更新预览”。每次显示一个放大图，保留主图框内原有内容与样式，文字与符号同比例放大，边缘内容按框裁切。框选区须完整位于主图；若范围太大无法放大，请缩小范围或增大尺寸。设置随工程保存，支持撤销。PNG/PDF/EPS/AI 均同步输出；PDF/AI 中线条和文字保留矢量，地形及 PNG 保留源影像分辨率。放大图仅作展示，节点编辑/测点选择请在主图操作。独立 GMT 脚本记录主图，放大合成由桌面导出执行，对应参数写入“输出名_局部放大参数.json”。实用app 已更新为 v1.19.0 并后台启动，旧版 v1.18.0 已备份；版本、ASAR、普通深度验签及实际运行路径已核对，未上传 GitHub。
+
+**本地版本 v1.17.0：**顶部“撤销”或 Command+Z / Ctrl+Z 可回退最近 20 步制图修改；输入框中快捷键撤销文字，顶部按钮始终撤销工程修改。连续输入合并一步，打开工程清空历史，保存不清空；导出/缓存删除等磁盘操作不回滚。AI 编辑版修复 BMT/LMT 右括号错位，已有文件需重新导出。本机实用app 已更新为 v1.17.0 并后台重启，旧版已备份；版本、ASAR、普通深度验签及实际启动路径通过核对。未上传 GitHub。
+
+**v1.15.0：**“构造线与图例”可一键区分类别线型。图例线条默认跟随图中不透明度，勾选“单独设置图例线条不透明度”后独立调整（100% 为不透明，0% 为透明）。图中线条在“地点与构造 → 样式”或“本地构造库”的类别样式中调整；设置随工程保存。GitHub 已发布源码仍为 v1.14.1，可下载安装包为 v1.8.1。
+
+**本地版本 v1.15.1：**修复同名 AI 不更新和预览期间导出无响应。实用app 已更新为 v1.15.1；本轮未上传 GitHub。
+
+**本地版本 v1.16.0：**
+
+- “图层与标注 → 区域框”：输入西、东、南、北边界，或拖拽绘制；在图上移动、拖动四角缩放，完成后保存。边框与内部填充不透明度独立，内部设为 0 即不填充。
+- “测点与 MT → 测点分类”：地图点选/框选，或列表搜索、多选测点，再标记 LMT、BMT、AMT。Shift 框选追加选择；各类样式可展开修改，图例自动同步。类别依据用户指定，不从周期推断。
+- 设置随 .mtgmt 保存，PDF / AI 编辑包保留矢量元素。实用app 已更新为 v1.16.0；GitHub 未更新。
+
+
+</details>
+
 关键词 / Keywords: 大地电磁、GMT、地球物理、EDI、相位张量、感应矢量、视电阻率、测点图、magnetotelluric, geophysics, phase tensor, tipper, apparent resistivity.
 
-v1.14.1 修复工作台入口，导出面板首项为 **导出图件 → 直接导出 AI（.ai）**：本机安装 Illustrator 后自动生成原生分层 `.ai`，不再需要手动运行脚本。输出在全局目录的“导出图件/区域”下，同名 AI 会加时间标记，避免覆盖已编辑文件。macOS 首次可能需要允许自动化权限。生成后关闭本次转换文档，恢复 Illustrator 原有文档；耗时绘图继续使用后台 worker。Windows 使用 Illustrator COM 调用，尚未进行 Windows 实机验证。
+v1.14.1 修复工作台入口，导出面板首项为 **导出图件 → 直接导出 AI（.ai）**：本机安装 Illustrator 后自动生成原生分层 `.ai`，不再需要手动运行脚本。输出在全局目录的“导出图件/区域”下，v1.15.1 起直接导出会更新同名 AI，旧文件自动备份到“版本备份/导出图件”；生成失败时保留旧文件。已在 Illustrator 打开的文档需要重新打开文件才会显示这次导出的内容。macOS 首次可能需要允许自动化权限。生成后关闭本次转换文档，恢复 Illustrator 原有文档；耗时绘图继续使用后台 worker。Windows 使用 Illustrator COM 调用，尚未进行 Windows 实机验证。
 
 保留 **AI 编辑包**：在 Illustrator 的“文件 → 脚本 → 其他脚本”运行包内 JSX，生成分层 `.ai`。名称和图例为完整文字；底图、构造线和符号为矢量，地形晕渲仍为影像。编辑版不加文字描边，可在 AI 中重新设置外观。
 
@@ -20,7 +80,7 @@ PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对
 
 在 **构造线与图例 → 位置 → 图外下方（两列）** 开启。新建工程默认此位置，旧工程保留原位置；图例自动扩展页面，不缩小地图。PNG/PDF/EPS 一致，原生图外图例不在图中拖动。论文样式增加 2 mm 外边距，并在 GMT 只有两端数字时补上比例尺中点。独立 GMT 脚本保留 GMT 自己的图例排版和比例尺刻度，原生双列样式以应用导出为准。
 
-## 制图工作台（源码 v1.14.1）
+## 制图工作台
 
 左侧选择功能，右侧调整参数，中央保持地图预览。点右侧“更新预览”应用修改，面板保持打开；“展开”可加宽编辑区域。按 **⌘/Ctrl + K** 搜索功能。
 
@@ -33,7 +93,7 @@ PDF 请用 Illustrator 的“打开”，置入时可能只是链接或组合对
 
 ## GMT 6.7 引擎适配（v1.10.0 起）
 
-当前源码版本 **v1.14.1**；此次仅更新源码和版本标签，不上传安装包、不创建新 Release。GitHub 可下载安装包仍为 **v1.8.1**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
+当前源码版本 **v1.33.2**。点击左侧 **GMT 引擎**，可自动优先选择 GMT 6.7、手动选择保留的 6.5/6.6，或浏览其他安装路径。指定路径失效会明确提示，不悄悄切换版本。引擎选择随全局工作区保存；工程记录版本信息，打开工程不会套用其他电脑的程序路径。
 
 默认安装 GMT **6.7.0**。macOS 使用现有 Homebrew 安装 GMT 与 Ghostscript，安装前核对 6.7 分支；没有 Homebrew 时提供安装说明。Windows 下载官方 6.7.0 x64 安装器。安装日志和缓存归入全局目录“安装包/GMT-6.7”。GMT 不内置于本 App。
 
@@ -168,9 +228,9 @@ MT field work often needs quick station maps, line maps, terrain-backed figures,
 
 ## 正式版下载 / Stable Release
 
-当前可下载安装包为 **v1.8.1**（源码已更新至 v1.14.1）。下载与你电脑架构对应的安装包，安装 GMT 6.x 后即可绘图。新用户默认数据目录为 `~/Documents/GMT工作区`；缓存、导出和工程在其中分类保存，无需开发者的外接硬盘。
+当前可下载安装包为 **v1.8.1**（当前源码为 v1.33.2）。下载与你电脑架构对应的安装包，安装 GMT 6.x 后即可绘图。新用户默认数据目录为 `~/Documents/GMT工作区`；缓存、导出和工程在其中分类保存，无需开发者的外接硬盘。
 
-Latest installer: **v1.8.1**; source code: **v1.14.1**. This source-only update does not include new installers. Choose the matching installer and install GMT 6.x separately. New users store generated files under their own `~/Documents/GMT工作区`.
+Latest installer: **v1.8.1**; source code: **v1.33.2**. This source-only update does not include new installers. Choose the matching installer and install GMT 6.x separately. New users store generated files under their own `~/Documents/GMT工作区`.
 
 macOS 包采用 ad-hoc 签名，未做 Apple 公证。如系统阻止打开，可在“系统设置 → 隐私与安全性”中确认允许此应用。Windows 包未作商业代码签名；本次没有 Windows 实机安装/升级验证。个人构造库、地形缓存、工程和用户名称词典不随安装包分发；可自行导入或通过软件的公开数据入口获取。
 
@@ -273,7 +333,9 @@ The app can detect GMT and provides installer/download entry points on supported
 ## 开发运行 / Development
 
 ```bash
-npm install
+git clone https://github.com/SC123667/mt-point-map-gmt.git
+cd mt-point-map-gmt
+npm ci
 npm start
 ```
 
@@ -285,20 +347,21 @@ npm run test:node
 
 ## 打包 / Build
 
-macOS:
+先安装 Node.js 22.x，并在仓库根目录执行 `npm ci`。
 
-```bash
-npm run dist:mac
+在 Mac 上构建 Apple Silicon 版 `.app` 和 `.dmg`。
+
+```sh
+npm run dist:mac -- --arm64 --config.mac.identity=- --publish never
 ```
 
-Windows:
+在 Windows 上构建 x64 安装版和便携版。
 
-```bash
-npm run dist:win
+```powershell
+npm run dist:win -- --x64 --publish never
 ```
 
-打包产物输出到 `release/`。  
-Release artifacts are written to `release/`.
+产物写入 `release/`。Intel Mac、Windows ARM64、仅生成 App 目录、签名、GMT 和 MTpy 配置见 [完整构建指南](DISTRIBUTION.md)。
 
 ## 输出文件 / Output
 

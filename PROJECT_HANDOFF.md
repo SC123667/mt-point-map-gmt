@@ -1,6 +1,157 @@
 # MT点位图制作工具—GMT 项目接手指南 / Project Handoff Guide
 
-> 最后核对日期 / Last verified: 2026-09-11 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+> 当前源码为 v1.33.2（2026-11-08）。跨平台构建和运行环境以 [DISTRIBUTION.md](DISTRIBUTION.md) 为准。下方按日期记录历史实现与验证状态。
+
+> 最后核对日期 / Last verified: 2026-09-17 ｜ 正式产品线 / Primary product line: Electron + Node.js + GMT 6.x ｜ 本文用途 / Purpose: 让新开发者不依赖历史聊天记录即可继续开发、测试、打包和发布。
+
+## 2026-11-03 v1.32.1 默认 F 地形配色
+
+- index.html 将 terrainCptInput 的默认 selected 改为 terrainF；已保存工程仍通过 applyConfigToUI 恢复明确的色带值。
+- 验证与安装记录在全局目录/验证/v1.32.1；保留唯一实用app，当前用户窗口不自动重启。
+
+## 2026-11-03 v1.32.0 B / C / F 地形配色（已更新，待用户重启）
+
+- terrain-palettes.js 统一生成 terrainB / terrainC / terrainF；F 分级间隔跟随 terrainColorbar.step，默认 500 m，超过 1000 级拒绝生成。默认范围 CPT 与用户选定预览精确一致。
+- 色带下拉框沿用配置、撤销及预览链路；不改当前选择或测量数据。MTpy 背景复用同一生成器，保留高程色标仅用于 baseMap 的规则。
+- 详细说明 docs/TERRAIN_PALETTES.md；验证与安装记录在全局目录/验证/v1.32.0。后台运行，不重启当前用户窗口；最终只保留实用app 中的一份 App。
+
+## 2026-11-03 v1.31.1 高程色标仅用于区域底图（已更新，待用户重启）
+
+- terrain-colorbar.command 仅允许 plotType=baseMap；MTpy prepare 虽借用 baseMap 生成内部背景，仍强制 show:false，且不再创建 elevationLegend，避免单图 / 组图 / AI 额外色标和留白。
+- 用户要求仅保留实用app 内的一份最新应用；构建使用临时目录，替换旧包移入废纸篓，不另存可被搜索到的 App 副本。源码保留 Git 提交 / 标签回滚。
+- 验证记录：全局目录/验证/v1.31.1。所有测试隐藏运行，不控制用户其他应用或重启当前窗口。
+
+## 2026-11-03 v1.31.0 最大相位 / Φ₂ 等效相位着色（App 已更新，待用户重启）
+
+- presentation.js / presentation-ui.js 接入 phimax、phi2，三种相位共用范围；mtpy_backend.py 从 MTpy 有符号 det 推导 Φ₂ 与角度，负行列式保留空心轮廓并记录 null / 原因。不得改成 sqrt(abs(det)) 或角度几何平均。
+- 图中色标注明公式；原 MTpy 几何、算法及 EDI 保留。后台测试与安装信息：全局目录/验证/v1.31.0；使用说明 docs/PHASE_COLORING.md。
+- 用户要求不影响其他软件：所有测试隐藏、无焦点，AI 只生成编辑包，不控制 Illustrator 或发送全局快捷键。
+
+- 实用app 文件已替换为 v1.31.0，75 个运行文件与候选源码一致，签名 / ASAR 一致。当前 App 进程未关闭或重启；用户保存工程后重新打开生效。旧 App、原工程文件与源码备份：/Users/cwn/Documents/GMT绘图-backups/phase-colors-v1.30.0-20261103-185109。
+
+## 2026-11-03 v1.30.0 图外高程色标（已安装）
+
+- terrain-colorbar.js 管理可编辑参数与 GMT 命令，默认图外底部居中（-DJBC）；terrain-colorbar-ui.js 注入地形面板。范围与底图 CPT 绑定，米/千米只改变标签单位。
+- mtpy-layers.js 从 GMT 背景裁出色标，mtpy-export.js 将一条共用色标附在整组下方；mtpy-ai.js 为全部语义页补齐相同画布与偏移，独立高程色标层。
+- 实用app 已替换为 v1.30.0，候选 75 个运行文件与源码一致，ASAR 与签名通过核对。替换前另存当前 81 测点及最新相位张量参数为 edi_更新v1.30.0前_20261103.mtgmt。
+- 使用说明与备份：docs/ELEVATION_COLORBAR.md；候选/安装验证记录以全局目录/验证/v1.30.0 为准。旧版 App 与原工程保留。没有全量测试或远程发布声明。
+
+## 2026-11-03 v1.29.1 SRTM 长路径阴影修复（已安装并恢复当前工程）
+
+- 用户当前 110.215334/114.782082/38.195641/41.793053、03s 范围，GMT 6.7 对长中文绝对输入路径报 Named variable does not exist / GRID_READ_ERROR，却返回 0；同一网格使用相对路径读取正常。现有高程无需重新下载。
+- srtm-worker.js 的 xyz2grd / grdgradient 和 main.js 普通地形准备的 grdcut / grdgradient 改为区域缓存目录下短相对路径。成功出口检查非空文件，并保留 stderr；旧数据、地形精度与科学参数不改。
+- gmt.js 为仍超过 240 UTF-8 字节的渲染相对路径建立短符号链接入口，保留原缓存文件；真实 PDF 必须包含地形 image 对象，不能只检查进程退出或图片是否存在。
+- tests/srtm_long_paths.test.js 用真实 GMT 检验 >255 UTF-8 字节路径、完整转换和已有网格续做，以及零退出码空文件处理。tests/srtm_app_integration.cjs 使用另存的当前 81 个测点工程，隔离验证 03s / 15s 阴影与预览。
+- 候选源码逐项核对、签名与安装 ASAR 一致；实际 App 显示 v1.29.1、81 个测点和“预览已更新”，实际预览已目视确认地形存在。最新工程另存 edi_更新v1.29.1前_20261103.mtgmt，更新后恢复该副本；原参数和原始数据保留。
+- 验证、实际区域修复记录和安装记录：全局目录/验证/v1.29.1。原工程另存 edi_阴影修复前_20261103_1819.mtgmt；旧 App 与改动前源码备份 /Users/cwn/Documents/GMT绘图-backups/srtm-fix-v1.29.0-20261103-181710。
+
+## 2026-11-03 v1.29.0 论文绘图默认参数（已安装并后台启动）
+
+- 参数化实现见 docs/PAPER_PARAMETERS.md。presentation.js 管理显示参数，presentation-ui.js 注入原有设置面板，工程持久化 / 撤销沿用原快照。
+- 普通地图走 GMT fancy；MTpy 在官方绘图后附加矢量边框 / 角标，β / φmin 色标使用官方量。最终 PDF 与分层 AI 同步缩放至指定毫米宽，背景、椭圆、箭头、坐标仍独立。
+- 真实 78 个可读取 EDI，五周期共 361 条记录与旧样例一致。另 11 个源 EDI 和 8 个旧测试为云端占位，不能宣称覆盖。
+- 备份、依赖恢复和完整 Git bundle 的限制见上述说明。验证目录为全局目录/验证/v1.29.0；安装验收以其中“安装验证.json”为准，未上传 GitHub。
+
+## 2026-09-17 v1.24.0 参考图曲线样式与 Times New Roman（已安装并后台启动）
+
+- curveCollection 新增 style(reference/classic)、phaseMode(signed/folded)、showErrors、connect；新工作区采用参考样式，旧工程可通过按钮切换。参考单测点复用组图绘制和原生文字路径；gmt-worker/main 同步识别参考单图的名称叠加，保证 AI/SVG 文字可编辑。
+- 上下图高比例、图内测点名及分量键、红蓝实心点、虚线网格和向内刻度按用户示例调整。误差棒按用户后续要求默认开启，连线默认关闭。原始相位使用现有 impedance.phaseXY/phaseYX，folded 保持 phaseXYPlot/phaseYXPlot；MT 算法及 EDI 记录未改。
+- illustrator-template 对 responseCurve 的西文（含希腊单位和数学符号）按字统一 TimesNewRomanPSMT 及粗斜体，保留中文；缺少字体即报错。参考样式 GMT 使用 Times-Roman，SVG 使用 Times New Roman。不得称 GMT 标准 Times-Roman 就是微软 TNR；原生 AI 脚本负责最终精确字体。
+- 验证目录：全局目录/验证/v1.24.0。25 组 Node、真实 EDI/GMT 和隐藏 Electron 控件/工程恢复测试；独立单图、横排、竖排和叠加 PDF 无 Image 对象，名称/XY/YX 在 SVG，误差数据保留。字体脚本模拟测试覆盖粗体、斜体、中文不变与缺字体报错；未操作用户 Illustrator，不宣称其实际字体已实机验证。
+- 候选 App：全局目录/安装包/v1.24.0/mac-arm64，源候选及最终候选严格深度验签通过；61 个 Electron 文件与源码一致，候选 ASAR 隐藏真实 EDI/GMT 与编辑包回归通过。ASAR SHA-256：e0ff5de4da26dce1a66738f7a196359a5f8f6e5b743c9d54b58fbf0b788fdf03。
+- 用户确认后更新唯一实用app 为 v1.24.0，并以 open -g -j 后台启动；实际路径 PID 64202 稳定。安装版本、ASAR、普通深度验签通过；目标严格验签仍有 Finder/resource-fork 元数据提示，源候选严格验签通过。旧版 v1.22.0 备份：/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.22.0-升级v1.24.0_20260917_192350/MT点位图制作工具—GMT.app；原包另存同目录“替换前原包”。记录：验证/v1.24.0/安装验证.json。未上传 GitHub。旧工程在“曲线组图与排版 → 应用参考图样式与紧凑排版”切换；不擅自改写用户工程。v1.23.0 的真实外盘高程/EM3DVP 联调仍待单独验证。
+
+## 2026-09-16 v1.23.0 自动地形获取与 EM3DVP XYZ（源码完成，待接盘实测）
+
+- 新增 em3dvp-elevation.js、elevation-worker.js、elevation-ui.js；工作台“输出与软件 → EM3DVP 高程导出”。设置保存在 config.elevationExport，复用工程保存/撤销。独立导出范围不修改地图。
+- main 的 elevation:export 先用独立 worker 匹配当前本地地形/同分辨率覆盖缓存；缺少时复用 TerrainPrepareTask / SrtmTerrainWorkerTask 和当前下载选项，通过代理进度输出到新面板，不注入地图 terrain:progress。保留后台耗时边界，导出时阻止缓存删除，支持取消和窗口销毁清理。
+- GMT grdinfo 校验经纬度、范围、单位；grd2xyz 流式读取，原始节点抽样，保留正负海拔，NaN 默认报错、可明确跳过。不做坐标投影、插值补零或高程基准转换。先写隐藏临时结果，全部成功后改名，每次唯一目录，附源路径/大小/时间/实际范围及说明。
+- 格式直接核对 EM3DVP src/add_topobathy.m 与 src/interpolate_topography_grid.m：经度、纬度、高程米，无表头有限数值三列。未修改 EM3DVP。
+- 验证暂存在本仓库 outputs/verification/v1.23.0（gitignored），通过 MT_GMT_WORKSPACE 隔离；未改生产目录。24 组 Node 测试；隐藏 Electron + GMT 6.7.0 已知公式合成网格验证裁切、逐点 XYZ、同分辨率覆盖缓存、导出按钮、工程恢复、重复导出、取消和失败清理；缺失缓存准备路由模拟验证，未真实联网下载。
+- 外置盘 /Volumes/MacBook Pro SSD 未连接，未创建该目录；当前实用app 仍为 v1.22.0，未打包/安装/重启/上传。接盘后验证真实缓存命中和下载、EM3DVP 实际导入，再按用户要求交付安装包。使用说明 docs/EM3DVP_ELEVATION.md。
+
+## 2026-09-16 v1.22.0 多测点响应组图与同轴叠加（已安装并后台启动）
+
+- response-collection.js 管理持久化的 curveCollection：mode（single/panels/overlay）、keys（名称/坐标/来源组成的身份键）、layout/count、axisMode、cellWidth/gapX/gapY/fontSize、showLegend/showGrid。旧工程默认 single；多测点组图入口优先独立面板，可切换叠加。空选择/筛选后丢失测点明确报错，不回退到其他测点。
+- response-collection-ui.js 在“测点与 MT → 曲线组图与排版”提供搜索、多选、全选/清空、拖动及上下移、每行/每列数量及横竖排版。画布常驻入口，组图隐藏单站导航；配置随工程快照保存并进入原有 20 步撤销。列表显示上限 200，支持搜索；渲染上限独立面板 100 站、叠加 20 站，过大页面/像素量给出提示。
+- response-collection-gmt.js 重用 gmt.js 的 buildCurveFiles（仅新增文件名前缀参数），原始响应、相位约定和误差算法均未改。每条 GMT 绘图命令显式指定面板的 R/J/Xa/Ya；独立面板可共用/独立坐标，叠加共用范围并以测点颜色和 XY 方块实线 / YX 圆虚线区分。所有生成工作继续在 GMT worker 内。
+- GMT 绘制曲线、误差棒、图框、图例符号；原生 SVG 叠加双语测点名称和图例文字。页面原点根据真实 EPS 读取，PNG/PDF/EPS、直接 AI 及 AI 编辑包使用同一版式。curve_collection_labels.json 保存顺序/布局，curve_ 数值及刻度文件随工作区整理。单独运行 GMT 脚本仍需配套原生文字 SVG 才能完整还原双语名称（与既有原生叠加边界一致）。
+- 验证目录：全局目录/验证/v1.22.0；23 组 Node 测试包含不同身份/排序/空选择/行列布局/叠加及组图与单图数值 TSV 逐字节一致。隐藏 Electron 集成使用真实 L003S001/L003S003/L003S005 EDI；检查窄/宽面板点击命中、拖动排序、撤销、工程恢复、四种排版及叠加、独立坐标/网格、图例关闭、中英文标题、每个面板实际有曲线、PDF 无 Image 对象及 AI 编辑包文字保留。直接 AI IPC 使用模拟外部 Illustrator 桥，不操作用户 Illustrator；Windows 实机未测试。
+- 源码与候选 ASAR 的隐藏 Electron/真实 GMT 6.7 集成均通过，旧单测点模式回归通过；最终合成 PDF 与编辑包底图均为单页且无 Image 对象，输出及界面截图已目视核对。候选 58 个 Electron 文件与源码一致，源包和最终候选严格验签通过；ASAR SHA-256：618ac8235b7263d2dbd6f372aa798339e4864c012e046b8f017f823a83a37483。
+- 检测旧版已关闭，未中断运行中的工程；备份 v1.21.0 后更新唯一实用app 至 v1.22.0 并用 open -g -j 后台启动，实际路径 PID 15776 稳定。安装版本、ASAR 与普通深度验签通过；目标严格验签仍有 Finder/resource-fork 元数据提示。备份：/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.21.0-升级v1.22.0_20260916_173148/MT点位图制作工具—GMT.app；原包亦保留。记录：验证/v1.22.0/安装验证.json。未操作用户 Illustrator，未上传 GitHub。
+
+## 2026-09-14 v1.21.0 论文响应曲线与测点识别（已安装并后台启动）
+
+- renderCurveContext 在画布上方显示当前选择、导航和 XY/YX 定义。旧预览与新选择不一致时同时显示“图中”和“待更新”；复用原 curveStationInput/navigateCurveStation、历史及版本队列。响应模式隐藏单周期控件。
+- gmt.js 为响应曲线写出自定义对数物理刻度、分量图例与子图编号；原 log10 TSV 数据保留不变，避免二次取对数。XY 红色方块、YX 蓝色圆；9–11 pt 字号，16 cm 图宽，图外底部图例、2 mm 出图边距；未强行将相位限为 0–90°，现有 0–180° 显示、相位处理与误差算法未改。
+- 参考来源与取舍在 docs/RESPONSE_CURVE_STYLE.md。用户真实 EDI 修改前后 8 份曲线/误差 TSV 逐字节一致（全局目录/验证/v1.21.0/数值一致性）。隐藏 Electron 回归覆盖窄/宽画布测点控件命中、切换同步、旧图识别、撤销、分量图例、标题关闭及矢量导出。
+- 源码 22 组 Node 测试通过；GMT worker 追加复测通过。候选源包及最终候选严格深度验签通过；55 个有效 Electron 文件与源码一致，ASAR SHA-256：32c8bc5f49b44df5d563361c6dbd2f0ee153aa3ea419113730dc1e9a4bbc3708。候选 ASAR 隐藏交互及真实 EDI/GMT PNG/PDF/EPS/AI 编辑包复测通过（含图外 XY/YX 文字、关闭标题、测点切换/撤销）；截图已目视核对。验证在全局目录/验证/v1.21.0。临时工作区整理包含 curve_ 数据/刻度/图例文件，保留可复现脚本所需输入。
+- 用户明确授权更新并后台重启。安装时旧版已退出；备份 v1.20.0 后更新唯一实用app，open -g -j 后 PID 64385 来自实际安装路径并稳定。安装版本、ASAR、普通深度验签通过；源候选严格验签通过，目标严格验签仍受 Finder/resource-fork 元数据影响。旧版及替换前原包保留在全局目录/版本备份/v1.20.0-升级v1.21.0_20260914_211827；安装记录：验证/v1.21.0/安装验证.json。本轮未操作用户 Illustrator、未上传 GitHub，原生 AI 和 Windows 实机未复测。
+
+## 2026-09-14 v1.20.0 EDI 响应曲线 AI 导出（已安装并后台启动）
+
+- 曲线测点控件旁新增直接 AI 与编辑包按钮，沿用当前测点、现有导出队列与同名文件替换路径。直接 AI 依赖本机 Illustrator，面板内保留说明。
+- response-export.responseConfig 在主进程及 GMT worker 使用，隔离地图专用选项并统一测点默认标题；不修改原 config/records 或 MT 数学。renderer 阻止曲线因地图等高线开启而准备地形。所有耗时 GMT 工作保留 worker。
+- 编辑包 metadata 增加 plotType；Illustrator 模板对曲线使用“响应曲线与坐标轴”层，不创建空的地形层。GMT 的线、数据符号、误差棒、坐标轴与文字保留原矢量，原生标题仍用 SVG 文字。
+- 新增 response_export.test.js 与隐藏 response_ai_integration.cjs，使用用户真实 L003S001.edi（48 个频点）；检查两个按钮的可见/命中与绑定、测点选择、中英文/关闭标题、PDF 无栅格对象且含坐标轴文字、PNG/PDF/EPS/编辑包、直接 AI IPC（外部 Illustrator 桥模拟）。未操作用户 Illustrator，不声称原生 AI 实机复测；Windows 实机未验证。
+- 22 组 Node 测试通过；候选 ASAR 的真实 EDI/GMT 导出回归通过；截图已目视确认曲线、误差棒与导出按钮。源候选及最终候选严格验签通过，55 个有效 Electron 文件与源码一致，ASAR：d2c50d7bb9ab3ed215c1d52fe014adae58744e9ad09d7d0aa244fd12012d44e6。验证目录：全局目录/验证/v1.20.0（Node测试.txt、ASAR验证.json、候选App/验证结果.json）。
+- 用户要求更新功能，检测实际应用已关闭，未中断运行中的工程；备份 v1.19.0 后更新唯一实用app 至 v1.20.0，open -g -j 后 PID 59027 来自实际安装路径并稳定。安装版本、ASAR、普通深度验签通过，目标严格验签仍受 Finder/resource-fork 元数据影响；源候选严格验签通过。备份：/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.19.0-升级v1.20.0_20260914_205749/MT点位图制作工具—GMT.app。安装记录：验证/v1.20.0/安装验证.json。未上传 GitHub，未操作用户 Illustrator。
+
+## 2026-09-13 v1.19.0 放大图位置调整（已安装并后台启动）
+
+- map-inset.settings 保存 x/y（0–1；左至右、上至下的可用移动距离），旧工程默认 0/1。layout 返回 placement；原生标题扩展画布时同步移动 placement，保持预览与所有导出坐标一致。
+- inset-position-ui.js 在已完成的预览上提供拖动命中区域，跟随缩放/平移；拖动只显示位置框，松手提交一次工程历史并重绘，Esc、pointercancel 取消。渲染中、旧预览、地理选择或编辑模式禁用，避免误改源地理坐标。
+- 区域框面板提供水平/垂直位置百分比与四角、居中预设。位置持久化在 properties.inset，不改变区域框几何、原内容及放大比例；边界限制在主图内部。
+- 源码 21 组 Node 测试与隐藏 Electron 真实 GMT 验证通过：拖动命中、缩放平移、撤销、取消、工程恢复、预设及 PNG/PDF/EPS/AI 编辑包位置一致。验证目录为全局目录/验证/v1.19.0。未操作 Illustrator，原生 AI 与 Windows 实机未复测。
+- 候选 v1.19.0 位于全局目录/安装包/v1.19.0/mac-arm64，源包与最终候选严格深度验签通过。54 个有效 Electron 文件与源码一致；ASAR SHA-256：4dab55700e0289a33458ef96943f0972811686940a78340ac2d74b365269b8ab。候选 ASAR 的隐藏交互及真实 GMT PNG/PDF/EPS/AI 编辑包复测通过，记录见 验证/v1.19.0/ASAR验证.json、候选App/移动后验证.json；控件截图见 控件/区域框放大设置.png。
+- 用户明确授权更新并后台重启。确认旧版退出后替换唯一实用app 为 v1.19.0，open -g -j 后 PID 33345 来自实际安装路径并连续稳定；版本、ASAR、普通深度验签通过，目标严格验签仍有 Finder/resource-fork 元数据提示，源候选严格验签通过。旧版备份：/Volumes/MacBook Pro SSD/GMT-缓存/版本备份/v1.18.0-升级v1.19.0_20260913_204214/MT点位图制作工具—GMT.app；替换前原包亦保留在同一备份目录。记录：验证/v1.19.0/安装验证.json。未上传 GitHub，未操作其他用户应用。
+
+## 2026-09-13 v1.18.0 区域框局部放大（已安装并后台重启）
+
+- map-selections 保存 properties.inset（enabled/width/borderWidth/borderColor）；区域框面板支持设置，保存时只启用一个放大图。隐藏框不显示放大图；旧工程默认关闭，撤销沿用工程快照。
+- map-inset.js 根据同一 GMT 投影后的密集区域边界，裁取主图已经绘制的内容并同比例放大；不重新查询构造/矿床、不重新下载或推算地形、不更改 MT 数学。当前为主图左下角单个放大图，尺寸 15–70%，越界或尺寸不足以放大时给出明确错误。
+- gmt-worker 强制生成合成需要的 PNG/PDF/EPS 和 mapFrame；坐标投影和 PDF 合成继续由后台 worker 执行。原生叠加完成后生成 PNG 裁切预览与矢量 Form XObject 放大，保留地图物理尺寸及图外图例。
+- AI 编辑包：底图 PDF 包含矢量放大；SVG 给原标注设置窗口遮挡，按原投影裁切并复制原文字到 GMT_inset，JSX 导入“局部放大标注”层。无文字场景不要求不存在的分组。未操作用户 Illustrator，实际 Illustrator 导入仍待验证。
+- SVG/PNG 均保留源内容裁切，边缘标签可能被切开，地形/PNG 不生成新增细节；直接 GMT 脚本为主图，桌面另存输出名_局部放大参数.json 记录合成位置。预览将 inset 布局保存在 mapContext，禁止把 inset 点击当作主图坐标编辑。
+- 验证目录：全局目录/验证/v1.18.0。新增 map_inset.test.js 与 map_inset_integration.cjs；包括 Mercator、Lambert、交换轴和跨日期变更线，真实 GMT 地形/分类/标注、UI保存/撤销/工程恢复、PDF/EPS及可编辑SVG、关闭同名重导出及无标注场景。21 组 Node 测试全部通过；源码与候选 ASAR 隐藏 Electron/真实 GMT 测试通过，实际面板开关可见且点击命中已核对。
+- 候选严格深度验签通过；53 个有效 Electron 文件与源码逐一一致，版本 1.18.0，ASAR SHA-256：9e1261152dff547cbaad4bf46aedd7ae21030697c00ccac61c35d4b5d9059a0f。候选在全局目录/安装包/v1.18.0/mac-arm64，验证结果在 验证/v1.18.0/ASAR验证.json、候选App/验证结果.json、候选控件/区域框放大设置.png。
+- 已按用户明确授权停止 v1.17.0（旧 PID 22298），备份到 全局目录/版本备份/v1.17.0-升级v1.18.0_20260913_200341，更新唯一实用app 至 v1.18.0。open -g -j 后 PID 27745 来自实际安装路径并连续稳定；版本、ASAR 和普通深度验签通过。目标严格验签仍有 Finder/resource-fork 元数据提示，源候选严格验签通过。安装记录：验证/v1.18.0/安装验证.json。未上传 GitHub；未操作其他用户应用，Windows 实机及真实 Illustrator 导入未验证。
+
+## 2026-09-13 v1.17.0 撤销与 AI 图例换行（已安装并后台重启）
+
+- project-history.js：20 步内存快照，原始测点/EDI 数组共享引用；微任务在同步操作结束后捕获，连续输入按焦点合并；恢复时抑制记录并增加预览版本，复用现有旧渲染丢弃机制。打开工程重置历史，保存不重置；缓存派生路径、磁盘导出不计入回滚。
+- 顶部可见撤销按钮、菜单 CmdOrCtrl+Z、Windows Ctrl+Z / macOS Command+Z；输入框由 Chromium 原生文字撤销处理。框选、分类、导入及绘图配置回退后同步面板与自动预览。
+- illustrator-export.js 不再以 Canvas 逐字宽估算行；DOM Range 读取实际行与位置，每行保留一个 SVG tspan。旧源码已稳定复现 BMT/LMT 单独右括号行，新代码包含真实多行及中文回退验证。未操作用户 Illustrator，尚未进行真实 Illustrator 再导入测试。
+- 验证目录：全局目录/验证/v1.17.0。源码 20 组 Node 测试通过；隐藏 Electron 撤销/菜单/输入框/20 步上限/框与分类/共享测点记录/缓存排除及 DOM 文字回归通过。真实 GMT 6.7 PNG/PDF/EPS 与 AI 编辑包测试通过。候选严格深度验签通过，52 个有效 Electron 文件与源码逐一一致；候选 ASAR 的撤销/文字布局与实际 GMT PNG/PDF/EPS、AI 编辑包复测全部通过。
+- 候选 App：全局目录/安装包/v1.17.0/mac-arm64/MT点位图制作工具—GMT.app；ASAR SHA-256：29f241a94bd8dc3a85c9e99f57a426ca1f86d517a2c55e1ed837d586f0b5253b。隐藏 SVG 渲染截图为 验证/v1.17.0/修复后可编辑图例.png。Windows 快捷键逻辑已模拟验证，尚未 Windows 实机测试。
+- 用户明确授权更新并后台重启。已停止旧版 v1.16.0，备份至 全局目录/版本备份/v1.16.0-升级v1.17.0_20260913_194336；实用app 已更新为 v1.17.0，open -g -j 后 PID 22298 来自实际安装路径，连续核对稳定。版本、ASAR、普通深度验签通过；目标严格验签仍受 Finder/resource-fork 元数据影响，源候选严格验签通过。安装记录：验证/v1.17.0/安装验证.json。未操作 Illustrator，未上传 GitHub。
+
+## 2026-09-13 v1.16.0 区域框与测点分类（已安装并后台重启）
+
+- 新模块 electron/map-selections.js 保存纯函数边界和分类模型；renderer/map-selections-ui.js 提供两个工作台面板及独立选择工具。通过既有 map-project-worker / map:project 在后台正反投影，无主线程同步 GMT 调用。
+- 区域框存为 cartography.features Polygon，properties.regionBox=[west,east,south,north]；每边采样为经纬度边界以适应非线性投影，边框 strokeOpacity 与填充 opacity 分开。地图拖拽、移动、角点缩放在完成时保存，可取消。
+- stationClasses={enabled,assignments,styles} 随 config 保存，测点键由名称+经纬度组成，避免同名不同位置误分组。编译成现有 stationGroups 并用 keys 匹配；图幅内类别用于原生图例，未分类沿用全局符号。关闭分类保留原 stationGroups 行为。未修改 MT 数学、原始坐标或响应。
+- 版本 1.16.0；实际实用app 已更新为 1.16.0。候选和验证均在全局目录对应子目录；未上传 GitHub，未操作 Illustrator。
+- 验证通过：20 组 Node 测试，75 个工作台面板/尺寸场景（含 Windows CSS 检查）；隐藏 Electron 真正触发保存按钮、坐标建框、拖拽创建、移动、角点缩放、测点点选/框选/列表多选、三类分配及样式修改、工程恢复。源代码及候选 ASAR 均完成真实 GMT 6.7 PNG/PDF 导出，候选额外验证 EPS 和 AI 编辑包中的分类图例。没有启动 Illustrator，未声称原生 .ai 实机编辑复测。
+- 源候选与最终候选严格深度验签通过（ad-hoc，未公证），51 个 Electron 文件与源码一致；版本 1.16.0，ASAR SHA-256：fd42ba96ac5822788a881bb97336a54ef7880a2aee8bbc523127ceaf7b371358。用户确认更新后正常退出旧版，备份到全局目录/版本备份/v1.15.1-升级v1.16.0_20260913_191353，更新唯一实用app。安装版本与 ASAR 一致、普通深度验签通过；目标严格验签仍有 Finder/resource-fork 元数据提示，候选严格验签通过。后台启动 PID 15035，运行路径为实际实用app 可执行文件；未上传 GitHub。
+
+## 2026-09-13 v1.15.1 重复导出修复（已安装并后台重启）
+
+- 原 AI 自动导出模板遇到同名文件会加时间戳，原文件未更新；现直接 AI 路径先生成独立 job/new-export.ai，校验输出属于本任务，再准备目标同目录临时副本、备份旧文件、rename 替换。手动 JSX 另存规则保留。未改 Illustrator 用户文档或自动重新打开它们。
+- renderer 原先在 preview.rendering 时静默返回；现手动导出排队并显示状态，预览结束后执行。导出任务本身进行中给出忙碌提示；取消操作清空排队请求。
+- 版本 1.15.1 源码；实际实用app 已更新为 1.15.1。验证在全局目录/验证/v1.15.1，候选在全局目录/安装包/v1.15.1。本轮未发布 GitHub。
+- 验证通过：19 组 Node 测试；真实 GMT 6.7 的 PNG/PDF/EPS 同路径二次导出 SHA-256 改变；隐藏工作台点击 PDF 按钮排队、完成后执行、取消清队列；候选 ASAR 重复导出同样通过。AI 真实文件替换/旧文件备份/无效文件保护通过，完整自动化路径使用模拟 Illustrator 序列化桥接；未启动或操作用户 Illustrator，未声称原生 AI 实机复测。
+- 候选源包及最终包严格深度验签通过；49 个 Electron 文件与源码一致；版本 1.15.1，ASAR SHA-256：059f0c3c02ade45c7ae56af8b44b0bd3ad3d4bd989597e2313b70dca4f9eb467。用户确认更新后正常退出旧版，备份到全局目录/版本备份/v1.15.0-升级v1.15.1_20260913_183832，再更新唯一实用app。安装目标版本、ASAR、普通深度验签通过；目标严格验签存在 Finder/resource-fork 元数据提示，候选严格验签通过。后台启动 PID 5423，路径为实用app 内实际可执行文件；未上传 GitHub。
+
+## 2026-09-12 v1.15.0 构造线与图例样式（已安装并后台启动）
+
+- strokeOpacity 为线条/边框不透明度，旧工程默认 100；旧 opacity 仍只控制区域填色。legend.lineOpacity=null 跟随图层，数值 0–100 独立覆盖图例线/区域边框；保留显式 0。
+- 原生图例使用实际物理线宽、线色、透明度和虚线比例；同类别不同样式分组显示。AI 编辑包 labels.svg 保留这些矢量属性。
+- “构造线与图例”新增区分线型按钮和图例独立不透明度；对象样式、本地库分类均可设置图中线条不透明度。所有设置随 .mtgmt 保存。
+- 本轮不改 MT 算法、坐标或原始地质数据，不操作用户 Illustrator 文档。源码版本 1.15.0；实用app 已更新为 1.15.0；未上传 GitHub（已发布源码 1.14.1、安装包 Release 1.8.1）。
+- 验证记录归入全局目录/验证/v1.15.0；安装包候选归入全局目录/安装包/v1.15.0。
+- 验证通过：19 组 Node 测试；69 个工作台面板/尺寸案例及 Windows CSS；隐藏 Electron 实际控件命中、切换同步/独立模式、工程恢复与类别预设；雄村 93 测点及现有构造真实 GMT 6.7 PNG/PDF、AI 编辑包。未启动 Illustrator，未复测原生 AI 自动保存，以免影响用户正在编辑的 AI 文档。
+- 候选 ASAR 的 49 个 Electron 文件与源码一致，包内版本 1.15.0；包内 UI、真实 GMT 导出及 AI 编辑包矢量属性验证通过。源包与最终候选均通过严格深度验签（ad-hoc，未公证）。ASAR SHA-256：7d8d8585caf92c61727a50c9772f8df4fd9b5618f351f745e4838d908bcf2a2d。用户明确授权更新并后台重启后，检查旧版已退出，备份到全局目录/版本备份/v1.14.1-升级v1.15.0_20260912_191510，更新唯一实用app。安装目标版本与 ASAR 一致、普通深度验签通过；Finder 附加元数据导致目标严格验签 resource-fork 提示，源候选严格验签通过。open -g -j 后 PID 78733 来自实际实用app路径；未操作 Illustrator、未上传 GitHub。
 
 ## 2026-09-11 v1.14.1 源码发布（不含安装包）
 
@@ -741,3 +892,29 @@ GitHub 曾把中文附件名规范化为 `MT.GMT-...`。上传后要读取远端
 - 旧 App 完整保存在全局 `版本备份/v1.7.0-20260908-升级v1.8.0/MT点位图制作工具—GMT.app`，旧 ASAR 哈希与升级前一致、普通深度验签通过。
 - 关闭旧版前，将真实当前工程通过应用另存到 `工程文件/升级v1.8.0前_当前工程_20260908.mtgmt`，区域 86/96/28/32，0 测点。原有工程文件未覆盖。
 - 仅本地维护与交付；未推送 GitHub、未创建 Release。
+
+## 2026-09-30 v1.28.4 海岸与水体
+
+- 用户最终选择保留原浅绿、米黄色带，仅优化水体；不将任何工程自动改成灰度，不改现有制图预设。海面默认浅蓝灰色，海岸及河湖描线默认关闭，原地形面板提供独立开关和颜色。
+- `electron/shorelines.js` 集中生成 GSHHG 分级命令；renderer 保存 `config.shorelines` 并支持撤销，GMT 与 MTpy 背景共享设置。MTpy 科学计算与手动预览行为不变。
+- 25 组 Node 回归、源码及候选 ASAR 的真实隐藏工作台测试通过；当前范围四种开关组合实际导出 PNG/PDF/EPS，AI 保存重开后海面独立移动、改色及文字编辑通过。GMT 6.5 区域图、6.7 全球/极区/跨日期变更线通过。说明见 `docs/SHORELINES.md`。
+- 候选包：`/Volumes/MacBook Pro SSD/GMT-缓存/安装包/v1.28.4/mac-arm64/MT点位图制作工具—GMT.app`，本地临时签名，严格深度验签通过。73 个运行/说明/版本文件与源码逐字节一致；ASAR SHA-256 `2e7a8b8d78b16b84371727e795f2badf71e81450bfcd51f6a1971f66f0d06901`。
+- 更新前完整 App 与 Git bundle 保存在 `/Users/cwn/Documents/GMT绘图-backups/coast-v1.28.3-20260930/`。验证及文献原图截图位于全局 `验证/v1.28.4/`；Windows 本轮未实机验证。已于本日按用户“你来重新安装”的授权完成实装；详情见下。未发布 GitHub。
+
+### v1.28.4 实装与工程恢复
+
+- 实际路径：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 1.28.4；ASAR SHA-256 与候选包一致：`2e7a8b8d78b16b84371727e795f2badf71e81450bfcd51f6a1971f66f0d06901`。
+- 退出旧版前通过原生“保存工程”另存 `工程文件/升级v1.28.4前_当前工程_20260930-205031.mtgmt`，文件 SHA-256 `0dc587f7db5d913f33ed8ac95e8842f3ba8ac8bb67a80fc3170296d798efc7b6`。保存成功后正常退出；以已校验暂存包替换，旧运行 App 另保留在上述备份目录的 `replaced-20260930-205031/MT点位图制作工具—GMT.app`。
+- 从实际安装路径重新启动，并通过原生打开工程对话框恢复该工程；实际预览于 21:00:44 更新。原配置为区域底图、86/100/20/30、0 测点、03s 地形、paper 色带、0.25 晕渲。新版海面填色默认生效，细碎海岸和河湖描线关闭；当前实际 GMT 引擎为 6.7.0。
+- 已安装 ASAR 的隔离工作台验证通过：水体选项、保存/恢复、撤销、MTpy 手动预览约定、真实 PNG/PDF/EPS 输出。证据目录为全局 `验证/v1.28.4/installed-20260930-205031/`；生产预览的 GMT 脚本也确认 `-S#edf4f7` 且无海岸/河湖 `-W` 描线。
+- 本地临时签名与普通深度验签通过。候选包和安装暂存包严格深度验签通过；Desktop 的 FileProvider 会重新附加 `com.apple.FinderInfo`，导致运行后的严格检查报告元数据，不是程序字节或签名内容变化。仅对新安装包的九处 FinderInfo 做过定点清理并保存原值，清理后严格验证通过；重新启动后元数据再次出现，不继续反复清除。普通验签、ASAR 一致性和实际运行/绘图均通过。
+- 安装记录及元数据原值保存在项目 `outputs/reinstall-v1.28.4/installation.json`，并复制到上述验证目录。工程、地形缓存、既有图件和旧版备份保留；没有远端发布。
+
+## 2026-10-14 v1.28.5 文件选择修复
+
+- 用户报告地点与构造的原生文件窗口偶发无法点选文件或浏览文件夹，只能取消后重启。旧版 renderer/IPC 复现确认连续导入会发出两个请求，且原生对话框未关联主窗口。该偶发冻结未稳定重现，本轮修复的是已确认的窗口归属与重入缺陷；说明见 `docs/FILE_DIALOGS.md`。
+- 新增 `electron/file-dialogs.js`：全部 11 个文件/文件夹/保存入口通过请求的 webContents 关联主窗口，同一时刻一个原生文件窗口；取消、错误、窗口关闭及迟到返回均保护占用状态。地点与构造及本地构造库从选择开始禁用重复导入，取消和解析失败后能直接重试。
+- 验证：26 组 Node 回归通过；候选 ASAR 的真实 renderer/IPC 流程验证正常、取消、原生错误、解析错误、重复请求和重试。源码及已安装 ASAR 各完成 7 次真实 macOS 原生选择，共 14 次，实际浏览嵌套目录、导入两个 GeoJSON 对象、同步一个文件夹要素，并在选择期间创建/销毁隐藏绘图窗口。全部原生窗口 owner 为同一工作台。测试均使用全局 `验证/v1.28.5/` 的隔离工作区，未修改真实工程。Windows 原生窗口本轮未实机测试。
+- 旧版完整 App 和 Git bundle：`/Users/cwn/Documents/GMT绘图-backups/file-dialog-v1.28.4-20261014-162041/`，旧运行包另保留于其中 `replaced-app/`。旧 ASAR 为 `2e7a8b8d78b16b84371727e795f2badf71e81450bfcd51f6a1971f66f0d06901`，复制后已比对。
+- 实装：`/Users/cwn/Desktop/所有文件夹/实用app/MT点位图制作工具—GMT.app`，版本 1.28.5；74 个运行/版本/说明文件与源码逐字节一致，候选包严格深度验签、实装普通深度验签通过。ASAR SHA-256：`5fd0e1c3bc9a3d8635129f1a0d2d0f34dab8c863231bca516bb9504fab874b0e`。用户程序检查时已经退出，安装时没有关闭活动工程；测试完成后从实装路径正常启动，确认主进程路径。
+- 安装记录：项目 `outputs/file-dialog-20261014/delivery.json`；实装原生验证：全局 `验证/v1.28.5/installed-native/native-results.json`。已有工程、图件和地形缓存保留；本地提交/标签，未发布 GitHub。

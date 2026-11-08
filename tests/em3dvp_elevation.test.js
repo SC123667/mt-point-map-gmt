@@ -1,0 +1,27 @@
+const assert=require('assert'),fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process');
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'em3dvp-test-'));process.env.MT_GMT_WORKSPACE=root;
+const e=require('../electron/em3dvp-elevation'),cache=require('../electron/terrain-cache');
+(async()=>{try{
+ for(const r of ['1//2/3','1/2/3/',[null,2,3,4],'180/-170/0/2','1/2/4/3','1/2/-91/0'])assert.throws(()=>e.region(r));
+ assert.deepEqual(e.region('87/89/28/30'),[87,89,28,30]);
+ const g=e.gridInfo('0 2 0 2 -2 2 1 1 3 3 0 1');assert(g.geographic);assert.throws(()=>e.gridInfo('0 2 0 2 0 1 1 1 3 3 2 1'));
+ assert.deepEqual(e.sourceRegion([-10,-8,0,2],{...g,west:350,east:352}),[350,352,0,2]);assert.throws(()=>e.sourceRegion([-1,2,0,2],g));
+ let i=0;const write=(lines,options={})=>e.writeXYZ(lines,path.join(root,`${i++}.xyz`),{r:[0,2,0,2],g,stride:1,factor:1,...options});
+ const lines=['0 2 -3','1 2 4','2 2 5','0 1 6','1 1 NaN','2 1 8','0 0 9','1 0 10','2 0 11'];
+ await assert.rejects(write(lines),/NaN/);const skipped=await write(lines,{skipMissing:true});assert.equal(skipped.rows,8);assert.equal(skipped.missing,1);assert.deepEqual(skipped.elevationRangeMeters,[-3,11]);
+ const stride=await write(lines,{stride:2,factor:1000});assert.equal(stride.rows,4);assert.deepEqual(stride.elevationRangeMeters,[-3000,11000]);
+ const ft=await write(['0 0 -10','1 0 0','1 1 10'],{factor:.3048});assert.deepEqual(ft.elevationRangeMeters,[-3.048,3.048]);
+ await assert.rejects(write(['0 0 1','1 0 2','2 0 3']),/共线/);
+ const ac=new AbortController();ac.abort();await assert.rejects(write(lines,{signal:ac.signal}),/取消/);
+ const pixel=await write(['0.5 1.5 1','1.5 1.5 2','0.5 0.5 3','1.5 0.5 4'],{g:{...g,registration:1,nx:2,ny:2}});assert.equal(pixel.rows,4);
+ const terrain=path.join(root,'地形缓存'),cfg={region:'0/2/0/2',terrainResolution:'03s',terrainCacheDirectory:terrain};
+ const p=cache.cachePaths(terrain,cfg);cache.initializeArea(p,cfg);fs.writeFileSync(p.shadePath,'not elevation');fs.writeFileSync(p.gridPath.replace('.nc','_处理中.nc'),'incomplete');
+ assert.equal(await e.findCachedGrid({...cfg,region:'0.5/1.5/0.5/1.5'}),null);
+ fs.writeFileSync(p.gridPath,'test metadata lookup');assert.equal((await e.findCachedGrid(cfg)).gridPath,p.gridPath);
+ assert.equal((await e.findCachedGrid({...cfg,region:'0.5/1.5/0.5/1.5'})).gridPath,p.gridPath);
+ assert.equal(await e.findCachedGrid({...cfg,terrainResolution:'01s'}),null);
+ const absent='/Volumes/MT_GMT_TEST_DISK_NOT_CONNECTED_'+process.pid;
+ const result=cp.spawnSync(process.execPath,['-e',`require('./electron/em3dvp-elevation').findCachedGrid({region:'0/2/0/2'}).catch(e=>{console.log(e.message);process.exit(3)})`],{cwd:path.join(__dirname,'..'),encoding:'utf8',env:{...process.env,MT_GMT_WORKSPACE:absent+'/GMT-缓存'}});
+ assert.equal(result.status,3);assert.match(result.stdout,/未连接/);assert(!fs.existsSync(absent));
+ console.log('EM3DVP elevation tests passed: validation, units, missing nodes, stride, cancellation, cache resolution and disconnected disk');
+}finally{fs.rmSync(root,{recursive:true,force:true});}})().catch(err=>{console.error(err);process.exitCode=1;});

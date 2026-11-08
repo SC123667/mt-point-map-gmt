@@ -31,6 +31,7 @@ function initWorkbenchUI(){
     const b=wbElement('button','wb-nav-item',title);b.type='button';b.dataset.panel=key;b.title=description;b.onclick=()=>openSettingsPanel(key);section.append(b);
     wb.commands.push({key,title,description,keywords,group,run:()=>openSettingsPanel(key)});
   }
+  initMapSelections();
   const imports=wbPanel('imports','添加到当前工程');
   imports.append(wbElement('p','wb-intro','从点位表或 EDI 开始。只绘制区域底图时，直接设置经纬度范围即可。'));
   wbMove(imports,['sidebarImportFileBtn','sidebarImportEdiBtn','sidebarLoadSampleBtn','rangeMapBtn']);
@@ -100,7 +101,9 @@ function showWorkbenchPanel(key){
   if(activeGroup){activeGroup.classList.remove('collapsed');activeGroup.querySelector('.wb-group-toggle').setAttribute('aria-expanded','true');}
   we('workbenchPanelDescription').textContent=entry?.[3]||'';
   document.querySelectorAll('.wb-nav-item').forEach(b=>{b.classList.toggle('selected',b.dataset.panel===key);if(b.dataset.panel===key)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
-  el.settingsConfirmBtn.textContent=['gmt','storage','help','export','imports','data','quality'].includes(key)?'完成':'更新预览';
+  el.settingsConfirmBtn.textContent=['gmt','storage','help','export','elevation','imports','data','quality'].includes(key)?'完成':'更新预览';
+  if(key==='regionBoxes')renderRegionBoxes();
+  if(key==='stationClasses')renderStationClasses();
   el.settingsDialogBody.scrollTop=0;
 }
 function hideWorkbenchPanel(){

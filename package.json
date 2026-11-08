@@ -1,6 +1,6 @@
 {
   "name": "mt-point-map-gmt",
-  "version": "1.14.1",
+  "version": "1.33.2",
   "description": "MT点位图制作工具-GMT / Cross-platform GMT desktop tool for magnetotelluric station maps, EDI parsing, phase tensor, tipper, and MT sounding curves.",
   "main": "electron/main.js",
   "author": "CWN",
@@ -27,12 +27,13 @@
   },
   "scripts": {
     "start": "electron .",
-    "test:node": "node tests/parser_edi.test.js && node tests/mt_math.test.js && node tests/mt_plots.test.js && node tests/fault_legend.test.js && node tests/import_worker.test.js && node tests/gmt_worker.test.js && node tests/srtm_worker.test.js && node tests/srtm_source.test.js && node tests/ui_workbench.test.js && node tests/base_map.test.js && node tests/vector_pdf.test.js && node tests/workspace_terrain.test.js && node tests/cartography.test.js && node tests/map_editing.test.js && node tests/local_structures.test.js && node tests/label_layout.test.js && node tests/gmt_engine.test.js && node tests/eps_page.test.js && node tests/illustrator_direct.test.js",
+    "test:node": "node tests/parser_edi.test.js && node tests/mt_math.test.js && node tests/mt_plots.test.js && node tests/fault_legend.test.js && node tests/import_worker.test.js && node tests/gmt_worker.test.js && node tests/srtm_worker.test.js && node tests/srtm_source.test.js && node tests/file_dialogs.test.js && node tests/ui_workbench.test.js && node tests/base_map.test.js && node tests/vector_pdf.test.js && node tests/workspace_terrain.test.js && node tests/cartography.test.js && node tests/map_editing.test.js && node tests/local_structures.test.js && node tests/label_layout.test.js && node tests/gmt_engine.test.js && node tests/eps_page.test.js && node tests/illustrator_direct.test.js && node tests/map_selections.test.js && node tests/map_inset.test.js && node tests/response_export.test.js && node tests/response_collection.test.js && node tests/em3dvp_elevation.test.js && node tests/response_reference.test.js",
     "dist:mac": "electron-builder --mac dmg dir",
     "patch:nsis": "node scripts/patch-nsis-install-section.js",
     "dist:win": "npm run patch:nsis && electron-builder --win nsis portable",
     "pack:mac": "electron-builder --mac dir",
-    "pack:win": "npm run patch:nsis && electron-builder --win dir"
+    "pack:win": "npm run patch:nsis && electron-builder --win dir",
+    "test:mtpy": "node tests/mtpy_export.test.js && node tests/mtpy_readability.test.js"
   },
   "devDependencies": {
     "electron": "^35.7.5",
@@ -86,7 +87,10 @@
     "portable": {
       "artifactName": "${productName}-${version}-win-${arch}-portable.${ext}"
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "asarUnpack": [
+      "electron/mtpy_backend.py"
+    ]
   },
   "dependencies": {
     "@cornerstonejs/codec-openjpeg": "1.3.5",

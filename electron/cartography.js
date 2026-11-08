@@ -1,13 +1,13 @@
 // Portable, pure map-feature model. GeoJSON coordinates always remain lon/lat.
 const crypto = require('crypto');
 const names = require('./map-names');
-const DEFAULT_STYLE = Object.freeze({ color:'#62494a', width:0.8, dash:'solid', fill:'#cfb8ab', opacity:35, symbol:'c', size:0.14, showLabel:true, labelColor:'#263238', font:'sans-serif', fontSize:9, halo:true, bold:false, haloWidth:1.1, position:'right', dx:2, dy:0, rotation:0, labelMode:'name' });
+const DEFAULT_STYLE = Object.freeze({ color:'#62494a', width:0.8, strokeOpacity:100, dash:'solid', fill:'#cfb8ab', opacity:35, symbol:'c', size:0.14, showLabel:true, labelColor:'#263238', font:'sans-serif', fontSize:9, halo:true, bold:false, haloWidth:1.1, position:'right', dx:2, dy:0, rotation:0, labelMode:'name' });
 const DEFAULT_CONTOURS = Object.freeze({ show:false, interval:500, major:2000, color:'#666666', width:0.25, majorWidth:0.65, labels:true, fontSize:8, minLength:0.4, labelSpacing:1.2 });
 const num=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):fallback;
 const color=(v,fallback)=>/^#[\da-f]{6}$/i.test(String(v))?v:fallback;
 function style(value={}) {
   const d=DEFAULT_STYLE;
-  return { color:color(value.color,d.color),width:num(value.width,0,8,d.width),dash:['solid','dash','dot'].includes(value.dash)?value.dash:d.dash,fill:color(value.fill,d.fill),opacity:num(value.opacity,0,100,d.opacity),symbol:['c','s','t','d','a','none'].includes(value.symbol)?value.symbol:d.symbol,size:num(value.size,0.01,3,d.size),showLabel:value.showLabel!==false,labelColor:color(value.labelColor,d.labelColor),font:['sans-serif','serif','monospace','PingFang SC','Microsoft YaHei','SimSun','Arial','Times New Roman'].includes(value.font)?value.font:d.font,fontSize:num(value.fontSize,4,72,d.fontSize),halo:value.halo!==false,bold:!!value.bold,haloWidth:num(value.haloWidth,0,4,d.haloWidth),position:['above','below','left','right','center'].includes(value.position)?value.position:d.position,dx:num(value.dx,-100,100,d.dx),dy:num(value.dy,-100,100,d.dy),rotation:num(value.rotation,-180,180,0),labelMode:['name','abbreviation','custom'].includes(value.labelMode)?value.labelMode:'name' };
+  return { color:color(value.color,d.color),width:num(value.width,0,8,d.width),strokeOpacity:num(value.strokeOpacity,0,100,100),dash:['solid','dash','dot'].includes(value.dash)?value.dash:d.dash,fill:color(value.fill,d.fill),opacity:num(value.opacity,0,100,d.opacity),symbol:['c','s','t','d','a','none'].includes(value.symbol)?value.symbol:d.symbol,size:num(value.size,0.01,3,d.size),showLabel:value.showLabel!==false,labelColor:color(value.labelColor,d.labelColor),font:['sans-serif','serif','monospace','PingFang SC','Microsoft YaHei','SimSun','Arial','Times New Roman'].includes(value.font)?value.font:d.font,fontSize:num(value.fontSize,4,72,d.fontSize),halo:value.halo!==false,bold:!!value.bold,haloWidth:num(value.haloWidth,0,4,d.haloWidth),position:['above','below','left','right','center'].includes(value.position)?value.position:d.position,dx:num(value.dx,-100,100,d.dx),dy:num(value.dy,-100,100,d.dy),rotation:num(value.rotation,-180,180,0),labelMode:['name','abbreviation','custom'].includes(value.labelMode)?value.labelMode:'name' };
 }
 function contours(v={}) { return {show:!!v.show,interval:num(v.interval,1,10000,500),major:num(v.major,0,20000,2000),color:color(v.color,'#666666'),width:num(v.width,0.05,4,0.25),majorWidth:num(v.majorWidth,0.05,8,0.65),labels:v.labels!==false,fontSize:num(v.fontSize,4,30,8),minLength:num(v.minLength,0,10,0.4),labelSpacing:num(v.labelSpacing,0.1,10,1.2)}; }
 function coordinate(c) { if(!Array.isArray(c)||c.length<2||String(c[0]).trim()===''||String(c[1]).trim()===''||!Number.isFinite(Number(c[0]))||!Number.isFinite(Number(c[1]))||Math.abs(Number(c[0]))>360||Math.abs(Number(c[1]))>90)throw new Error('坐标无效：请使用 WGS84 经度、纬度（十进制度），不能直接使用投影米制坐标。'); return [Number(c[0]),Number(c[1])]; }
@@ -63,6 +63,7 @@ function anchor(f,region) {
   const bounds=pts.reduce((b,p)=>[Math.min(b[0],p[0]),Math.max(b[1],p[0]),Math.min(b[2],p[1]),Math.max(b[3],p[1])],[Infinity,-Infinity,Infinity,-Infinity]);
   return [(Math.max(w,bounds[0])+Math.min(e,bounds[1]))/2,(Math.max(s,bounds[2])+Math.min(n,bounds[3]))/2];
 }
+function strokePen(value={}){const s=style(value);return `${s.width}p,${s.color}${s.strokeOpacity<100?'@'+(100-s.strokeOpacity):''}${s.dash==='dash'?',-':s.dash==='dot'?',.':''}`;}
 function effectiveStyle(f,c={}){return style({...c.categoryStyles?.[f.category],...f.style});}
 function labelText(f,s,c={}){return names.label(f,s,c);}
 function normalize(value={}) {return {...names.settings(value),paperStyle:!!value.paperStyle,labelLayout:require('./label-layout').settings(value.labelLayout),categoryNames:{...(value.categoryNames||{})},localLibrary:require('./local-structures').settings(value.localLibrary),features:(value.features||[]).map((f,i)=>feature(f,i)),categoryStyles:{...(value.categoryStyles||{})},contours:contours(value.contours)};}
@@ -73,4 +74,4 @@ function parsePaste(text,type='Point',name='自定义构造',category='地点') 
   return [feature({name,category,geometry:{type,coordinates:type==='Polygon'?[coords]:coords}})];
 }
 function geoJSON(features){return {type:'FeatureCollection',features:features.map(f=>({type:'Feature',id:f.id,geometry:f.geometry,properties:{...f.properties,name:f.name,originalName:f.originalName,nameZh:f.nameZh,nameEn:f.nameEn,category:f.category,abbreviation:f.abbreviation,label:f.label,labelAnchor:f.labelAnchor,source:f.source,style:f.style}}))};}
-module.exports={DEFAULT_STYLE,DEFAULT_CONTOURS,style,contours,geometry,feature,collection,vertices,inRegion,anchor,effectiveStyle,labelText,normalize,parsePaste,geoJSON};
+module.exports={DEFAULT_STYLE,DEFAULT_CONTOURS,style,contours,geometry,feature,collection,vertices,inRegion,anchor,strokePen,effectiveStyle,labelText,normalize,parsePaste,geoJSON};

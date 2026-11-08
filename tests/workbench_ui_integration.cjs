@@ -23,7 +23,7 @@ app.whenReady().then(async()=>{try{
  await until(()=>js('typeof wb!=="undefined"&&wb.ready&&!!state.gmtInfo').catch(()=>false),'Workbench initialization');
  // Suppress native alert windows in this QA process and keep their messages as evidence.
  await js('window.qaAlerts=[];window.alert=message=>qaAlerts.push(message);void 0');
- const results=[],panels=await js('WORKBENCH_PANELS.map(p=>p[1])');assert.equal(panels.length,23);
+ const results=[],panels=await js('WORKBENCH_PANELS.map(p=>p[1])');assert.equal(panels.length,25);
  for(const [width,height] of [[1100,720],[1280,820],[1600,940]]){
   win.setSize(width,height);await pause(150);
   for(const key of panels){

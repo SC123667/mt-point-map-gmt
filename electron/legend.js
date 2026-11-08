@@ -34,17 +34,42 @@ function buildLegendEntries(config) {
     }
   }
   const names = require('./map-names'), cart = require('./cartography');
-  const categories = new Map();
-  for(const f of config.cartography?.features||[])if(f.visible!==false&&cart.inRegion(f,config.region)&&!(f.geometry.type.includes('Point')&&cart.effectiveStyle(f,config.cartography).symbol==='none')&&!categories.has(f.category))categories.set(f.category,f);
-  for(const [category,f] of categories){const style=cart.effectiveStyle(f,config.cartography);overlayEntries.push({label:category,category,symbol:f.geometry.type.includes('Point')?'point':f.geometry.type.includes('Polygon')?'area':'line',opacity:style.opacity,gmtSymbol:style.symbol==='none'?'c':style.symbol,fill:style.fill,size:`${style.size}c`,pen:`${style.width}p,${style.color}${style.dash==='dash'?',-':style.dash==='dot'?',.':''}`});}
+  // A category may contain different symbols (e.g. Cu-Au stars and Au diamonds).
+  // Keep each distinct visual style instead of silently using its first feature.
+  const groups = new Map(), categoryCounts = new Map();
+  for(const f of config.cartography?.features||[]){
+    if(f.visible===false||!cart.inRegion(f,config.region))continue;
+    const style=cart.effectiveStyle(f,config.cartography);
+    const symbol=f.geometry.type.includes('Point')?'point':f.geometry.type.includes('Polygon')?'area':'line';
+    if(symbol==='point'&&style.symbol==='none')continue;
+    const entry={label:f.category,category:f.category,symbol,opacity:style.opacity,gmtSymbol:style.symbol,fill:style.fill,size:`${style.size}c`,pen:cart.strokePen(style)};
+    const key=JSON.stringify([f.category,symbol,entry.pen,symbol==='point'?[entry.gmtSymbol,entry.fill,entry.size]:symbol==='area'?[entry.fill,entry.opacity]:null]);
+    if(!groups.has(key)){groups.set(key,{entry,features:[]});categoryCounts.set(f.category,(categoryCounts.get(f.category)||0)+1);}
+    groups.get(key).features.push(f);
+  }
   const language=config.cartography?.language;
-  for(const entry of [...stationEntries,...overlayEntries])entry.label=entry.category?names.categoryLabel(entry.category,config.cartography):names.translated(entry.label,language);
+  const sequence=new Map();
+  for(const {entry,features} of groups.values()){
+    entry.label=names.categoryLabel(entry.category,config.cartography);
+    if((categoryCounts.get(entry.category)||0)>1&&entry.label){
+      const n=(sequence.get(entry.category)||0)+1;sequence.set(entry.category,n);
+      const labels=[...new Set(features.map(f=>names.label(f,{}, {...config.cartography,nameFormat:'abbreviation'})).filter(v=>v&&!require('./label-layout').genericName(v)))];
+      const suffix=labels.length&&labels.length<=3?labels.join(' / '):`${language==='en'?'Style':'样式'} ${n}`;
+      entry.label+=` · ${suffix}`;
+    }
+    overlayEntries.push(entry);
+  }
+  for(const entry of [...stationEntries,...overlayEntries]){
+    if(!entry.category)entry.label=names.translated(entry.label,language);
+    if(entry.symbol==='line'||entry.symbol==='area')entry.pen=legendPen(entry.pen,config.legend);
+  }
   return (config.legend?.order === "overlay-first" ? [...overlayEntries, ...stationEntries] : [...stationEntries, ...overlayEntries]).filter(e=>e.label);
 }
 
 function buildStationLegendEntries(config = {}) {
   if (config.plotType === "baseMap") return [];
   const groups = Array.isArray(config.stationGroups) ? config.stationGroups.filter(Boolean) : [];
+  if(config.stationClasses?.enabled&&!groups.length)return [];
   if (groups.length) {
     return groups.map((group, index) => ({
       label: group.label || group.id || `Group ${index + 1}`,
@@ -71,7 +96,8 @@ function buildLegendSpec(entries, config = {}) {
     `H ${settings.titleFont} ${settings.title || "Legend"}`,
     `D ${settings.clearance} ${settings.delimiterPen || "0.35p,gray70"}`
   ];
-  for (const entry of entries) {
+  for (const raw of entries) {
+    const entry={...raw,pen:(raw.symbol==='line'||raw.symbol==='area')?legendPen(raw.pen,settings):raw.pen};
     const label = String(entry.label || "").trim();
     if (!label) continue;
     if (entry.symbol === "point") {
@@ -117,6 +143,7 @@ function normalizeLegendConfig(config = {}) {
     ...settings,
     titleFontSize,
     labelFontSize,
+    lineOpacity:settings.lineOpacity==null?null:clampNumber(settings.lineOpacity,0,100,100),
     borderWidth,
     backgroundTransparency,
     cornerRadius,
@@ -129,6 +156,15 @@ function normalizeLegendConfig(config = {}) {
     labelFont: settings.labelFont || `${labelFontSize.toFixed(1)}p,Helvetica,${textColor}`,
     frame: settings.frame || `+p${borderWidth.toFixed(2)}p,${borderColor}+g${backgroundColor}@${backgroundTransparency.toFixed(0)}+r${cornerRadius.toFixed(0)}p`
   };
+}
+
+// null follows the map; an explicit zero must remain fully transparent.
+function legendPen(pen='0.8p,black',settings={}){
+  if(settings?.lineOpacity==null)return pen;
+  const parts=String(pen).split(',');
+  const opacity=clampNumber(settings.lineOpacity,0,100,100);
+  parts[1]=(parts[1]||'black').replace(/@[\d.]+$/,'')+(opacity<100?'@'+(100-opacity):'');
+  return parts.join(',');
 }
 
 function buildMTOverlayLegendEntry(config = {}) {
@@ -196,6 +232,7 @@ module.exports = {
   buildLegendEntries,
   buildLegendSpec,
   normalizeLegendConfig,
+  legendPen,
   writeLegendFile,
   legendCommand
 };

@@ -22,6 +22,7 @@
       </div>
       <div class="header-actions">
         <button id="headerOpenProjectBtn" class="header-button" type="button">打开工程</button>
+        <button id="headerUndoBtn" class="header-button" type="button" disabled title="撤销上一步 · Command+Z / Ctrl+Z">↶ 撤销</button>
         <button id="headerSaveProjectBtn" class="header-button" type="button">保存工程</button>
         <button id="headerExportBtn" class="header-button primary" type="button">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 4-4m-4 4-4-4M4 16h12" /></svg>
@@ -66,6 +67,7 @@
           <button class="tool-tab" data-plot-type="phaseTensorMap" type="button">相位张量</button>
           <button class="tool-tab" data-plot-type="tipperMap" type="button">感应矢量</button>
           <button class="tool-tab" data-plot-type="responseCurve" type="button">曲线</button>
+          <button id="mtpyOpenBtn" class="header-button" type="button">MTpy 参数</button>
         </div>
       </section>
       <div class="settings-toolbar" aria-label="参数模块">
@@ -270,8 +272,12 @@
 
       <section class="pane preview-pane">
         <div class="preview-canvas-meta">
-          <div><span class="preview-synced"><i></i>自动预览</span><b id="canvasPlotTitle">点位图</b><small id="canvasDataMeta">尚未导入测点</small></div>
-          <div class="preview-meta-tools" aria-hidden="true"><span>滚轮缩放</span><i></i><span>拖拽平移</span></div>
+          <div><span class="preview-synced"><i></i><span id="previewModeLabel">自动预览</span></span><b id="canvasPlotTitle">点位图</b><small id="canvasDataMeta">尚未导入测点</small></div>
+          <div class="preview-meta-tools"><span>滚轮缩放</span><i></i><span>拖拽平移</span><button id="previewBtn" type="button">更新预览</button></div>
+        </div>
+        <div id="curveContextBar" class="curve-context-bar" hidden>
+          <div class="curve-context-controls"><label>当前测点 <select id="canvasCurveStation" aria-label="当前曲线测点"></select></label><span id="canvasCurvePosition"></span><button id="canvasCurvePrevious" type="button" aria-label="上一曲线测点">← 上一个</button><button id="canvasCurveNext" type="button" aria-label="下一曲线测点">下一个 →</button><button id="canvasCurveLayout" type="button">组图 / 叠加与排版</button></div>
+          <div id="curveContextKey" class="curve-context-key"><span>上：视电阻率 · 下：相位</span><span><b class="curve-key-xy">■</b> XY（Ex / Hy）</span><span><b class="curve-key-yx">●</b> YX（Ey / Hx）</span><span>细线连接采样点，竖线为误差棒</span></div>
         </div>
         <div class="preview-box" id="previewBox" tabindex="0">
           <div class="preview-image-layer" id="previewImageLayer" aria-hidden="true"></div>
@@ -392,13 +398,20 @@
             <select id="terrainCptInput">
               <option value="paper">论文 · 低饱和地形</option>
               <option value="paperGray">论文 · 浅灰地形</option>
-              <option value="geo" selected>geo 地形色带</option>
+              <option value="terrainB">B · 增强绿褐</option>
+              <option value="terrainC">C · 经典分层地形</option>
+              <option value="terrainF" selected>F · 分级设色（默认 500 m）</option>
+              <option value="geo">geo 地形色带</option>
               <option value="relief">relief 阴影地形</option>
               <option value="topo">topo 高程色带</option>
               <option value="dem2">dem2 柔和地形</option>
             </select>
           </label>
-          <label>阴影强度<input id="terrainIntensityInput" type="number" min="0.1" max="1.5" step="0.05" value="0.65" /></label>
+          <label>阴影强度<input id="terrainIntensityInput" type="number" min="0.1" max="1.5" step="0.05" value="0.25" /></label>
+          <label class="check"><input id="showCoastInput" type="checkbox" />海岸线</label>
+          <label class="check"><input id="showInlandWaterInput" type="checkbox" />河湖边界</label>
+          <label class="check"><input id="fillSeaInput" type="checkbox" checked />海面填色</label>
+          <label>海面颜色<input id="seaColorInput" type="color" value="#edf4f7" /></label>
           <label class="check"><input id="terrainAllowDownloadInput" type="checkbox" checked />允许联网下载缺失地形数据</label>
           <label id="terrainSrtmSourceRow" class="terrain-source-row hidden">高精度下载源
             <select id="terrainSrtmSourceInput">
@@ -470,13 +483,16 @@
         <fieldset class="analysis-settings" data-settings-panel="mtParams">
           <legend>MT 图件参数</legend>
           <div class="analysis-only curve-only curve-station-control">
-            <label>曲线测点<select id="curveStationInput" aria-label="曲线测点"></select></label>
+            <button id="curveCollectionOpenBtn" type="button">多测点组图 / 同轴叠加 / 排版</button><label>单测点模式的测点<select id="curveStationInput" aria-label="曲线测点"></select></label>
             <div class="curve-station-nav" role="group" aria-label="切换曲线测点">
               <button id="curvePreviousBtn" type="button" title="上一测点（左方向键）">← 上一测点</button>
               <span id="curveStationPosition" aria-live="polite">0 / 0</span>
               <button id="curveNextBtn" type="button" title="下一测点（右方向键）">下一测点 →</button>
             </div>
             <p class="field-note curve-keyboard-hint">也可用键盘 ← / → 连续查看相邻测点。</p>
+            <button id="curveExportAiBtn" type="button" class="primary">导出当前曲线 AI（.ai）</button>
+            <button id="curveExportPackageBtn" type="button">导出当前曲线 AI 编辑包</button>
+            <p class="wb-export-note">导出当前模式的视电阻率和相位曲线（单测点、组图或叠加）；曲线、符号、误差棒和坐标轴保留矢量。直接 .ai 需要本机 Illustrator；编辑包可在其他电脑运行包内脚本。</p>
           </div>
           <label class="analysis-only strike-only">走向长度<input id="strikeLengthInput" type="number" min="0.005" max="0.12" step="0.005" value="0.035" /></label>
           <label class="analysis-only strike-only">走向颜色
@@ -486,27 +502,31 @@
               <option value="#d7191c">红色</option>
             </select>
           </label>
-          <label class="analysis-only tensor-only">椭圆尺度<input id="tensorScaleInput" type="number" min="0.005" max="0.10" step="0.005" value="0.030" /></label>
-          <label class="analysis-only tensor-only">椭圆边框色
-            <select id="tensorPenColorInput">
-              <option value="black">黑色</option>
-              <option value="gray30">深灰</option>
-              <option value="white">白色</option>
-            </select>
-          </label>
-          <label class="analysis-only tipper-only">矢量分量
-            <select id="tipperComponentInput">
-              <option value="real">实部</option>
-              <option value="imag">虚部</option>
-            </select>
-          </label>
-          <label class="analysis-only tipper-only">约定
-            <select id="tipperConventionInput">
-              <option value="parkinson">Parkinson</option>
-              <option value="wiese">Wiese</option>
-            </select>
-          </label>
-          <label class="analysis-only tipper-only">箭头尺度<input id="tipperScaleInput" type="number" min="0.005" max="0.15" step="0.005" value="0.055" /></label>
+          <div class="mtpy-controls">
+            <label>周期 / s<input id="mtpyPeriods" value="1, 10, 100, 1000" /></label>
+            <label>图件<select id="mtpyMode"><option value="combined">椭圆＋感应箭头</option><option value="phase">相位张量椭圆</option><option value="tipper">感应箭头</option></select></label>
+            <div class="form-grid">
+              <label>箭头分量<select id="mtpyComponent"><option value="yri">实部＋虚部</option><option value="yr">实部</option><option value="yi">虚部</option></select></label>
+              <label>箭头约定<select id="mtpyConvention"><option value="parkinson">Parkinson</option><option value="wiese">Wiese</option></select></label>
+              <label>椭圆大小<input id="mtpyEllipseScale" type="number" min="0.1" max="5" step="0.05" value="0.7" /></label>
+              <label>箭头比例<input id="mtpyArrowScale" type="number" min="0.1" max="5" step="0.05" value="0.85" /></label>
+              <label>每行图数<input id="mtpyColumns" type="number" min="1" max="4" value="2" /></label>
+              <label>排版<select id="mtpyLayout"><option value="compact">紧凑</option><option value="spaced">分散</option></select></label>
+              <label>末行对齐<select id="mtpyLastRowAlign"><option value="center">居中</option><option value="left">左对齐</option><option value="right">右对齐</option></select></label>
+              <label>底图层次<select id="mtpyBackgroundStyle"><option value="soft">柔和</option><option value="original">原样</option></select></label>
+              <label>图间距 / mm<input id="mtpyPanelGap" type="number" min="0" max="50" value="3" /></label>
+              <label>色标<select id="mtpyColorbarMode"><option value="shared">共用</option><option value="individual">各图独立</option><option value="none">不显示</option></select></label>
+              <label>色标位置<select id="mtpyColorbarPosition"><option value="bottom">下方</option><option value="top">上方</option><option value="left">左侧</option><option value="right">右侧</option></select></label>
+              <label>色标对齐<select id="mtpyColorbarAlign"><option value="center">居中</option><option value="start">左对齐</option><option value="end">右对齐</option></select></label>
+              <label>色标间距 / mm<input id="mtpyColorbarGap" type="number" min="0" max="100" step="1" value="3" /></label>
+            </div>
+            <details><summary>维性阈值与插值</summary><div class="form-grid">
+              <label>β 阈值 / °<input id="mtpySkew" type="number" min="0.1" step="0.1" value="5" /></label>
+              <label>偏心率阈值<input id="mtpyEccentricity" type="number" min="0.001" step="0.01" value="0.1" /></label>
+              <label>插值跨度 / log₁₀<input id="mtpyMaxGap" type="number" min="0.01" max="3" step="0.1" value="1" /></label>
+            </div></details>
+          </div>
+          <div hidden><input id="tensorScaleInput" value="0.03" /><select id="tensorPenColorInput"><option>black</option></select><select id="tipperComponentInput"><option>real</option><option>imag</option></select><select id="tipperConventionInput"><option>parkinson</option><option>wiese</option></select><input id="tipperScaleInput" value="0.055" /></div>
         </fieldset>
 
         <details class="map-settings overlay-details" data-settings-panel="overlay">
@@ -540,6 +560,10 @@
                 <option value="overlay-first">图层在前</option>
               </select>
             </label>
+            <button id="structureLinePresetBtn" type="button">区分构造类别线型</button>
+            <label class="check"><input id="legendLineOpacityOverrideInput" type="checkbox" />单独设置图例线条不透明度</label>
+            <label>图例线条不透明度 %<input id="legendLineOpacityInput" type="number" min="0" max="100" step="5" value="100" disabled /></label>
+            <p id="legendLineOpacityHint" class="field-note">默认跟随图中线条。100% 完全不透明，0% 完全透明；不影响图例文字。</p>
             <p id="legendPositionHint" class="field-note legend-position-readout hidden"></p>
             <details class="legend-style-details">
               <summary>图例文字</summary>

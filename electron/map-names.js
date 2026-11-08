@@ -10,6 +10,7 @@ const terms = [
  ['拉萨','Lhasa','',[]],['林芝','Nyingchi','',['林芝市']],['日喀则','Xigaze','',['Shigatse','日喀则市']],
  ['城市','Cities','',['City']],['地点','Places','',['Place']],['矿床','Deposits','',['Deposit']],
  ['断层','Faults','',['Fault']],['活动断层','Active faults','',['Active fault']],['缝合带','Suture zones','',['Suture zone']],
+ ['区域框','Region boxes','',[]],
  ['构造区域','Tectonic regions','',[]],['研究区','Study area','',[]],['板块边界','Plate boundaries','',[]],['板块区域','Tectonic plates','',[]],
  ['正断层','Normal faults','',[]],['逆冲断层','Thrust faults','',[]],['左旋断层','Sinistral faults','',[]],['右旋断层','Dextral faults','',[]],['背斜','Anticlines','',[]],['向斜','Synclines','',[]],['构造边界','Tectonic boundaries','',[]],
  ['火山岩','Volcanic rocks','',[]],['地质构造','Geological structures','',[]],

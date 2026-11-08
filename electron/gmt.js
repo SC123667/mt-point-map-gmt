@@ -206,7 +206,10 @@ function autoRegion(records) {
 }
 
 function buildScript(records, config, outputDirectory, formats = ["png"]) {
-  config = require("./map-names").plotConfig(config);
+  const display=require("./presentation");
+  const appearance=display.validate(config.presentation);
+  config={...config,cartography:display.cartography(config)};
+  config = require("./map-selections").classifiedConfig(records,require("./map-names").plotConfig(config));
   if (config.plotType === "baseMap") {
     const issue = geographicRegionIssue(config.region, config.projection);
     if (issue) throw new Error(issue);
@@ -252,16 +255,16 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
   const legend = legendScriptPart(config, outputDirectory, region, shell);
   const cartography = require("./cartography-gmt").scriptParts(config, outputDirectory, region, shell, quote);
   const prefix = shell === "bat" ? "" : "  ";
-  const mapStyleCommand = config.cartography?.paperStyle
+  let mapStyleCommand = config.cartography?.paperStyle
     ? `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 10p,Helvetica,gray20 FONT_ANNOT_PRIMARY 7.5p,Helvetica,gray25 FONT_LABEL 7.5p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mmF MAP_FRAME_PEN 0.5p,gray30 MAP_TICK_PEN_PRIMARY 0.4p,gray35 MAP_TICK_LENGTH_PRIMARY 0.1c MAP_GRID_PEN_PRIMARY 0.15p,gray85,- MAP_TITLE_OFFSET 0.14c`
     : `${prefix}gmt set MAP_FRAME_TYPE plain FONT_TITLE 12p,Helvetica-Bold,gray15 FONT_ANNOT_PRIMARY 8.5p,Helvetica,gray25 FONT_LABEL 9p,Helvetica,gray25 FORMAT_GEO_MAP ddd:mm:ssF MAP_FRAME_PEN 0.70p,gray25 MAP_TICK_PEN_PRIMARY 0.55p,gray35 MAP_GRID_PEN_PRIMARY 0.20p,gray82,- MAP_TITLE_OFFSET 0.14c`;
+  const gmtFont=appearance.fontFamily==="Arial"?"Helvetica":"Times-Roman";
+  mapStyleCommand+=` MAP_FRAME_TYPE ${appearance.frameStyle} MAP_FRAME_WIDTH ${appearance.frameWidth}p MAP_FRAME_PEN ${appearance.framePen}p,black MAP_DEFAULT_PEN ${appearance.framePen}p,black FONT_ANNOT_PRIMARY ${appearance.fontSize}p,${gmtFont},black FONT_LABEL ${appearance.fontSize}p,${gmtFont},black`;
   const backgroundCommands = [];
   if (terrain.imageCommand) {
     backgroundCommands.push(terrain.imageCommand);
-    if (!config.swapAxes) backgroundCommands.push(`${prefix}gmt coast -R${region} -J${config.projection} -Di -W0.35p,gray45`);
-  } else if (!config.swapAxes) {
-    backgroundCommands.push(`${prefix}gmt coast -R${region} -J${config.projection} -Di -Ggray97 -Swhite -W0.35p,gray50`);
   }
+  backgroundCommands.push(...require('./shorelines').commands(config, region, prefix, !!terrain.imageCommand));
   if (shell === "bat") {
     return [
       "@echo off",
@@ -281,6 +284,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
       config.showLabels && labelRecords.length ? `gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
       config.showScale && !config.swapAxes ? `gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
       config.showNorthArrow && !config.swapAxes ? `gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+      terrain.colorbarCommand,
       legend.command,
       "gmt end",
       ""
@@ -305,6 +309,7 @@ function buildScript(records, config, outputDirectory, formats = ["png"]) {
     config.showLabels && labelRecords.length ? `  gmt text ${quote(labelsPathForScript)} -R${region} -J${config.projection} -F+f${quote(labelFont)}+jLB -D${offset}` : "",
     config.showScale && !config.swapAxes ? `  gmt basemap -R${region} -J${config.projection} -L${mapRefpoint(config.scalePosition, "BR")}+w${scale.length}+o0.5c/0.5c+f+l${scale.label}` : "",
     config.showNorthArrow && !config.swapAxes ? `  gmt basemap -R${region} -J${config.projection} -Td${mapRefpoint(config.northPosition, "TR")}+w1.0c+o0.4c/0.4c` : "",
+    terrain.colorbarCommand,
     legend.command,
     "gmt end",
     ""
@@ -389,6 +394,7 @@ function normalizeStationGroups(groups) {
     .filter((group) => group && typeof group === "object")
     .map((group, index) => ({
       ...group,
+      keySet: Array.isArray(group.keys)?new Set(group.keys):null,
       id: String(group.id || `group-${index + 1}`),
       label: String(group.label || group.id || `Group ${index + 1}`),
       symbol: new Set(["c", "t", "s", "d"]).has(group.symbol) ? group.symbol : "c",
@@ -400,6 +406,7 @@ function normalizeStationGroups(groups) {
 }
 
 function stationRecordMatchesGroup(record, group) {
+  if(Array.isArray(group.keys))return (group.keySet||new Set(group.keys)).has(require("./map-selections").stationKey(record));
   const name = String(record?.name || "");
   const line = String(record?.line || "");
   const match = group.match && typeof group.match === "object" ? group.match : group;
@@ -625,6 +632,7 @@ function tensorColor(beta) {
 }
 
 function buildResponseCurveScript(records, config, outputDirectory, formats = ["png"]) {
+  if (require("./response-collection").normalize(config.curveCollection).mode !== "single" || require("./response-collection").normalize(config.curveCollection).style === "reference") return require("./response-collection-gmt").build(records,config,outputDirectory,formats,{buildCurveFiles,resolveGMT,gmtEnvironmentLines,gmtCacheEnv,quote,gmtBeginCommand});
   const station = records.find((record) => record.name === config.curveStation) || records.find((record) => record.mtResponses?.length);
   if (!station || !station.mtResponses?.length) throw new Error("当前数据没有可绘制的阻抗曲线。");
   const shell = process.platform === "win32" ? "bat" : "sh";
@@ -643,45 +651,67 @@ function buildResponseCurveScript(records, config, outputDirectory, formats = ["
   const configuredTitle = String(config.title || "").trim();
   const curveTitle = configuredTitle && configuredTitle !== "MT Survey Stations"
     ? configuredTitle
-    : `${station.name} MT response (XY red, YX green)`;
+    : `${station.name} MT response`;
   const curveTitleOption = config.showTitle !== false && (!needsNativeTextRendering(curveTitle) || config.forceGMTTitle) ? `+t${q(curveTitle)}` : "";
-  const topFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya1f0.5g1+l${q("log10 rho_a (Ohm m)")} -BWSen${curveTitleOption}`;
-  const bottomFrame = `-Bxa0.5f0.1g0.5+l${q("log10 period (s)")} -Bya30f10g30+l${q("phase (degree)")} -BWSen`;
-  const plotWidth = "16c";
-  const plotHeight = "5.0c";
-  const topOffset = "7.0c";
-  const pointSize = "0.16c";
+  // Data remain in the existing log10 workspace. Custom ticks express their
+  // physical values, equivalent to a logarithmic axis without transforming twice.
+  function logarithmicTicks(file, min, max) {
+    const lines=[], stride=Math.max(1,Math.ceil((max-min)/7));
+    for(let exponent=Math.floor(min);exponent<=Math.ceil(max);exponent++) {
+      for(let m=1;m<=9;m++) {
+        const value=exponent+Math.log10(m);if(value<min-1e-8||value>max+1e-8)continue;
+        const major=(m===1&&exponent%stride===0)||((max-min)<1&&[2,5].includes(m));
+        lines.push(`${value.toFixed(8)} ${major?(config.showGrid===false?'a':'ag'):'f'}${major?(m===1?` 10@+${exponent}@+`:` ${(m*10**exponent).toPrecision(2)}`):''}`);
+      }
+    }
+    fs.writeFileSync(path.join(outputDirectory,file),lines.join("\n")+"\n");
+  }
+  logarithmicTicks('curve_period_ticks.txt',curve.xMin,curve.xMax);
+  logarithmicTicks('curve_rho_ticks.txt',curve.rhoMin,curve.rhoMax);
+  const xTicks=`-Bpxc${q(f('curve_period_ticks.txt'))}`;
+  const topFrame = `${xTicks} -Bpyc${q(f('curve_rho_ticks.txt'))}+l${q("Apparent resistivity (@~W@~ m)")} -BWsen${curveTitleOption}`;
+  const bottomFrame = `${xTicks}+l${q("Period (s)")} -Bya45f15${config.showGrid===false?'':'g45'}+l${q("Phase (degree)")} -BWSen`;
+  const plotWidth = "16c", topHeight = "5.0c", bottomHeight = "3.5c", topOffset = "4.1c";
+  const pointSize = "0.12c", xyColor='#b33d36', yxColor='#276a9a';
+  const legendRows=['N 2'];
+  if(curve.hasRhoXY||curve.hasPhaseXY)legendRows.push(`S 0.2c s ${pointSize} white 0.85p,${xyColor} 0.5c XY (Ex / Hy)`);
+  if(curve.hasRhoYX||curve.hasPhaseYX)legendRows.push(`S 0.2c c ${pointSize} white 0.85p,${yxColor} 0.5c YX (Ey / Hx)`);
+  fs.writeFileSync(path.join(outputDirectory,'curve_legend.txt'),legendRows.join('\n')+'\n');
+  for(const [file,yMin,yMax,label] of [['curve_panel_a.txt',curve.rhoMin,curve.rhoMax,'(a)'],['curve_panel_b.txt',0,180,'(b)']]) {
+    fs.writeFileSync(path.join(outputDirectory,file),`${curve.xMin+(curve.xMax-curve.xMin)*.015} ${yMax-(yMax-yMin)*.04} ${label}\n`);
+  }
+  const seriesCommands=(metric)=>{
+    const titleCase=metric==='rho'?'Rho':'Phase';
+    return [['xy','XY',xyColor,'s'],['yx','YX',yxColor,'c']].flatMap(([key,cap,color,symbol])=>[
+      curve[`has${titleCase}${cap}Error`]?`${p}gmt plot ${q(f(`curve_${metric}_${key}_err.tsv`))} -W0.45p,${color}`:'',
+      curve[`has${titleCase}${cap}`]?`${p}gmt plot ${q(f(`curve_${metric}_${key}.tsv`))} -W0.55p,${color}`:'',
+      curve[`has${titleCase}${cap}`]?`${p}gmt plot ${q(f(`curve_${metric}_${key}.tsv`))} -S${symbol}${pointSize} -Gwhite -W0.85p,${color}`:''
+    ]).filter(Boolean);
+  };
   const commands = [
-    `${p}gmt basemap -R${bottomRegion} -JX${plotWidth}/${plotHeight} ${bottomFrame} -X1.6c -Y1.5c`,
-    curve.hasPhaseXYError ? `${p}gmt plot ${q(f("curve_phase_xy_err.tsv"))} -W0.7p,black` : "",
-    curve.hasPhaseYXError ? `${p}gmt plot ${q(f("curve_phase_yx_err.tsv"))} -W0.7p,black` : "",
-    curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -W1.1p,red` : "",
-    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -W1.1p,limegreen` : "",
-    curve.hasPhaseXY ? `${p}gmt plot ${q(f("curve_phase_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
-    curve.hasPhaseYX ? `${p}gmt plot ${q(f("curve_phase_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : "",
-    `${p}gmt basemap -R${topRegion} -JX${plotWidth}/${plotHeight} ${topFrame} -Y${topOffset}`,
-    curve.hasRhoXYError ? `${p}gmt plot ${q(f("curve_rho_xy_err.tsv"))} -W0.7p,black` : "",
-    curve.hasRhoYXError ? `${p}gmt plot ${q(f("curve_rho_yx_err.tsv"))} -W0.7p,black` : "",
-    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -W1.1p,red` : "",
-    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -W1.1p,limegreen` : "",
-    curve.hasRhoXY ? `${p}gmt plot ${q(f("curve_rho_xy.tsv"))} -Ss${pointSize} -Gred -W0.45p,black` : "",
-    curve.hasRhoYX ? `${p}gmt plot ${q(f("curve_rho_yx.tsv"))} -Ss${pointSize} -Glimegreen -W0.45p,black` : ""
+    `${p}gmt basemap -R${bottomRegion} -JX${plotWidth}/${bottomHeight} ${bottomFrame} -X2.2c -Y3.0c`,
+    ...seriesCommands('phase'),
+    `${p}gmt text ${q(f('curve_panel_b.txt'))} -F+f9p,Helvetica-Bold+jTL -Gwhite -C0.04c`,
+    `${p}gmt legend ${q(f('curve_legend.txt'))} -DJBC+w8c+o0c/1.1c --FONT_ANNOT_PRIMARY=9p`,
+    `${p}gmt basemap -R${topRegion} -JX${plotWidth}/${topHeight} ${topFrame} -Y${topOffset}`,
+    ...seriesCommands('rho'),
+    `${p}gmt text ${q(f('curve_panel_a.txt'))} -F+f9p,Helvetica-Bold+jTL -Gwhite -C0.04c`
   ].filter(Boolean);
   if (shell === "bat") {
     return ["@echo off", "setlocal enabledelayedexpansion", "cd /d \"%~dp0\"", ...environmentLines,
       gmtBeginCommand(config.outputName || "mt_response_curve", formats, config),
-      "gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
+      "gmt set MAP_FRAME_TYPE plain FONT_TITLE 11p,Helvetica-Bold FONT_LABEL 10p,Helvetica FONT_ANNOT_PRIMARY 9p,Helvetica MAP_GRID_PEN_PRIMARY 0.18p,gray90 MAP_FRAME_PEN 0.65p,gray25 MAP_TICK_LENGTH_PRIMARY 2p MAP_ANNOT_OFFSET_PRIMARY 3p MAP_LABEL_OFFSET 5p",
       ...commands,
       "gmt end", ""].filter((line) => line !== "-").join("\r\n");
   }
   return ["#!/usr/bin/env bash", "set -euo pipefail", `cd ${quote(outputDirectory)}`, ...environmentLines, "",
     gmtBeginCommand(outputPrefix, formats, config),
-    "  gmt set MAP_FRAME_TYPE plain FONT_TITLE 18p FONT_LABEL 15p FONT_ANNOT_PRIMARY 11p MAP_GRID_PEN_PRIMARY 0.25p,gray80 MAP_FRAME_PEN 0.8p",
+    "  gmt set MAP_FRAME_TYPE plain FONT_TITLE 11p,Helvetica-Bold FONT_LABEL 10p,Helvetica FONT_ANNOT_PRIMARY 9p,Helvetica MAP_GRID_PEN_PRIMARY 0.18p,gray90 MAP_FRAME_PEN 0.65p,gray25 MAP_TICK_LENGTH_PRIMARY 2p MAP_ANNOT_OFFSET_PRIMARY 3p MAP_LABEL_OFFSET 5p",
     ...commands,
     "gmt end", ""].join("\n");
 }
 
-function buildCurveFiles(station, outputDirectory) {
+function buildCurveFiles(station, outputDirectory, prefix = "curve_", options = {}) {
   const rows = station.mtResponses.map((response) => ({ response, metrics: metricsForResponse(response) }))
     .filter((item) => item.metrics?.impedance)
     .sort((a, b) => a.response.period - b.response.period);
@@ -710,23 +740,25 @@ function buildCurveFiles(station, outputDirectory) {
       series.rhoYX.push([x, value]);
       if (yxError.logRho) series.rhoYXError.push([x, value, yxError.logRho]);
     }
-    if (Number.isFinite(x) && Number.isFinite(impedance.phaseXYPlot)) {
-      series.phaseXY.push([x, impedance.phaseXYPlot]);
-      if (xyError.phase) series.phaseXYError.push([x, impedance.phaseXYPlot, xyError.phase]);
+    const phaseXY = options.phaseMode === "signed" ? impedance.phaseXY : impedance.phaseXYPlot;
+    const phaseYX = options.phaseMode === "signed" ? impedance.phaseYX : impedance.phaseYXPlot;
+    if (Number.isFinite(x) && Number.isFinite(phaseXY)) {
+      series.phaseXY.push([x, phaseXY]);
+      if (xyError.phase) series.phaseXYError.push([x, phaseXY, xyError.phase]);
     }
-    if (Number.isFinite(x) && Number.isFinite(impedance.phaseYXPlot)) {
-      series.phaseYX.push([x, impedance.phaseYXPlot]);
-      if (yxError.phase) series.phaseYXError.push([x, impedance.phaseYXPlot, yxError.phase]);
+    if (Number.isFinite(x) && Number.isFinite(phaseYX)) {
+      series.phaseYX.push([x, phaseYX]);
+      if (yxError.phase) series.phaseYXError.push([x, phaseYX, yxError.phase]);
     }
   }
-  writeXY(path.join(outputDirectory, "curve_rho_xy.tsv"), series.rhoXY);
-  writeXY(path.join(outputDirectory, "curve_rho_yx.tsv"), series.rhoYX);
-  writeErrorSegments(path.join(outputDirectory, "curve_rho_xy_err.tsv"), series.rhoXYError);
-  writeErrorSegments(path.join(outputDirectory, "curve_rho_yx_err.tsv"), series.rhoYXError);
-  writeXY(path.join(outputDirectory, "curve_phase_xy.tsv"), series.phaseXY);
-  writeXY(path.join(outputDirectory, "curve_phase_yx.tsv"), series.phaseYX);
-  writeErrorSegments(path.join(outputDirectory, "curve_phase_xy_err.tsv"), series.phaseXYError);
-  writeErrorSegments(path.join(outputDirectory, "curve_phase_yx_err.tsv"), series.phaseYXError);
+  writeXY(path.join(outputDirectory, prefix + "rho_xy.tsv"), series.rhoXY);
+  writeXY(path.join(outputDirectory, prefix + "rho_yx.tsv"), series.rhoYX);
+  writeErrorSegments(path.join(outputDirectory, prefix + "rho_xy_err.tsv"), series.rhoXYError);
+  writeErrorSegments(path.join(outputDirectory, prefix + "rho_yx_err.tsv"), series.rhoYXError);
+  writeXY(path.join(outputDirectory, prefix + "phase_xy.tsv"), series.phaseXY);
+  writeXY(path.join(outputDirectory, prefix + "phase_yx.tsv"), series.phaseYX);
+  writeErrorSegments(path.join(outputDirectory, prefix + "phase_xy_err.tsv"), series.phaseXYError);
+  writeErrorSegments(path.join(outputDirectory, prefix + "phase_yx_err.tsv"), series.phaseYXError);
   const xs = Object.values(series).flat().map((row) => row[0]);
   const rhos = [...series.rhoXY, ...series.rhoYX, ...errorExtents(series.rhoXYError), ...errorExtents(series.rhoYXError)].map((row) => row[1]);
   return {
@@ -793,25 +825,38 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
   const shade = !sampleLocalPreview && config.terrainShadePath && fs.existsSync(config.terrainShadePath) ? config.terrainShadePath : paths.shadePath;
   const remote = terrainRemoteName(config.terrainResolution);
   const intensity = terrainIntensity(config.terrainIntensity);
+  const elevation=require("./terrain-colorbar").validate(config.terrainColorbar);
   let cpt = terrainCpt(config.terrainCpt);
-  const paperTerrain=['paper','paperGray'].includes(cpt);
-  if(['paper','paperGray'].includes(cpt)){
-    const cptName=`terrain_${cpt}.cpt`;fs.writeFileSync(path.join(outputDirectory,cptName),require('./paper-style').terrainCPT(cpt));
+  const customTerrain=require('./terrain-palettes').has(cpt);
+  const paperTerrain=['paper','paperGray'].includes(cpt)||customTerrain;
+  if(paperTerrain){
+    const cptName=`terrain_${cpt}.cpt`;fs.writeFileSync(path.join(outputDirectory,cptName),require(customTerrain?'./terrain-palettes':'./paper-style').terrainCPT(cpt,elevation));
     cpt=quote(shell==='bat'?cptName:path.join(outputDirectory,cptName));
   }
   const prefix = shell === "bat" ? "" : "  ";
   const preCommands = [];
+  if(!paperTerrain){
+    const palette='terrain_elevation.cpt';
+    preCommands.push(`${prefix}gmt makecpt -C${cpt} -T${elevation.min}/${elevation.max} -Z -H > ${quote(palette)}`);
+    cpt=quote(palette);
+  }
+  // GMT 6.7/NetCDF can reject an absolute output name over 255 UTF-8 bytes,
+  // even returning exit code zero. Use a short relative -G within the cache
+  // directory; the final cache path and modern-map working directory stay fixed.
+  const gridWrite=(module,input,options,output)=>shell==='bat'
+    ? `${prefix}gmt ${module} ${quote(input)} ${options} -G${quote(output)}`
+    : `${prefix}(cd ${quote(path.dirname(output))} && gmt ${module} ${quote(path.isAbsolute(input)?path.relative(path.dirname(output),input):input)} ${options} -G${quote(path.basename(output))} && test -s ${quote(path.basename(output))})`;
   // GMT's default dark-side HSV saturation amplifies tiny yellow/green tints.
   // Keep the illumination neutral and restrained for the publication palettes.
   if(paperTerrain)preCommands.push(`${prefix}gmt set COLOR_HSV_MIN_S 0 COLOR_HSV_MAX_S 0 COLOR_HSV_MIN_V 0.55 COLOR_HSV_MAX_V 1`);
   preCommands.push(`${prefix}gmt set GMT_DATA_SERVER ${quote(terrainDataServer(config.terrainDataServer))}`);
   preCommands.push(`${prefix}gmt set GMT_DATA_UPDATE_INTERVAL ${config.terrainAllowDownload ? "1d" : "off"}`);
   if (localGrid) {
-    if (sampleLocalPreview && !fs.existsSync(grid)) preCommands.push(`${prefix}gmt grdsample ${quote(localGrid)} -R${geographicRegion} -I${terrainResolutionSeconds(config.terrainResolution)}s -G${quote(grid)} -nl`);
-    if (!fs.existsSync(shade)) preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
+    if (sampleLocalPreview && !fs.existsSync(grid)) preCommands.push(gridWrite("grdsample",localGrid,`-R${geographicRegion} -I${terrainResolutionSeconds(config.terrainResolution)}s -nl`,grid));
+    if (!fs.existsSync(shade)) preCommands.push(gridWrite("grdgradient",grid,`-A315 -Ne${intensity}`,shade));
   } else if (!fs.existsSync(grid) || !fs.existsSync(shade)) {
-    preCommands.push(`${prefix}gmt grdcut ${remote} -R${geographicRegion} -G${quote(grid)} -V`);
-    preCommands.push(`${prefix}gmt grdgradient ${quote(grid)} -A315 -Ne${intensity} -G${quote(shade)}`);
+    preCommands.push(gridWrite("grdcut",remote,`-R${geographicRegion} -V`,grid));
+    preCommands.push(gridWrite("grdgradient",grid,`-A315 -Ne${intensity}`,shade));
   }
 
   let renderGrid = grid;
@@ -827,8 +872,23 @@ function terrainScriptParts(config, region, outputDirectory, shell, sourceRegion
     renderGrid = swapped.gridPath;
     renderShade = swapped.shadePath;
   }
+  if(shell!=='bat'){
+    // A relative path can still exceed GMT's NetCDF parser limit when both
+    // the directory and filename contain the full Chinese area label.
+    const shortInput=(file,role)=>{
+      const relative=path.relative(outputDirectory,file);
+      if(Buffer.byteLength(relative,'utf8')<240)return relative;
+      const id=require('crypto').createHash('sha256').update(file).digest('hex').slice(0,12);
+      const alias=`.gmt-terrain-${role}-${id}.nc`;
+      preCommands.push(`${prefix}ln -sfn ${quote(file)} ${quote(alias)}`);
+      return alias;
+    };
+    renderGrid=shortInput(renderGrid,'grid');
+    renderShade=shortInput(renderShade,'shade');
+  }
   return {
     preCommands,
+    colorbarCommand: require("./terrain-colorbar").command(config,cpt,region,quote,prefix),
     contourCommand: require("./cartography-gmt").contourCommand(config, renderGrid, region, quote, prefix),
     imageCommand: !config.showTerrain ? "" : `${prefix}gmt grdimage ${quote(renderGrid)} -R${region} -J${config.projection} -I${quote(renderShade)} -C${cpt} -E${config.terrainPreview ? 150 : pngDpi(config.pngDpi)}`
   };
@@ -920,7 +980,7 @@ function psconvertOptionsForFormats(formats, config = {}) {
     const base = format.split("+")[0];
     return ["bmp", "jpg", "png", "PNG", "ppm", "tif"].includes(base);
   });
-  return [config.cartography?.paperStyle ? 'A+m0.2c' : '', hasRaster ? `E${pngDpi(config.pngDpi)}` : ''].filter(Boolean).join(',');
+  return [(config.plotType==='responseCurve'||config.cartography?.paperStyle) ? 'A+m0.2c' : '', hasRaster ? `E${pngDpi(config.pngDpi)}` : ''].filter(Boolean).join(',');
 }
 
 function pngDpi(value) {

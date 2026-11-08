@@ -8,6 +8,7 @@ const path = require("path");
 const { fork, spawn } = require("child_process");
 const { pathToFileURL } = require("url");
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, protocol, shell } = require("electron");
+const fileDialogs=require('./file-dialogs').create({dialog,BrowserWindow});
 const { buildLegendEntries, normalizeLegendConfig } = require("./legend");
 const { nativePositionStyle } = require("./native-position");
 const {
@@ -30,6 +31,7 @@ const {
 } = require("./gmt");
 
 const APP_TITLE = "MT点位图制作工具—GMT";
+const mtpyWorkbench=require('./mtpy-workbench').create({resolveLocalLibrary,normalizeTerrainConfig,runGMTWorker,overlayNativeDecorations});
 try {
   app.setPath("userData", workspaceDirectory("运行数据/Electron"));
   app.setPath("sessionData", workspaceDirectory("运行数据/Electron"));
@@ -220,7 +222,7 @@ function configureMenu(win) {
     {
       label: "编辑",
       submenu: [
-        { role: "undo", label: "撤销" },
+        { label: "撤销", accelerator: "CmdOrCtrl+Z", click: () => sendMenuAction(win, "menu:undo") },
         { role: "redo", label: "重做" },
         { type: "separator" },
         { role: "cut", label: "剪切" },
@@ -342,7 +344,7 @@ ipcMain.handle("window:exitFullscreen", (event) => {
 });
 
 ipcMain.handle("file:open", async (event) => {
-  const result = await dialog.showOpenDialog({
+  const result = await fileDialogs.open(event,{
     title: "选择点位或 MT 响应表格",
     properties: ["openFile"],
     filters: [
@@ -355,7 +357,7 @@ ipcMain.handle("file:open", async (event) => {
 });
 
 ipcMain.handle("edi:openDirectory", async (event) => {
-  const result = await dialog.showOpenDialog({
+  const result = await fileDialogs.open(event,{
     title: "选择 EDI 文件夹",
     properties: ["openDirectory"]
   });
@@ -378,9 +380,9 @@ ipcMain.handle("data:applyMapping", (event, payload) => {
   return runImportWorker(event.sender, { mode: "applyMapping", rows: payload.rows, mapping: payload.mapping });
 });
 
-ipcMain.handle("project:saveAs", async (_event, payload) => {
+ipcMain.handle("project:saveAs", async (event, payload) => {
   const suggested = String(payload?.suggestedName || "mt_gmt_project").replace(/[\\/:*?"<>|]+/g, "_");
-  const result = await dialog.showSaveDialog({
+  const result = await fileDialogs.save(event,{
     title: "保存 MT-GMT 工程",
     defaultPath: path.join(workspaceDirectory("工程文件"), `${suggested}.mtgmt`),
     filters: [
@@ -394,8 +396,8 @@ ipcMain.handle("project:saveAs", async (_event, payload) => {
   return result.filePath;
 });
 
-ipcMain.handle("project:open", async () => {
-  const result = await dialog.showOpenDialog({
+ipcMain.handle("project:open", async (event) => {
+  const result = await fileDialogs.open(event,{
     title: "打开 MT-GMT 工程",
     properties: ["openFile"],
     filters: [
@@ -409,9 +411,9 @@ ipcMain.handle("project:open", async () => {
   return { filePath, project };
 });
 
-ipcMain.handle("file:saveText", async (_event, payload) => {
+ipcMain.handle("file:saveText", async (event, payload) => {
   const defaultPath = String(payload?.defaultPath || "mt_gmt_export.txt").replace(/[\\/:*?"<>|]+/g, "_");
-  const result = await dialog.showSaveDialog({
+  const result = await fileDialogs.save(event,{
     title: payload?.title || "保存文本文件",
     defaultPath: path.join(workspaceDirectory("导出表格"), defaultPath),
     filters: payload?.filters || [
@@ -425,12 +427,15 @@ ipcMain.handle("file:saveText", async (_event, payload) => {
 });
 
 ipcMain.handle("gmt:buildScript", async (event, payload) => {
+  requireMTpyForAnalysis(payload);
   payload=await resolveLocalLibrary(event.sender,payload);
+  payload=await resolveTerrainScale(payload);
   return buildScript(payload.records, normalizeTerrainConfig(payload), outputDirectoryFromPayload(payload), payload.formats || ["png", "pdf", "eps"]);
 });
 
 ipcMain.handle("gmt:saveScript", async (event, payload) => {
-  const result = await dialog.showSaveDialog({
+  requireMTpyForAnalysis(payload);
+  const result = await fileDialogs.save(event,{
     title: "保存 GMT 脚本",
     defaultPath: path.join(workspaceDirectory("导出脚本"), `${payload.config.outputName || "mt_point_map"}.${process.platform === "win32" ? "bat" : "gmt"}`),
     filters: [
@@ -440,6 +445,7 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
   });
   if (result.canceled || !result.filePath) return null;
   payload=await resolveLocalLibrary(event.sender,payload);
+  payload=await resolveTerrainScale(payload);
   await runGMTWorker(event.sender, {
     mode: "saveScript",
     records: payload.records,
@@ -452,10 +458,16 @@ ipcMain.handle("gmt:saveScript", async (event, payload) => {
 });
 
 ipcMain.handle("gmt:export", async (event, payload) => {
+  payload=await resolveTerrainScale(payload);
+  if(mtpyWorkbench.active(payload?.config?.plotType)){
+    const result=await mtpyWorkbench.render(event,payload);
+    return {...result,terrainScale:payload.terrainScale};
+  }
+  payload={...payload,config:require("./response-export").responseConfig(payload.records||[],payload.config)};
   const directAI=(payload.formats||[]).includes("ai");
   const illustrator=directAI?await require("./illustrator-direct").findIllustrator():null;
   payload=await resolveLocalLibrary(event.sender,payload);
-  payload={...payload,config:require("./map-names").plotConfig(payload.config)};
+  payload={...payload,config:require("./map-selections").classifiedConfig(payload.records||[],require("./map-names").plotConfig(payload.config))};
   if(directAI)payload.config={...payload.config,illustratorPackage:true,illustratorDirect:true};
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
@@ -480,8 +492,14 @@ ipcMain.handle("gmt:export", async (event, payload) => {
     result.files.push(output);
   }
   result.localLibrary=payload.localLibrary;
+  result.terrainScale=payload.terrainScale;
   return result;
 });
+
+function requireMTpyForAnalysis(payload) {
+  if(['phaseTensorMap','tipperMap'].includes(payload?.config?.plotType))
+    throw new Error('MTpy 图件请使用主工作台的预览和导出；不支持导出旧 GMT 张量计算脚本。');
+}
 
 ipcMain.handle("output:chooseDirectory", async () => {
   await shell.openPath(workspaceRoot());
@@ -505,8 +523,8 @@ ipcMain.handle("terrain:estimate", (_event, payload) => {
   };
 });
 
-ipcMain.handle("terrain:chooseLocalGrid", async () => {
-  const result = await dialog.showOpenDialog({
+ipcMain.handle("terrain:chooseLocalGrid", async (event) => {
+  const result = await fileDialogs.open(event,{
     title: "选择本地 GRD 地形图",
     properties: ["openFile"],
     filters: [
@@ -519,7 +537,7 @@ ipcMain.handle("terrain:chooseLocalGrid", async () => {
 });
 
 ipcMain.handle("fault:openFiles", async (event, payload) => {
-  const result = await dialog.showOpenDialog({
+  const result = await fileDialogs.open(event,{
     title: "选择构造线或断层线文件",
     properties: ["openFile", "multiSelections"],
     filters: [
@@ -531,6 +549,43 @@ ipcMain.handle("fault:openFiles", async (event, payload) => {
   const color = String(payload?.color || "#d7191c");
   return runImportWorker(event.sender, { mode: "faultFiles", filePaths: result.filePaths, color });
 });
+
+// High-level elevation export owns its own worker and only reuses the terrain
+// task while preparing missing data. It never changes the map's region/state.
+const elevationJobs = new Map();
+ipcMain.handle('elevation:export', async (event,payload) => {
+ if(elevationJobs.has(event.sender.id))throw Error('高程导出正在进行，请等待或取消。');
+ const job={cancelled:false,child:null,terrain:null};elevationJobs.set(event.sender.id,job);
+ const cancel=()=>{job.cancelled=true;if(job.child?.connected)job.child.send({type:'cancel'});if(job.terrain&&!job.terrain.done)job.terrain.cancel();};
+ event.sender.once('destroyed',cancel);
+ const emit=progress=>{if(!event.sender.isDestroyed())event.sender.send('elevation:progress',progress);};
+ const run=async p=>{if(job.cancelled)throw Error('已取消高程导出。');return runForkWorker('elevation-worker.js',p,event.sender,'elevation',{onSpawn:child=>{job.child=child;if(job.cancelled)child.send({type:'cancel'});}});};
+ try{
+  require('./em3dvp-elevation').region(payload.region);
+  const config=normalizeTerrainConfig({config:{...payload.config,region:payload.region,terrainPreview:false,terrainGridPath:'',terrainShadePath:''}});
+  const outputDirectory=workspaceDirectory('导出高程/EM3DVP');
+  emit({percent:3,message:'正在按经纬度范围匹配本地地形缓存…'});
+  let found=await run({mode:'findCache',config});
+  if(!found){
+   config.localTerrainGridPath='';
+   if(currentTerrainTask&&!currentTerrainTask.done)throw Error('地形底图任务正在进行，请完成后再导出高程。');
+   const estimate=terrainEstimate(config.region,config.terrainResolution);if(estimate.blocked)throw Error(estimate.warning);
+   const gmtInfo=resolveGMT();if(!gmtInfo.available)throw Error('未找到 GMT，请先选择已安装引擎。');
+   const status=await new Promise((resolve,reject)=>{
+    const Task=terrainSource(config.terrainResolution)==='srtm'?SrtmTerrainWorkerTask:TerrainPrepareTask;
+    const proxy={isDestroyed:()=>event.sender.isDestroyed(),send:(_channel,value)=>{emit({percent:Math.min(45,Number(value.percent||0)*.45),message:value.message});if(['completed','failed','cancelled'].includes(value.state))queueMicrotask(()=>{if(currentTerrainTask===job.terrain)currentTerrainTask=null;resolve(value);});}};
+    job.terrain=new Task({gmtInfo,outputDirectory,config,webContents:proxy,onDone:()=>{if(currentTerrainTask===job.terrain)currentTerrainTask=null;}});currentTerrainTask=job.terrain;
+    try{if(job.cancelled){currentTerrainTask=null;reject(Error('已取消高程导出。'));}else job.terrain.start();}catch(e){if(currentTerrainTask===job.terrain)currentTerrainTask=null;reject(e);}
+   });
+   if(status.state!=='completed')throw Error(status.message||'地形准备未完成。');
+   found={gridPath:status.gridPath,source:'复用地形底图流程自动准备'};
+  }
+  emit({percent:48,message:found.source+'：'+path.basename(found.gridPath)});
+  const result=await run({...payload,gridPath:found.gridPath,areaName:config.terrainRegionName||payload.areaName});
+  return {...result,terrainSource:found.source};
+ }finally{event.sender.removeListener('destroyed',cancel);elevationJobs.delete(event.sender.id);}
+});
+ipcMain.handle('elevation:cancel',event=>{const job=elevationJobs.get(event.sender.id);if(job){job.cancelled=true;if(job.child?.connected)job.child.send({type:'cancel'});if(job.terrain&&!job.terrain.done)job.terrain.cancel();}return {ok:true};});
 
 ipcMain.handle("terrain:prepare", (event, payload) => startTerrainTask(event.sender, payload));
 ipcMain.handle("terrain:pause", () => {
@@ -580,9 +635,10 @@ ipcMain.handle("gmt:downloadCancel", () => {
   currentInstallerDownload.cancel();
   return { ok: true };
 });
-ipcMain.handle("gmt:cancelRender", () => {
+ipcMain.handle("gmt:cancelRender", (event) => {
+  const cancelledMTpy=mtpyWorkbench.cancel(event.sender.id);
   if(require("./illustrator-direct").cancelIllustrator())return {ok:true,message:"已请求取消 AI 导出，正在恢复原文档。"};
-  if (!currentGMTRenderTask?.child || currentGMTRenderTask.child.killed) return { ok: false, message: "当前没有正在运行的 GMT 绘图任务。" };
+  if (!currentGMTRenderTask?.child || currentGMTRenderTask.child.killed) return { ok: cancelledMTpy, message: cancelledMTpy?"已请求取消 MTpy 绘图。":"当前没有正在运行的 GMT 绘图任务。" };
   const cancelledRenderChild=currentGMTRenderTask.child;
   try {
     cancelledRenderChild.send({ type: "cancel" });
@@ -595,9 +651,9 @@ ipcMain.handle("gmt:cancelRender", () => {
   return { ok: true, message: "已请求取消当前 GMT 绘图任务。" };
 });
 ipcMain.handle("gmt:recheck", () => runForkWorker('gmt-engine-worker.js',{mode:'status'}));
-ipcMain.handle("gmt:selectEngine", async (_event, selected) => {
+ipcMain.handle("gmt:selectEngine", async (event, selected) => {
   if(currentGMTRenderTask || (currentTerrainTask&&!currentTerrainTask.done))throw new Error('请等待绘图或地形任务结束后再切换引擎。');
-  if(selected===null){const r=await dialog.showOpenDialog({title:'选择 GMT 可执行文件',properties:['openFile','showHiddenFiles','treatPackageAsDirectory']});if(r.canceled)return null;selected=r.filePaths[0];}
+  if(selected===null){const r=await fileDialogs.open(event,{title:'选择 GMT 可执行文件',properties:['openFile','showHiddenFiles','treatPackageAsDirectory']});if(r.canceled)return null;selected=r.filePaths[0];}
   return runForkWorker('gmt-engine-worker.js',{mode:'select',path:selected});
 });
 ipcMain.handle("map:project", (_event, payload) => runForkWorker("map-project-worker.js", payload));
@@ -609,8 +665,8 @@ ipcMain.handle("geodata:task", async (event, payload) => {
   finally { geodataTasks.delete(event.sender.id); }
 });
 ipcMain.handle("geodata:cancel", event => { const child=geodataTasks.get(event.sender.id); if(child) child.send({type:"cancel"}); return true; });
-ipcMain.handle("geodata:open", async () => {
-  const result=await dialog.showOpenDialog({title:"导入地点或构造数据",properties:["openFile"],filters:[{name:"矢量图层 / 地点表",extensions:["geojson","json","shp","zip","gmt","xy","dat","csv","tsv","txt","xlsx","xls"]}]});
+ipcMain.handle("geodata:open", async (event) => {
+  const result=await fileDialogs.open(event,{title:"导入地点或构造数据",properties:["openFile"],filters:[{name:"矢量图层 / 地点表",extensions:["geojson","json","shp","zip","gmt","xy","dat","csv","tsv","txt","xlsx","xls"]}]});
   return result.canceled?null:result.filePaths[0];
 });
 ipcMain.handle("shell:openExternal", (_event, url) => shell.openExternal(url));
@@ -625,7 +681,7 @@ async function resolveLocalLibrary(webContents,payload){
  const model=require('./local-structures'),manual=c.features||[],seen=new Set(manual.map(f=>model.geometryKey(f.geometry)));
  return {...payload,localLibrary:info,config:{...config,cartography:{...c,features:[...manual,...features.filter(f=>!seen.has(model.geometryKey(f.geometry)))]}}};
 }
-ipcMain.handle('library:chooseDirectory',async()=>{const r=await dialog.showOpenDialog({title:'选择本地构造文件夹（复制至全局缓存）',properties:['openDirectory']});return r.canceled?null:r.filePaths[0];});
+ipcMain.handle('library:chooseDirectory',async(event)=>{const r=await fileDialogs.open(event,{title:'选择本地构造文件夹（复制至全局缓存）',properties:['openDirectory']});return r.canceled?null:r.filePaths[0];});
 function runImportWorker(webContents, payload) {
   return runForkWorker("import-worker.js", payload, webContents, "import");
 }
@@ -640,6 +696,7 @@ function runForkWorker(scriptName, payload, webContents, progressChannel, option
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       serialization: "advanced"
     });
+    options.onSpawn?.(child);
     if (options.track === "geodata" && webContents) geodataTasks.set(webContents.id, child);
     if (options.track === "gmt") currentGMTRenderTask = { child, startedAt: Date.now() };
     let settled = false;
@@ -741,14 +798,42 @@ function writeSettings(settings) {
 }
 
 async function overlayNativeDecorations(result, config, outputName, requestedFormats) {
+  const insetModule=require('./map-inset'),insetFeature=insetModule.active(config);
+  let insetLayout;
+  if(insetFeature){
+    const region=require('./map-selections').bounds(String(config.region).split('/'));
+    const b=require('./map-selections').bounds(insetFeature.properties.regionBox);
+    const shift=360*Math.round(((region[0]+region[1])/2-(b[0]+b[1])/2)/360);
+    b[0]+=shift;b[1]+=shift;
+    if(b[0]<region[0]||b[1]>region[1]||b[2]<region[2]||b[3]>region[3])throw Error('局部放大区域必须完整位于主图范围内。');
+    const ring=require('./map-selections').boxGeometry(b).coordinates[0],outer=require('./map-selections').boxGeometry(region).coordinates[0];
+    const points=await runForkWorker('map-project-worker.js',{config,frame:result.mapFrame,points:[...ring,...outer]});
+    insetLayout=insetModule.layout(insetFeature,points.slice(0,ring.length),points.slice(ring.length),result.mapFrame);
+  }
   const pngPath = path.join(result.outputDirectory, `${outputName}.png`);
   if (!fs.existsSync(pngPath)) throw new Error(`中文图名/图例叠加失败：未找到 PNG 底图 ${pngPath}`);
   const needsPDF = (result.generatedFormats || requestedFormats).includes("pdf");
   const rendered = await renderDecoratedMap(pngPath, {...config, legend:{...config.legend,show:!!result.nativeLegend}, mapPageWidth:result.mapFrame?.width, annotationLayout: result.annotationLayout}, needsPDF);
+  if(!insetLayout)await fs.promises.rm(path.join(result.outputDirectory,`${outputName}_局部放大参数.json`),{force:true});
+  const basePDF=needsPDF?await fs.promises.readFile(path.join(result.outputDirectory, `${outputName}.pdf`)):null;
+  if(insetLayout){
+    const titlePoints=rendered.titleHeight*result.mapFrame.height/rendered.imageSize.height;
+    const fullLayout=insetModule.shifted(insetLayout,titlePoints);
+    rendered.pngBuffer=await renderInsetPreview(rendered,insetLayout,result.mapFrame.width);
+    if(rendered.editingSVG){
+      // Use the isolated preview renderer to transform editable SVG DOM.
+      const transformed=await transformInsetSVG(rendered.editingSVG,fullLayout);
+      rendered.editingSVG=transformed.svg;
+      if(transformed.hasInset)rendered.editingGroups.push('GMT_inset');
+    }
+    result.inset={...fullLayout,featureId:insetFeature.id};
+    fs.writeFileSync(path.join(result.outputDirectory,`${outputName}_局部放大参数.json`),JSON.stringify(result.inset,null,2));
+  }
   if (config.illustratorPackage) {
+    rendered.plotType=config.plotType;
     const packageRoot=config.illustratorDirect?await fs.promises.mkdtemp(path.join(workspaceDirectory('临时文件'),'ai-export-')):result.outputDirectory;
     const script = await require('./illustrator-export').writeIllustratorPackage(packageRoot, outputName,
-      await fs.promises.readFile(path.join(result.outputDirectory, `${outputName}.pdf`)), rendered);
+      insetLayout?await runForkWorker('gmt-worker.js',{mode:'composeInset',bytes:basePDF,layout:insetLayout}):basePDF, rendered);
     result.illustratorScript=script;
     if(!config.illustratorDirect)result.files.push(script);
   }
@@ -762,7 +847,7 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   if (needsPDF) {
     vectorPDF = await runForkWorker("gmt-worker.js", {
       mode: "composeVectorPDF",
-      baseBytes: fs.readFileSync(path.join(result.outputDirectory, `${outputName}.pdf`)),
+      baseBytes: basePDF,
       overlayBytes: rendered.pdfBuffer,
       imageSize: rendered.imageSize,
       titleHeight: rendered.titleHeight,
@@ -771,6 +856,7 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   }
   fs.writeFileSync(pngPath, rendered.pngBuffer);
   if (needsPDF) {
+    if(result.inset)vectorPDF=await runForkWorker('gmt-worker.js',{mode:'composeInset',bytes:vectorPDF,layout:result.inset});
     fs.writeFileSync(path.join(result.outputDirectory, `${outputName}.pdf`), vectorPDF);
   }
   if (requestedFormats.includes("eps")) await runForkWorker("gmt-worker.js",{mode:"pdfToEPS",pdfPath:path.join(result.outputDirectory,`${outputName}.pdf`),epsPath:path.join(result.outputDirectory,`${outputName}.eps`),dpi:config.pngDpi});
@@ -783,12 +869,31 @@ async function overlayNativeDecorations(result, config, outputName, requestedFor
   }
 }
 
+// Hidden, file-based composition keeps large terrain bytes out of data URLs.
+async function renderInsetPreview(rendered,layout,pageWidth){
+  const dir=await fs.promises.mkdtemp(path.join(workspaceDirectory('临时文件/原生叠加'),'inset-'));
+  let win;try{
+    const input=path.join(dir,'source.png');await fs.promises.writeFile(input,rendered.pngBuffer);
+    const width=rendered.imageSize.width,height=rendered.imageSize.height+rendered.titleHeight+rendered.footerHeight,q=width/pageWidth;
+    const v=require('./map-inset').shifted(layout,rendered.titleHeight/q);
+    const px={...v,source:{x:v.source.x*q,y:v.source.y*q,width:v.source.width*q,height:v.source.height*q,points:v.source.points.map(p=>p.map(x=>x*q))},target:Object.fromEntries(Object.entries(v.target).map(([k,x])=>[k,x*q])),borderWidth:v.borderWidth*q};
+    const html=path.join(dir,'inset.html');await fs.promises.writeFile(html,require('./map-inset').previewHTML(pathToFileURL(input).href,width,height,px));
+    win=new BrowserWindow({show:false,focusable:false,width,height,useContentSize:true,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true}});
+    await win.loadFile(html);await win.webContents.executeJavaScript('Promise.all([...document.images].map(i=>i.decode())).then(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))))');
+    return (await win.webContents.capturePage()).toPNG();
+  }finally{if(win&&!win.isDestroyed())win.destroy();await fs.promises.rm(dir,{recursive:true,force:true});}
+}
+async function transformInsetSVG(svg,layout){
+  const win=new BrowserWindow({show:false,focusable:false,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true}});
+  try{await win.loadURL('about:blank');return await win.webContents.executeJavaScript(`(${require('./map-inset').decorateSVG.toString()})(${JSON.stringify(svg)},${JSON.stringify(layout)})`);}finally{win.destroy();}
+}
+
 async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
   const image = nativeImage.createFromPath(pngPath);
   const size = image.getSize();
   if (!size.width || !size.height) throw new Error("中文图名/图例叠加失败：无法读取 GMT PNG 尺寸。");
   const requestedTitle = config.showTitle === false ? "" : String(config.title || "").trim();
-  const title = (config.illustratorPackage || needsNativeTextRendering(requestedTitle)) ? requestedTitle : "";
+  const title = (config.illustratorPackage || needsNativeTextRendering(requestedTitle) || config.plotType === "responseCurve" && (require("./response-collection").normalize(config.curveCollection).mode !== "single" || require("./response-collection").normalize(config.curveCollection).style === "reference")) ? requestedTitle : "";
   const titleHeight = title ? Math.max(56, Math.round(size.height * 0.065)) : 0;
   const titleSize = Math.max(22, Math.min(40, Math.round(size.width * 0.022)));
   const totalHeight = size.height + titleHeight;
@@ -957,7 +1062,7 @@ async function renderDecoratedMap(pngPath, config = {}, includePDF = true) {
 }
 
 function nativeMapElementsMarkup(config, imageSize) {
-  if (!config?.swapAxes) return "";
+  if (config?.plotType === "responseCurve" || !config?.swapAxes) return "";
   const scale = config.showScale ? nativeScaleMarkup(config, imageSize) : "";
   const compass = config.showNorthArrow ? nativeCompassMarkup(config) : "";
   return `${scale}${compass}`;
@@ -1018,7 +1123,7 @@ function nativeLegendMarkup(config, imageSize) {
     const pxPerPoint = imageSize.width / (config.mapPageWidth || config.annotationLayout?.width || projectionWidthCm(config.projection) * 72 / 2.54);
     const labelSize = settings.labelFontSize * pxPerPoint, titleSize = settings.titleFontSize * pxPerPoint;
     const gap = labelSize * 0.25, symbolBox = labelSize * 1.25;
-    const rows = entries.map(entry => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap)).join('');
+    const rows = entries.map(entry => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap, pxPerPoint)).join('');
     return `<div class="native-legend" style="position:relative;width:100%;font-family:Arial,'Microsoft YaHei','PingFang SC',sans-serif;color:${escapeHTML(settings.textColor)}"><div class="native-legend-title" style="font-size:${titleSize}px;margin-bottom:${gap}px">${escapeHTML(settings.title || 'Legend')}</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:${labelSize * 2}px;overflow-wrap:anywhere">${rows}</div></div>`;
   }
   const position = parseNativeLegendPosition(settings.position);
@@ -1033,21 +1138,32 @@ function nativeLegendMarkup(config, imageSize) {
   const gap = clampNative(Math.round(0.10 * pxPerCm), 8, 18);
   const alpha = 1 - clampNative(Number(settings.backgroundTransparency) || 0, 0, 100) / 100;
   const transform = nativeLegendTransform(position.justify);
-  const rows = entries.map((entry) => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap)).join("");
+  const rows = entries.map((entry) => nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap, pxPerCm/28.346)).join("");
   return `<div class="native-legend" style="left:${(position.x * 100).toFixed(3)}%;top:${((1 - position.y) * 100).toFixed(3)}%;transform:${transform};width:${width}px;padding:${padding}px;background:${escapeHTML(settings.backgroundColor)};background-color:${colorWithAlpha(settings.backgroundColor, alpha)};border:${settings.borderWidth}px solid ${escapeHTML(settings.borderColor)};border-radius:${settings.cornerRadius}px;color:${escapeHTML(settings.textColor)};box-shadow:0 3px 14px rgba(22,31,45,0.12)"><div class="native-legend-title" style="font-size:${titleSize}px">${escapeHTML(settings.title || "图例")}</div><div class="native-legend-rule" style="margin:${gap}px 0"></div>${rows}</div>`;
 }
 
-function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
-  const penColor = escapeHTML(String(entry.pen || '').split(',')[1] || 'black');
+function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap, pxPerPoint=labelSize/8.5) {
+  const penParts=String(entry.pen||'0.5p,black').split(',');
+  const [color,transparency='0']=(penParts[1]||'black').split('@');
+  const penColor=escapeHTML(color);
+  const penWidth=Math.max(0,Number.parseFloat(penParts[0])||0);
+  const strokeWidth=penWidth*pxPerPoint*100/symbolBox;
+  const strokeOpacity=1-clampNative(Number(transparency)||0,0,100)/100;
+  const line=entry.symbol==='line', boxWidth=line?symbolBox*2.8:symbolBox;
+  const viewWidth=line?280:100;
+  const stroke=`stroke="${penColor}" stroke-width="${strokeWidth}" stroke-opacity="${strokeOpacity}"`;
+
   const fill = escapeHTML(entry.fill || '#2f6f8f');
-  const dash = String(entry.pen).endsWith(',-') ? 'stroke-dasharray="14 8"' : String(entry.pen).endsWith(',.') ? 'stroke-dasharray="3 6"' : '';
+  // Scale the pattern with physical pen width, just as GMT does; fixed SVG
+  // lengths made thick dashed faults look dotted in the legend.
+  const dash = String(entry.pen).endsWith(',-') ? `stroke-dasharray="${8*strokeWidth} ${4*strokeWidth}"` : String(entry.pen).endsWith(',.') ? `stroke-dasharray="${strokeWidth} ${4*strokeWidth}"` : '';
   let shape;
   if (entry.symbol === 'line') {
-    shape = `<line x1="8" y1="50" x2="92" y2="50" stroke="${penColor}" stroke-width="5" ${dash}/>`;
+    shape = `<line x1="8" y1="50" x2="272" y2="50" ${stroke} ${dash}/>`;
   } else if (entry.symbol === 'area') {
-    shape = `<rect x="8" y="25" width="84" height="50" fill="${fill}" fill-opacity="${Number(entry.opacity ?? 100)/100}" stroke="${penColor}" stroke-width="3" ${dash}/>`;
+    shape = `<rect x="8" y="25" width="84" height="50" fill="${fill}" fill-opacity="${Number(entry.opacity ?? 100)/100}" ${stroke} ${dash}/>`;
   } else {
-    const style = `fill="${fill}" stroke="${penColor}" stroke-width="3"`;
+    const style = `fill="${fill}" ${stroke}`;
     const type = entry.gmtSymbol || 'c';
     if (type === 'a') shape = `<polygon points="50,20 57,41 79,41 61,55 68,77 50,63 32,77 39,55 21,41 43,41" ${style}/>`;
     else if (type === 't') shape = `<polygon points="50,23 78,75 22,75" ${style}/>`;
@@ -1057,7 +1173,7 @@ function nativeLegendEntryMarkup(entry, symbolBox, labelSize, gap) {
   }
   // A direct SVG flex item prints reliably in Chromium; nested inline-flex
   // spans can lose their painted symbols on a dynamically extended PDF page.
-  return `<div class="native-legend-entry" style="font-size:${labelSize}px;margin-top:${gap}px;break-inside:avoid"><svg xmlns="http://www.w3.org/2000/svg" width="${symbolBox}" height="${symbolBox}" viewBox="0 0 100 100" style="display:block;flex:0 0 ${symbolBox}px;margin-right:${gap}px;overflow:visible">${shape}</svg><span style="min-width:0">${escapeHTML(entry.label)}</span></div>`;
+  return `<div class="native-legend-entry" style="font-size:${labelSize}px;margin-top:${gap}px;break-inside:avoid"><svg xmlns="http://www.w3.org/2000/svg" width="${boxWidth}" height="${symbolBox}" viewBox="0 0 ${viewWidth} 100" style="display:block;flex:0 0 ${boxWidth}px;margin-right:${gap}px;overflow:visible">${shape}</svg><span style="min-width:0">${escapeHTML(entry.label)}</span></div>`;
 }
 
 function parseNativeLegendPosition(value) {
@@ -1113,8 +1229,13 @@ function loadRenderer(win) {
   const jsPath = path.join(rendererDir, "renderer.js");
   const bridge = `
     const { ipcRenderer } = require("electron");
+    window.ResponseCollection = require(${JSON.stringify(path.join(__dirname,"response-collection.js"))});
+    window.MapSelections = require(${JSON.stringify(path.join(__dirname,"map-selections.js"))});
+    window.Shorelines = require(${JSON.stringify(path.join(__dirname,"shorelines.js"))});
     window.WorkbenchPanels = require(${JSON.stringify(path.join(__dirname,"workbench-panels.js"))});
     window.MapNames = require(${JSON.stringify(path.join(__dirname,"map-names.js"))});
+    window.TerrainColorbar = require(${JSON.stringify(path.join(__dirname,"terrain-colorbar.js"))});
+    window.MapPresentation = require(${JSON.stringify(path.join(__dirname,"presentation.js"))});
     window.PaperStyle = require(${JSON.stringify(path.join(__dirname,"paper-style.js"))});
     window.mtApp = {
       geographicRegionIssue: ${geographicRegionIssue.toString()},
@@ -1135,6 +1256,9 @@ function loadRenderer(win) {
       chooseOutputDirectory: (currentDirectory) => ipcRenderer.invoke("output:chooseDirectory", currentDirectory),
       deleteCurrentOutputs: (payload) => ipcRenderer.invoke("output:deleteCurrent", payload),
       estimateTerrain: (payload) => ipcRenderer.invoke("terrain:estimate", payload),
+      exportElevation: payload => ipcRenderer.invoke('elevation:export',payload),
+      cancelElevation: () => ipcRenderer.invoke('elevation:cancel'),
+      onElevationProgress: handler => ipcRenderer.on('elevation:progress',(_event,value)=>handler(value)),
       prepareTerrain: (payload) => ipcRenderer.invoke("terrain:prepare", payload),
       chooseLocalTerrainGrid: () => ipcRenderer.invoke("terrain:chooseLocalGrid"),
       pauseTerrain: () => ipcRenderer.invoke("terrain:pause"),
@@ -1160,6 +1284,7 @@ function loadRenderer(win) {
       cancelGMTDownload: () => ipcRenderer.invoke("gmt:downloadCancel"),
       onGMTDownloadProgress: (handler) => ipcRenderer.on("gmt:downloadProgress", (_event, payload) => handler(payload)),
       cancelGMTRender: () => ipcRenderer.invoke("gmt:cancelRender"),
+      onMenuUndo: (handler) => ipcRenderer.on("menu:undo", handler),
       onMenuOpenFile: (handler) => ipcRenderer.on("menu:openFile", handler),
       onMenuOpenEdiDirectory: (handler) => ipcRenderer.on("menu:openEdiDirectory", handler),
       onMenuOpenProject: (handler) => ipcRenderer.on("menu:openProject", handler),
@@ -1194,11 +1319,17 @@ function loadRenderer(win) {
 
   let html = fs.readFileSync(htmlPath, "utf8");
   const css = fs.readFileSync(cssPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"workbench.css"),"utf8");
-  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"local-library-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"workbench-ui.js"),"utf8");
+  const renderer = fs.readFileSync(jsPath, "utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"cartography-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-drawing-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"local-library-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"workbench-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"map-selections-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"project-history.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"inset-position-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"response-collection-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"elevation-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"presentation-ui.js"),"utf8") + "\n" + fs.readFileSync(path.join(rendererDir,"terrain-colorbar-ui.js"),"utf8");
   html = html
     .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
     .replace('<script src="renderer.js"></script>', `<script>\n${bridge}\n${renderer}\n</script>`);
   win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+}
+
+async function resolveTerrainScale(payload){
+  const config=normalizeTerrainConfig(payload);
+  const terrainScale=await require('./terrain-autoscale').resolve(payload.terrainRecords||payload.records||[],config,outputDirectoryFromPayload(payload));
+  return {...payload,config:{...config,terrainColorbar:terrainScale.settings},terrainScale};
 }
 
 function normalizeTerrainConfig(payload) {
@@ -1260,7 +1391,7 @@ function terrainCacheSummary(outputDirectory) {
 }
 
 function assertTerrainIdle() {
-  if ((currentTerrainTask && !currentTerrainTask.done) || currentGMTRenderTask) throw new Error("请先完成或取消绘图和地形任务，再删除共享缓存。");
+  if (elevationJobs.size || (currentTerrainTask && !currentTerrainTask.done) || currentGMTRenderTask) throw new Error("请先完成或取消绘图和地形任务，再删除共享缓存。");
 }
 
 function deleteCurrentTerrainCache(outputDirectory, payload) {
@@ -1380,6 +1511,7 @@ function formatBytesLocal(bytes) {
 }
 
 function startTerrainTask(webContents, payload) {
+  if ([...elevationJobs.values()].some(j=>j.terrain&&!j.terrain.done)) return {ok:false,message:"正在为高程导出准备地形，请先完成或取消高程导出。"};
   const outputDirectory = outputDirectoryFromPayload(payload);
   saveOutputDirectory(outputDirectory);
   const config = normalizeTerrainConfig(payload);
@@ -1524,7 +1656,7 @@ class TerrainPrepareTask {
   runCut() {
     this.runGMTStep({
       step: "cut",
-      args: ["grdcut", terrainRemoteName(this.config.terrainResolution), `-R${this.config.region}`, `-G${this.gridTempPath}`, "-V"],
+      args: ["grdcut", terrainRemoteName(this.config.terrainResolution), `-R${this.config.region}`, `-G${path.basename(this.gridTempPath)}`, "-V"],
       message: `正在获取并裁剪 ${terrainRemoteName(this.config.terrainResolution)}...`,
       basePercent: 12,
       next: () => this.runGradient()
@@ -1534,7 +1666,7 @@ class TerrainPrepareTask {
   runGradient() {
     this.runGMTStep({
       step: "gradient",
-      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.shadeTempPath}`],
+      args: ["grdgradient", path.basename(this.paths.gridPath), "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${path.basename(this.shadeTempPath)}`],
       message: "正在生成地形阴影...",
       basePercent: 80,
       next: () => this.complete()
@@ -1548,9 +1680,10 @@ class TerrainPrepareTask {
     this.percent = Math.max(this.percent, basePercent);
     this.pausing = false;
     this.pausedBySignal = false;
+    this.lastOutput = "";
     this.emit();
     this.child = spawn(this.gmtInfo.path, args, {
-      cwd: this.outputDirectory,
+      cwd: this.paths.directory,
       encoding: "utf8",
       env: gmtChildEnv(this.gmtInfo, this.config)
     });
@@ -1576,12 +1709,9 @@ class TerrainPrepareTask {
         return;
       }
       if (code === 0) {
-        if (step === "cut" && !fs.existsSync(this.gridTempPath)) {
-          this.fail("GMT 没有生成地形网格文件。请尝试更低分辨率，或检查 GMT 数据服务器/GDAL OpenJPEG 支持。");
-          return;
-        }
-        if (step === "gradient" && !fs.existsSync(this.shadeTempPath)) {
-          this.fail("GMT 没有生成地形阴影文件。请尝试更低分辨率或重新准备底图。");
+        const output = step === "cut" ? this.gridTempPath : step === "gradient" ? this.shadeTempPath : null;
+        if (output && (!fs.existsSync(output) || fs.statSync(output).size === 0)) {
+          this.fail(`GMT 没有生成有效的地形${step === "cut" ? "网格" : "阴影"}文件。${this.lastOutput ? `\n${this.lastOutput}` : ""}`);
           return;
         }
         if (step === "cut") fs.renameSync(this.gridTempPath, this.paths.gridPath);

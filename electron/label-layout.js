@@ -31,15 +31,20 @@ function candidates(f,region,fallback){
 function textSize(name,fontSize,bold=false){const lines=String(name).split(/\n|\\n/);return {width:Math.max(...lines.map(line=>[...line].reduce((n,c)=>n+(/[\u2e80-\uffff]/.test(c)?1:/[MW@%]/.test(c)?.9:/[ilI.,' ]/.test(c)?.32:.62),0)))*fontSize*(bold?1.08:1)+4,height:lines.length*fontSize*1.22+3};}
 function overlaps(a,b){return a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;}
 function place(layout,options={}){
- const cfg=settings(options);if(!cfg.enabled)return {...layout,placement:{enabled:false,shown:layout.labels.length,hidden:[]}};
+ const cfg=settings(options),hidden=[];
+ const visible=cfg.hideGeneric?layout.labels.filter(label=>{
+  if(!label.generic&&!genericName(label.name))return true;
+  hidden.push({id:label.id,name:label.name,reason:'generic'});
+  return false;
+ }):layout.labels;
+ if(!cfg.enabled)return {...layout,labels:visible,placement:{enabled:false,shown:visible.length,hidden}};
  const frame=layout.frame||{x:0,y:0,width:layout.width,height:layout.height};
- const used=[...(layout.obstacles||[])],seen=new Set(),hidden=[],labels=[];
+ const used=[...(layout.obstacles||[])],seen=new Set(),labels=[];
  // Reserve actual point symbols so a neighbour's name cannot cover them.
  const symbols=layout.labels.filter(l=>l.point&&!l.pinned&&l.style.symbol!=='none').map(l=>{const r=l.style.size*72/2.54/2+1;return {id:l.id,x:l.x-r,y:l.y-r,width:r*2,height:r*2};});
- const ordered=[...layout.labels].sort((a,b)=>(Number(b.pinned)-Number(a.pinned))||((b.priority||0)-(a.priority||0))||String(a.id).localeCompare(String(b.id)));
+ const ordered=[...visible].sort((a,b)=>(Number(b.pinned)-Number(a.pinned))||((b.priority||0)-(a.priority||0))||String(a.id).localeCompare(String(b.id)));
  for(const l of ordered){
   const key=nameKey(l.name);
-  if(cfg.hideGeneric&&(l.generic||genericName(l.name))){hidden.push({id:l.id,name:l.name,reason:'generic'});continue;}
   if(!l.pinned&&seen.has(key)){hidden.push({id:l.id,name:l.name,reason:'duplicate'});continue;}
   if(!l.pinned&&labels.length>=cfg.maxLabels){hidden.push({id:l.id,name:l.name,reason:'density'});continue;}
   const s=l.style,box=textSize(l.name,s.fontSize,s.bold),candidates=l.candidates?.length?l.candidates:[{x:l.x,y:l.y}];let placed;

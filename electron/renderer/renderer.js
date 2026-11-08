@@ -1,3 +1,28 @@
+
+function isMTpyPlot(type=state.plotType){return ['phaseTensorMap','tipperMap'].includes(type);}
+var mtpyFields={periods:'Periods',mode:'Mode',component:'Component',convention:'Convention',ellipseScale:'EllipseScale',arrowScale:'ArrowScale',lastRowAlign:'LastRowAlign',backgroundStyle:'BackgroundStyle',columns:'Columns',layout:'Layout',panelGap:'PanelGap',colorbarMode:'ColorbarMode',colorbarPosition:'ColorbarPosition',colorbarAlign:'ColorbarAlign',colorbarGap:'ColorbarGap',skew:'Skew',eccentricity:'Eccentricity',maxGap:'MaxGap'};
+function readMTpySettings(){return Object.fromEntries(Object.entries(mtpyFields).map(([key,suffix])=>[key,document.getElementById('mtpy'+suffix).value]));}
+function restoreMTpySettings(settings={}){settings=settings||{};settings={ellipseScale:0.7*Number(settings.symbolScale||1),arrowScale:0.85*Number(settings.symbolScale||1),lastRowAlign:'center',backgroundStyle:'soft',...settings};for(const [key,suffix]of Object.entries(mtpyFields))if(settings[key]!=null)document.getElementById('mtpy'+suffix).value=String(settings[key]);syncMTpyControls();}
+function syncMTpyControls(){
+ const vertical=['left','right'].includes(document.getElementById('mtpyColorbarPosition').value),align=document.getElementById('mtpyColorbarAlign');
+ align.options[1].textContent=vertical?'上对齐':'左对齐';align.options[2].textContent=vertical?'下对齐':'右对齐';
+ const disabled=document.getElementById('mtpyMode').value==='tipper'||document.getElementById('mtpyColorbarMode').value==='none';
+ for(const suffix of ['ColorbarPosition','ColorbarAlign','ColorbarGap'])document.getElementById('mtpy'+suffix).disabled=disabled;
+}
+function initMTpyControls(){
+ for(const suffix of Object.values(mtpyFields))document.getElementById('mtpy'+suffix).addEventListener('change',()=>{
+  const mode=document.getElementById('mtpyMode').value;
+  if(suffix==='Mode'){setPlotType(mode==='tipper'?'tipperMap':'phaseTensorMap');document.getElementById('mtpyMode').value=mode;}
+  if(suffix==='Layout'){const compact=document.getElementById('mtpyLayout').value==='compact';document.getElementById('mtpyPanelGap').value=compact?'3':'6';if(compact)document.getElementById('mtpyColorbarMode').value='shared';}
+  if(suffix==='ColorbarMode'&&document.getElementById('mtpyColorbarMode').value==='individual')document.getElementById('mtpyLayout').value='spaced';
+  syncMTpyControls();scheduleAutoPreview('MTpy 参数已更新');
+ });syncMTpyControls();
+ // Shared map fields also remain editable drafts, including during a render.
+ for(const eventName of ['input','change'])document.addEventListener(eventName,event=>{
+  if(isMTpyPlot()&&event.target.matches('input,select,textarea')&&event.target.closest('fieldset[data-settings-panel],.quick-inspector'))scheduleAutoPreview();
+ });
+}
+
 const state = {
   parsed: null,
   allRecords: [],
@@ -5,6 +30,8 @@ const state = {
   columns: [],
   mapping: null,
   plotType: "stationMap",
+  curveCollection: {mode:"single",keys:null,style:"reference",phaseMode:"signed",showGrid:true,showErrors:true,connect:false,gapX:.4},
+  elevationExport: {},
   outputDirectory: "",
   workspaceDirectory: "",
   terrainCacheDirectory: "",
@@ -43,9 +70,10 @@ const state = {
     dragPanStart: null
   },
   terrainWaiter: null,
-  cartography: {language:"zh",nameFormat:"name",features:[],categoryStyles:{},contours:{}},
+  cartography: {language:"zh",nameFormat:"abbreviation",features:[],categoryStyles:{},contours:{}},
   faultLayers: [],
   stationGroups: [],
+  stationClasses: {enabled:false,assignments:{},styles:{}},
   labelNames: [],
   axisTransform: {
     swapAxes: false,
@@ -170,6 +198,7 @@ const ids = [
   "gmtEngineSelect", "gmtEngineBrowse", "engineStatusText", "engineInstallText",
   "installPlanText", "outputPath", "chooseOutputBtn", "showTitleInput", "titleInput", "regionInput", "projectionInput", "frameInput",
 	  "autoRegionBtn", "showTerrainInput", "terrainResolutionInput", "terrainCptInput", "terrainIntensityInput",
+    "showCoastInput", "showInlandWaterInput", "fillSeaInput", "seaColorInput",
 	  "inspectorTitle", "plotTypeHint", "strikeLengthInput", "strikeColorInput", "tensorScaleInput", "tensorPenColorInput",
 	  "tipperComponentInput", "tipperConventionInput", "tipperScaleInput",
 	  "terrainRegionNameInput", "workspacePathText", "openWorkspaceBtn",
@@ -188,7 +217,7 @@ const ids = [
   "legendOrderInput", "legendStationLabelInput", "legendOverlayLabelInput",
   "legendWidthInput", "legendTitleSizeInput", "legendLabelSizeInput", "legendTextColorInput", "legendTextColorPicker",
   "legendBackgroundInput", "legendBackgroundPicker", "legendBackgroundAlphaInput", "legendBorderColorInput",
-  "legendBorderColorPicker", "legendBorderWidthInput",
+  "legendBorderColorPicker", "legendBorderWidthInput", "legendLineOpacityInput", "legendLineOpacityOverrideInput", "structureLinePresetBtn",
   "deleteOutputBtn", "runtimeStatus", "gmtStatusText", "versionText",
   "headerProjectName", "headerOpenProjectBtn", "headerSaveProjectBtn", "headerExportBtn", "sidebarGMTVersion", "sidebarGMTButton",
   "sidebarImportFileBtn", "sidebarImportEdiBtn", "sidebarLoadSampleBtn",
@@ -204,12 +233,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   populateColorControls();
   wireEvents();
   initWorkbenchUI();
+  initResponseCollectionUI();
+  initElevationUI();
   renderLocalTerrainGrid();
   renderTerrainDataServerCustom();
   renderFaultLayers();
   setPlotType("stationMap");
   renderQuickInspector();
   await refreshStatus();
+  initProjectHistory();
 });
 
 function bind(control, eventName, handler, options) {
@@ -218,6 +250,10 @@ function bind(control, eventName, handler, options) {
 
 function wireEvents() {
   initWindowControls();
+  document.getElementById('mtpyOpenBtn').addEventListener('click',()=>{if(!isMTpyPlot())setPlotType('phaseTensorMap');openSettingsPanel('mtParams');});
+  initPresentationControls();
+  initTerrainColorbarControls();
+  initMTpyControls();
   window.mtApp.onMenuOpenFile(openPointFile);
   window.mtApp.onMenuOpenEdiDirectory(openEdiDirectory);
   window.mtApp.onMenuOpenProject?.(openProjectFile);
@@ -261,6 +297,11 @@ function wireEvents() {
   bind(el.regionInput, "input", syncRegionBounds);
   bind(el.projectionInput, "input", renderRegionValidation);
   bind(el.tableHelpBtn, "click", showTableHelp);
+  bind(document.getElementById('canvasCurveStation'), 'change', e => {
+    el.curveStationInput.value=e.target.value;el.curveStationInput.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  bind(document.getElementById('canvasCurvePrevious'), 'click', () => navigateCurveStation(-1));
+  bind(document.getElementById('canvasCurveNext'), 'click', () => navigateCurveStation(1));
   bind(el.mtPeriodInput, "change", () => scheduleAutoPreview("周期已切换，正在自动绘制预览...", { delay: 120 }));
   bind(el.curveStationInput, "change", () => {
     renderCurveNavigation();
@@ -295,6 +336,8 @@ function wireEvents() {
   bind(el.cancelRenderBtn, "click", cancelCurrentRender);
   bind(el.exportPngBtn, "click", () => exportMap(["png"], true));
   bind(el.exportAiDirectBtn, "click", () => exportMap(["ai"], true));
+  bind(document.getElementById("curveExportAiBtn"), "click", () => exportMap(["ai"], true));
+  bind(document.getElementById("curveExportPackageBtn"), "click", () => exportMap(["pdf"], true, {illustrator:true}));
   bind(el.exportAiBtn, "click", () => exportMap(["pdf"], true, {illustrator:true}));
   bind(el.exportPdfBtn, "click", () => exportMap(["pdf"], true));
   bind(el.exportEpsBtn, "click", () => exportMap(["eps"], true));
@@ -342,6 +385,12 @@ function wireEvents() {
     bind(control, "change", updateTerrainEstimate);
   });
   bind(el.terrainDataServerInput, "change", renderTerrainDataServerCustom);
+  for (const control of [el.showCoastInput, el.showInlandWaterInput, el.fillSeaInput, el.seaColorInput]) {
+    bind(control, "change", () => {
+      el.seaColorInput.disabled = !el.fillSeaInput.checked;
+      scheduleAutoPreview("海岸与水体样式已更新");
+    });
+  }
   bind(el.showScaleInput, "change", () => {
     renderDraggableMapElements();
     scheduleAutoPreview("比例尺显示状态已更改，正在自动更新预览...");
@@ -517,6 +566,7 @@ function renderQuickInspector() {
   if (el.canvasDataMeta) {
     el.canvasDataMeta.textContent = state.plotType === "baseMap" ? `经纬度范围 ${el.regionInput.value || "待设置"}` : records.length ? `${records.length} 个测点${lineCount ? ` · ${lineCount} 条测线` : ""}` : "尚未导入测点";
   }
+  renderCurveContext();
   let issueCount = 0;
   if (state.allRecords.length) {
     try {
@@ -591,6 +641,15 @@ function wireLegendControls() {
     renderQuickInspector();
     queueLegendPreview("图例显示状态已更改，正在自动更新预览...");
   });
+  el.structureLinePresetBtn.addEventListener('click',()=>{
+    state.cartography=window.PaperStyle.applyLineStyles(state.cartography);
+    renderCartography();cartChanged();
+    queueLegendPreview('已区分构造类别的颜色和线型，正在更新预览…');
+  });
+  el.legendLineOpacityOverrideInput.addEventListener('change',()=>{
+    el.legendLineOpacityInput.disabled=!el.legendLineOpacityOverrideInput.checked;
+    queueLegendPreview('图例线条不透明度已更改，正在更新预览…');
+  });
   el.legendIncludeFaultsInput.addEventListener("change", () => queueLegendPreview("图例内容已更改，正在自动更新预览..."));
   el.legendOrderInput.addEventListener("change", () => queueLegendPreview("图例顺序已更改，正在自动更新预览..."));
   el.legendTitleInput.addEventListener("input", () => queueLegendPreview("图例标题已更改，正在自动更新预览..."));
@@ -612,6 +671,7 @@ function wireLegendControls() {
     el.legendTitleSizeInput,
     el.legendLabelSizeInput,
     el.legendBackgroundAlphaInput,
+    el.legendLineOpacityInput,
     el.legendBorderWidthInput
   ].forEach((control) => {
     control.addEventListener("input", () => queueLegendPreview("图例样式已更改，正在自动更新预览..."));
@@ -634,6 +694,7 @@ function setPlotType(plotType) {
     button.classList.toggle("active", button.dataset.plotType === state.plotType);
   });
   document.body.dataset.plotType = state.plotType;
+  if(isMTpyPlot()){const mode=document.getElementById('mtpyMode');if(state.plotType==='tipperMap')mode.value='tipper';else if(mode.value==='tipper')mode.value='combined';}
   const labels = {
     baseMap: ["区域底图", "按经纬度范围绘图，无需测点；可导出到 Illustrator 编辑"],
     stationMap: ["绘图参数", "点位图模式"],
@@ -733,7 +794,8 @@ async function confirmSettingsDialog() {
     const applied = await applyMapping({ silent: true });
     if (!applied) return;
   }
-  if (["gmt", "storage", "help", "export", "imports", "data", "quality"].includes(panel)) return closeSettingsDialog();
+  if (["gmt", "storage", "help", "export", "elevation", "imports", "data", "quality"].includes(panel)) return closeSettingsDialog();
+  if (isMTpyPlot()) return exportMap(["png"], false);
   scheduleAutoPreview(`${SETTINGS_PANELS[panel] || "设置"}已更新，正在自动绘制预览...`, { delay: 120 });
 }
 
@@ -787,6 +849,7 @@ async function openProjectFile() {
     const opened = await window.mtApp.openProject();
     if (!opened?.project) return;
     restoreProjectSnapshot(opened.project, opened.filePath);
+    resetProjectHistory();
     notify(`工程已打开：${opened.filePath}`);
   } catch (error) {
     notify(`工程打开失败：${error.message || String(error)}`);
@@ -855,8 +918,13 @@ function restoreProjectSnapshot(project, filePath = "") {
 
 function applyConfigToUI(config) {
   if (!config) return;
+  state.elevationExport = {...(config.elevationExport||{})};
+  state.curveCollection = window.ResponseCollection.normalize(config.curveCollection);
+  renderResponseCollection();
   state.cartography = {features:[],categoryStyles:{},contours:{},...(config.cartography || {})};
   renderCartography();
+  state.stationClasses=window.MapSelections.classes(config.stationClasses);
+  if(typeof selectionUI!=="undefined"){stopSelectionMode();selectionUI.selected.clear();}
   state.stationGroups = Array.isArray(config.stationGroups) ? config.stationGroups.map((group) => ({ ...group })) : [];
   state.labelNames = Array.isArray(config.labelNames) ? [...config.labelNames] : [];
   state.axisTransform = {
@@ -865,6 +933,8 @@ function applyConfigToUI(config) {
     yAxisLabel: String(config.yAxisLabel || "Longitude (E)")
   };
   if (config.plotType) setPlotType(config.plotType);
+  restoreMTpySettings(config.mtpy);
+  restorePresentation({...config.presentation,labelFormat:config.presentation?.labelFormat??(config.cartography?.nameFormat?'project':window.MapPresentation.defaults.labelFormat)});
   setChecked(el.showTitleInput, typeof config.showTitle === "boolean" ? config.showTitle : Boolean(String(config.title || "").trim()));
   setInputValue(el.titleInput, config.title);
   setInputValue(el.regionInput, config.region);
@@ -892,8 +962,16 @@ function applyConfigToUI(config) {
   setChecked(el.showTerrainInput, config.showTerrain);
   el.terrainRegionNameInput.value = config.terrainRegionName || "";
   setInputValue(el.terrainResolutionInput, config.terrainResolution);
+  renderElevationSettings();
+  restoreTerrainColorbar(config.terrainColorbar);
   setInputValue(el.terrainCptInput, config.terrainCpt);
   setInputValue(el.terrainIntensityInput, config.terrainIntensity);
+  const shorelines = window.Shorelines.settings(config.shorelines);
+  setChecked(el.showCoastInput, shorelines.coast);
+  setChecked(el.showInlandWaterInput, shorelines.inland);
+  setChecked(el.fillSeaInput, shorelines.fillSea);
+  setInputValue(el.seaColorInput, shorelines.seaColor);
+  el.seaColorInput.disabled = !shorelines.fillSea;
   setChecked(el.terrainAllowDownloadInput, config.terrainAllowDownload);
   setTerrainDataServerValue(config.terrainDataServer);
   setInputValue(el.terrainSrtmSourceInput, window.mtApp.srtmSource(config));
@@ -911,6 +989,9 @@ function applyConfigToUI(config) {
   setInputValue(el.tipperScaleInput, config.tipperScale);
   if (config.legend) {
     setChecked(el.showLegendInput, config.legend.show);
+    el.legendLineOpacityOverrideInput.checked=config.legend.lineOpacity!=null;
+    el.legendLineOpacityInput.disabled=config.legend.lineOpacity==null;
+    el.legendLineOpacityInput.value=config.legend.lineOpacity??100;
     setInputValue(el.legendTitleInput, config.legend.title);
     setInputValue(el.legendStationLabelInput, config.legend.stationLabel);
     setInputValue(el.legendOverlayLabelInput, config.legend.overlayLabel);
@@ -936,7 +1017,7 @@ function applyConfigToUI(config) {
 }
 
 function setInputValue(input, value) {
-  if (!input || value === undefined || value === null || value === "") return;
+  if (!input || value === undefined || value === null) return;
   input.value = String(value);
 }
 
@@ -1463,6 +1544,10 @@ function readConfig() {
     plotType: state.plotType,
     mtPeriod: Number(el.mtPeriodInput.value),
     curveStation: el.curveStationInput.value,
+    curveCollection: window.ResponseCollection.normalize(state.curveCollection),
+    elevationExport: readElevationSettings(),
+    mtpy: readMTpySettings(),
+    presentation: readPresentation(),
     strikeLength: Number(el.strikeLengthInput.value),
     strikeColor: el.strikeColorInput.value,
     tensorScale: Number(el.tensorScaleInput.value),
@@ -1487,6 +1572,7 @@ function readConfig() {
     pointFill: readColor("pointFill"),
     pointPenWidth: Number(el.penWidthInput.value),
     pointPenColor: readColor("penColor"),
+    stationClasses: JSON.parse(JSON.stringify(state.stationClasses)),
     stationGroups: state.stationGroups.map((group) => ({ ...group })),
     labelNames: [...state.labelNames],
     swapAxes: state.axisTransform.swapAxes,
@@ -1498,8 +1584,11 @@ function readConfig() {
     labelDY: Number(el.labelDYInput.value),
     showTerrain: el.showTerrainInput.checked,
     terrainResolution: el.terrainResolutionInput.value,
+    terrainColorbar: readTerrainColorbar(),
     terrainCpt: el.terrainCptInput.value,
     terrainIntensity: Number(el.terrainIntensityInput.value),
+    shorelines: window.Shorelines.settings({coast: el.showCoastInput.checked, inland: el.showInlandWaterInput.checked,
+      fillSea: el.fillSeaInput.checked, seaColor: el.seaColorInput.value}),
     terrainAllowDownload: el.terrainAllowDownloadInput.checked,
     terrainDataServer: readTerrainDataServer(),
     terrainSrtmSource: el.terrainSrtmSourceInput.value,
@@ -1515,6 +1604,7 @@ function readConfig() {
     })),
     legend: {
       show: el.showLegendInput.checked,
+      lineOpacity: el.legendLineOpacityOverrideInput.checked?clamp(Number(el.legendLineOpacityInput.value),0,100):null,
       title: el.legendTitleInput.value.trim() || "Legend",
       stationLabel: el.legendStationLabelInput.value.trim() || "Station",
       overlayLabel: el.legendOverlayLabelInput.value.trim() || defaultLegendOverlayLabel(state.plotType),
@@ -1533,7 +1623,10 @@ function readConfig() {
     outputName: el.outputNameInput.value.trim() || "mt_point_map",
     pngDpi: clamp(Math.round(Number(el.pngDpiInput.value) || 300), 72, 1200)
   };
-  if (state.plotType === "responseCurve") config.showTerrain = false;
+  if (state.plotType === "responseCurve") {
+    config.showTerrain = false;
+    config.cartography = {...config.cartography, contours:{...config.cartography?.contours,show:false}};
+  }
   return config;
 }
 
@@ -1675,6 +1768,9 @@ function formatsDialogAvailable() {
 }
 
 async function exportMap(formats, showAlert, options = {}) {
+  // MTpy renders are explicit submissions, including after an older timer fires.
+  if (options.auto && isMTpyPlot()) return false;
+  if(typeof selectionUI!=="undefined"&&selectionUI.mode){if(showAlert)notify("请先完成区域框或测点选择，再导出。");return false;}
   if (typeof mapDraw !== "undefined" && mapDraw.active) { if(showAlert) notify("请先完成或取消当前构造绘制，再导出图件。"); return false; }
   if (!state.records.length && state.plotType !== "baseMap") return notify("请先导入点位数据，或选择区域底图按范围绘图。");
   if (!options.auto && state.preview.autoTimer) {
@@ -1683,9 +1779,15 @@ async function exportMap(formats, showAlert, options = {}) {
   }
   if (state.preview.rendering) {
     if (options.auto) state.preview.queuedAuto = true;
+    else if(showAlert){
+      if(state.preview.exporting){notify('已有图件正在导出，请等待完成后再导出。');return false;}
+      state.preview.queuedExport={formats:[...formats],options:{...options}};
+      setRuntimeStatus('导出已排队，当前预览完成后自动开始…','busy');
+    }
     return false;
   }
   state.preview.rendering = true;
+  state.preview.exporting = !!showAlert;
   const requestRevision = state.preview.revision;
   const requestPlotType = state.plotType;
   const renderRecords = recordsForPlot();
@@ -1695,7 +1797,7 @@ async function exportMap(formats, showAlert, options = {}) {
   const baseConfig = readConfig();
   const config = isPreviewRender ? previewConfig(baseConfig) : baseConfig;
   config.illustratorPackage = Boolean(options.illustrator);
-  config.interactiveMap = config.plotType !== "responseCurve";
+  config.interactiveMap = config.plotType !== "responseCurve"&&!isMTpyPlot(config.plotType);
   if (isPreviewRender && config.showTerrain && config.terrainResolution !== baseConfig.terrainResolution) {
     setRuntimeStatus(`快速预览地形 ${config.terrainResolution}；正式导出保持 ${baseConfig.terrainResolution}`, "busy");
   }
@@ -1720,7 +1822,7 @@ async function exportMap(formats, showAlert, options = {}) {
     }
     let result;
     try {
-      result = await window.mtApp.exportMap({ records: renderRecords, config, formats, outputDirectory: state.outputDirectory });
+      result = await window.mtApp.exportMap({ records: renderRecords, terrainRecords: state.allRecords, config, formats, outputDirectory: state.outputDirectory });
     } catch (error) {
       notify(error.message || String(error));
       return false;
@@ -1734,21 +1836,33 @@ async function exportMap(formats, showAlert, options = {}) {
     state.outputDirectory = result.outputDirectory;
     renderOutputDirectory();
     const isCurrentRequest = requestRevision === state.preview.revision && requestPlotType === state.plotType;
-    if (formats.includes("png")) {
-      const png = result.files.find((file) => file.toLowerCase().endsWith(".png"));
-      if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType, {frame:result.mapFrame, config:JSON.parse(JSON.stringify(config))});
+    if(result.terrainScale){
+      config.terrainColorbar=result.terrainScale.settings;
+      if(isCurrentRequest)applyTerrainScale(result.terrainScale);
+    }
+    if (formats.includes("png")||isMTpyPlot(config.plotType)) {
+      const png = result.preview || result.files.find((file) => file.toLowerCase().endsWith(".png"));
+      if (png && isCurrentRequest) await renderPreview(png, requestRevision, requestPlotType, {frame:result.mapFrame, inset:result.inset, config:JSON.parse(JSON.stringify(config))});
     }
     const labelReport=result.annotationLayout?.placement;
-    const labelStatus=labelReport?.enabled?` · 名称 ${labelReport.shown} 项${labelReport.hidden.length?`，略去 ${labelReport.hidden.length} 项重复/编号/拥挤文字`:''}`:'';
+    const labelStatus=labelReport?` · 名称 ${labelReport.shown} 项${labelReport.hidden.length?`，略去 ${labelReport.hidden.length} 项重复/编号/拥挤文字`:''}`:'';
     if (showAlert) setRuntimeStatus(`导出完成：${result.files.length} 个文件${labelStatus}`, "ready");
     else if (isCurrentRequest) setRuntimeStatus(`预览已更新${labelStatus}`, "ready");
     if (showAlert) notify(`导出完成：\n${result.files.join("\n")}`);
     return true;
   } finally {
     state.preview.rendering = false;
+    state.preview.exporting = false;
     el.cancelRenderBtn.classList.add("hidden");
     setPreviewBusy(false);
-    if (state.preview.queuedAuto) {
+    if (isMTpyPlot() && requestPlotType === state.plotType && requestRevision !== state.preview.revision) {
+      setPreviewStatus('参数已修改，尚未绘制；修改完成后点击“更新预览”。', 'pending');
+    }
+    if(state.preview.queuedExport){
+      const queued=state.preview.queuedExport;state.preview.queuedExport=null;
+      state.preview.queuedAuto=false;
+      await exportMap(queued.formats,true,queued.options);
+    } else if (state.preview.queuedAuto) {
       state.preview.queuedAuto = false;
       scheduleAutoPreview("设置继续变化，正在自动更新预览...");
     }
@@ -1756,6 +1870,8 @@ async function exportMap(formats, showAlert, options = {}) {
 }
 
 async function cancelCurrentRender() {
+  state.preview.queuedExport=null;
+  state.preview.queuedAuto=false;
   const result = await window.mtApp.cancelGMTRender?.();
   setPreviewStatus(result?.message || "已请求取消绘图。", "pending");
 }
@@ -2206,7 +2322,7 @@ async function saveScript() {
   }
   let saved;
   try {
-    saved = await window.mtApp.saveScript({ records: recordsForPlot(), config, outputDirectory: state.outputDirectory, formats: ["png", "pdf", "eps"] });
+    saved = await window.mtApp.saveScript({ records: recordsForPlot(), terrainRecords: state.allRecords, config, outputDirectory: state.outputDirectory, formats: ["png", "pdf", "eps"] });
   } catch (error) {
     notify(error.message || String(error));
     return;
@@ -2235,12 +2351,13 @@ function plotReadinessIssue(config) {
     const issue = String(config.region || "").trim() ? window.mtApp.geographicRegionIssue(config.region, config.projection) : "";
     if (issue) return issue;
   }
-  if (["strikeMap", "phaseTensorMap", "tipperMap", "responseCurve"].includes(config.plotType)) {
+  if (["strikeMap", "responseCurve"].includes(config.plotType)) {
     const hasMT = state.records.some((record) => record.mtResponses?.length);
     if (!hasMT) {
       return "当前数据只有点位坐标，没有可用于走向、相位张量、Tipper 或曲线图的 MT 响应数据。请导入 EDI 文件夹，或在表格中提供周期/频率与阻抗张量列。";
     }
   }
+  if(isMTpyPlot(config.plotType))return state.records.some(r=>/\.edi$/i.test(r.sourcePath||''))?'':'MTpy 绘图需要原始 EDI 文件。';
   const selected = state.records
     .map((record) => nearestResponseClient(record, config.mtPeriod))
     .filter(Boolean);
@@ -2258,6 +2375,7 @@ function plotReadinessIssue(config) {
     }
   }
   if (config.plotType === "responseCurve") {
+    if (window.ResponseCollection.normalize(config.curveCollection).mode !== "single") return window.ResponseCollection.issue(state.records,config);
     if (!config.curveStation) return "请选择一个包含 MT 响应数据的测点。";
     const station = state.records.find((record) => record.name === config.curveStation);
     if (!station?.mtResponses?.some(responseHasCurveData)) return "所选测点没有可绘制的 ZXY/ZYX 视电阻率和相位响应。";
@@ -2413,6 +2531,28 @@ function populateMTControls() {
     el.curveStationInput.value = previousCurveStation;
   }
   renderCurveNavigation();
+  renderResponseCollection();
+}
+
+function renderCurveContext() {
+  document.getElementById('previewModeLabel').textContent = isMTpyPlot() ? '手动预览' : '自动预览';
+  const bar=document.getElementById('curveContextBar');if(!bar)return;
+  bar.hidden=state.plotType!=='responseCurve';if(bar.hidden)return;
+  const multi=window.ResponseCollection.normalize(state.curveCollection).mode!=='single';
+  for(const id of ['canvasCurveStation','canvasCurvePosition','canvasCurvePrevious','canvasCurveNext']){const node=document.getElementById(id);(id==='canvasCurveStation'?node.closest('label'):node).hidden=multi;}
+  document.getElementById('curveContextKey').hidden=multi&&state.curveCollection.mode==='overlay';
+  const curveStyle=window.ResponseCollection.normalize(state.curveCollection),key=document.getElementById('curveContextKey');
+  key.querySelector('.curve-key-xy').textContent=curveStyle.style==='reference'?'●':'■';
+  key.lastElementChild.textContent=curveStyle.style==='reference'?`红色 XY · 蓝色 YX；${curveStyle.phaseMode==='signed'?'原始相位（含负值）':'0–180° 折叠相位'}${curveStyle.showErrors?'；显示误差棒':''}`:'细线连接采样点，竖线为误差棒';
+  if(multi){const config=readConfig(),shown=state.preview.mapContext?.config;el.canvasDataMeta.textContent=window.ResponseCollection.describe(state.records,config)+(state.preview.displayRevision!==state.preview.revision?' · 待更新':'');if(shown&&JSON.stringify(shown.curveCollection)!==JSON.stringify(config.curveCollection))el.canvasDataMeta.textContent='图中：'+window.ResponseCollection.describe(state.records,shown)+' · 待更新：'+window.ResponseCollection.describe(state.records,config);return;}
+  const input=document.getElementById('canvasCurveStation'),options=Array.from(el.curveStationInput.options);
+  if(input.options.length!==options.length||options.some((o,i)=>input.options[i]?.value!==o.value)) input.replaceChildren(...options.map(o=>new Option(o.text,o.value)));
+  input.value=el.curveStationInput.value;input.disabled=!options.length;
+  document.getElementById('canvasCurvePosition').textContent=options.length?`${el.curveStationInput.selectedIndex+1} / ${options.length}`:'0 / 0';
+  for(const id of ['canvasCurvePrevious','canvasCurveNext'])document.getElementById(id).disabled=options.length<2;
+  const shown=state.preview.hasImage&&state.preview.mapContext?.config?.plotType==='responseCurve'?state.preview.mapContext.config.curveStation:'';
+  const current=input.value||'未选择测点';
+  el.canvasDataMeta.textContent=shown&&shown!==current?`图中：${shown} · 待更新：${current}`:`测点：${current}${state.preview.displayRevision!==state.preview.revision?' · 待更新':''}`;
 }
 
 function renderCurveNavigation() {
@@ -2422,9 +2562,11 @@ function renderCurveNavigation() {
   if (el.curvePreviousBtn) el.curvePreviousBtn.disabled = count <= 1;
   if (el.curveNextBtn) el.curveNextBtn.disabled = count <= 1;
   if (el.curveStationInput) el.curveStationInput.disabled = count === 0;
+  renderCurveContext();
 }
 
 function navigateCurveStation(delta) {
+  if (window.ResponseCollection.normalize(state.curveCollection).mode !== "single") return false;
   const count = el.curveStationInput?.options?.length || 0;
   if (!count) return false;
   const current = Math.max(0, el.curveStationInput.selectedIndex);
@@ -2470,6 +2612,7 @@ async function renderPreview(filePath, expectedRevision = null, expectedPlotType
     const dimensions = await imageDimensions(url);
     if (expectedRevision !== null && (expectedRevision !== state.preview.revision || expectedPlotType !== state.plotType)) return false;
     state.preview.mapContext = mapContext;
+    state.preview.displayRevision = state.preview.revision;
     state.preview.imageWidth = dimensions.width;
     state.preview.imageHeight = dimensions.height;
     el.previewImageLayer.style.backgroundImage = `url(${url})`;
@@ -2479,6 +2622,7 @@ async function renderPreview(filePath, expectedRevision = null, expectedPlotType
     el.previewBox.classList.add("has-preview");
     el.previewBox.setAttribute("aria-label", "GMT 点位图预览");
     state.preview.hasImage = true;
+    renderCurveContext();
     resetPreviewView();
     return true;
   } catch (error) {
@@ -2493,6 +2637,7 @@ async function renderPreview(filePath, expectedRevision = null, expectedPlotType
 function clearPreviewImage() {
   state.preview.hasImage = false;
   state.preview.mapContext = null;
+  cancelInsetDrag();renderInsetHandle();
   state.preview.imageWidth = 0;
   state.preview.imageHeight = 0;
   state.preview.zoom = 1;
@@ -2523,8 +2668,8 @@ function renderPlaceholder() {
     baseMap: "点击左侧“制图 → 按经纬度范围绘图”，填写边界即可生成底图",
     stationMap: "导入点位后自动绘制点位图，也可选择“区域底图”直接按范围绘图",
     strikeMap: "导入 MT 数据并选择周期后自动绘制走向图",
-    phaseTensorMap: "导入 MT 数据并选择周期后自动绘制相位张量椭圆图",
-    tipperMap: "导入 MT 数据并选择周期后自动绘制感应矢量图",
+    phaseTensorMap: "设置周期及其他参数后，点击“更新预览”统一绘制相位张量椭圆图",
+    tipperMap: "设置周期及其他参数后，点击“更新预览”统一绘制感应矢量图",
     responseCurve: "导入 MT 数据并选择测点后自动绘制视电阻率和相位曲线"
   };
   state.preview.revision += 1;
@@ -2534,14 +2679,23 @@ function renderPlaceholder() {
 }
 
 function markPreviewStale(message) {
-  if (!state.preview.hasImage) return;
+  if (!state.preview.hasImage && !isMTpyPlot()) return;
   scheduleAutoPreview(message || "设置已更改，正在自动更新预览...");
 }
 
 function scheduleAutoPreview(message, options = {}) {
+  queueProjectHistory();
   if (state.preview.autoTimer) clearTimeout(state.preview.autoTimer);
+  state.preview.autoTimer = null;
   state.preview.revision += 1;
+  renderCurveContext();
+  renderInsetHandle();
   renderLegendDragHandle();
+  if (isMTpyPlot()) {
+    state.preview.queuedAuto = false;
+    setPreviewStatus('参数已修改，尚未绘制；修改完成后点击“更新预览”。', 'pending');
+    return;
+  }
   if (!state.records.length && state.plotType !== "baseMap") return;
   if (state.plotType === "baseMap" && regionIssue()) return;
   setPreviewStatus(message || "设置已更改，正在自动更新预览...", "pending");
@@ -2564,10 +2718,12 @@ function autoPreviewDelay() {
 }
 
 function setPreviewBusy(active, message = "") {
+  renderInsetHandle();
   if (el.previewBtn) {
     el.previewBtn.disabled = active;
-    el.previewBtn.textContent = active ? "生成中..." : "生成预览";
+    el.previewBtn.textContent = active ? "生成中..." : "更新预览";
   }
+  el.settingsConfirmBtn.disabled = active && isMTpyPlot();
   if (active) setPreviewStatus(message || "正在生成预览...", "busy");
   else if (el.previewStatus.dataset.kind === "busy") hidePreviewStatus();
 }
@@ -2871,7 +3027,9 @@ function resetPreviewView() {
 }
 
 function updatePreviewTransform() {
+  if(typeof renderInsetHandle==="function")renderInsetHandle();
   if (typeof renderMapDrawing === "function") requestAnimationFrame(renderMapDrawing);
+  if(typeof renderSelectionOverlay==='function')requestAnimationFrame(renderSelectionOverlay);
   el.previewImageLayer.style.transform = `translate(${state.preview.panX.toFixed(2)}px, ${state.preview.panY.toFixed(2)}px) scale(${state.preview.zoom.toFixed(4)})`;
   el.previewZoomLabel.textContent = `${Math.round(state.preview.zoom * 100)}%`;
   el.previewBox.classList.toggle("is-zoomed", state.preview.zoom > PREVIEW_MIN_ZOOM + 0.001);

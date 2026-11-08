@@ -55,8 +55,8 @@
     app.preferences.PDFFileOptions.pageToOpen=1;
     doc=app.open(new File(stage.fsName+'/base.pdf'));
     var bounds=doc.artboards[0].artboardRect;
-    terrain=doc.layers.add();terrain.name='地形影像';
-    var base=doc.layers.add();base.name='底图与构造线';
+    if(info.plotType!=='responseCurve'){terrain=doc.layers.add();terrain.name='地形影像';}
+    var base=doc.layers.add();base.name=info.plotType==='responseCurve'?'响应曲线与坐标轴':'底图与构造线';
     var old=[];for(var i=0;i<doc.layers.length;i++)if(doc.layers[i]!==base&&doc.layers[i]!==terrain)old.push(doc.layers[i]);
     for(var i=0;i<old.length;i++){while(old[i].pageItems.length)flatten(old[i].pageItems[0],base);old[i].remove();}
     doc.artboards[0].artboardRect=[bounds[0],bounds[1]+info.title,bounds[2],bounds[3]-info.footer];
@@ -64,7 +64,7 @@
     if(info.groups&&info.groups.length){
     overlay=app.open(new File(stage.fsName+'/labels.svg'));
     var source=overlay.artboards[0].artboardRect;
-    var names=['GMT_names','GMT_legend','GMT_elements'], labels=['名称标注','图例','图件元素'];
+    var names=['GMT_names','GMT_legend','GMT_elements','GMT_inset'], labels=['名称标注','图例','图件元素','局部放大标注'];
     for(var n=0;n<names.length;n++){
       overlay.activate();var found=null;for(var k=0;k<overlay.groupItems.length;k++)if(overlay.groupItems[k].name.replace(/ /g,'_')===names[n]){found=overlay.groupItems[k];break;}
       if(!found){if(info.groups&&info.groups.join('|').indexOf(names[n])>=0)throw new Error('SVG 分组未正确导入：'+names[n]);continue;}
@@ -79,6 +79,25 @@
     overlay.close(SaveOptions.DONOTSAVECHANGES);overlay=null;
     }
     doc.activate();
+    if(info.westernFont==='Times New Roman'){
+      var fontNames=['TimesNewRomanPSMT','TimesNewRomanPS-BoldMT','TimesNewRomanPS-ItalicMT','TimesNewRomanPS-BoldItalicMT'],fonts=[];
+      for(var f=0;f<fontNames.length;f++){
+        try{fonts.push(app.textFonts.getByName(fontNames[f]));}
+        catch(fontError){throw new Error('请安装 Times New Roman（常规、粗体、斜体、粗斜体）后重新导出 AI。缺少：'+fontNames[f]);}
+      }
+      for(var t=0;t<doc.textFrames.length;t++){
+        checkCancelled();var characters=doc.textFrames[t].textRange.characters;
+        for(var ch=0;ch<characters.length;ch++){
+          var character=characters[ch],code=character.contents.charCodeAt(0);
+          // Latin, Greek units and mathematical symbols; leave CJK fallback intact.
+          if(code<=0x024f||(code>=0x0370&&code<=0x03ff)||(code>=0x2000&&code<=0x22ff)){
+            var attributes=character.characterAttributes,oldName=attributes.textFont.name.toLowerCase();
+            var bold=/bold|black|heavy/.test(oldName),italic=/italic|oblique/.test(oldName);
+            attributes.textFont=fonts[(bold?1:0)+(italic?2:0)];
+          }
+        }
+      }
+    }
     var options=new IllustratorSaveOptions();options.pdfCompatible=true;options.compressed=true;
     var output=new File(automation?automation.outputPath:folder.fsName+'/可编辑图件.ai');
     if(output.exists)output=new File(output.fsName.replace(/\.ai$/i,'')+'_'+new Date().getTime()+'.ai');

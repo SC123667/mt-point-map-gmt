@@ -146,9 +146,11 @@ try {
   assert.deepStrictEqual(xyPhase.map((row) => row[0]), [-1, 0, 1]);
   assert(xyPhase.every((row) => Math.abs(row[1] - 45) < 1e-9));
   assert(yxPhase.every((row) => Math.abs(row[1] - 45) < 1e-9), "YX phases must be shown in the same quadrant as XY");
-  assert(curveScript.includes("log10 period (s)"));
+  assert(curveScript.includes("Period (s)"));
+  assert(fs.readFileSync(path.join(curveDir,"curve_period_ticks.txt"),"utf8").includes("10@+-1@+"));
+  assert(curveScript.includes("curve_legend.txt"),"Component key must remain even without a title");
   assert(curveScript.includes("-JX16c/5.0c"));
-  assert(curveScript.includes("curve_phase_xy.tsv -W1.1p,red"));
+  assert(curveScript.includes("curve_phase_xy.tsv -W0.55p,#b33d36"));
   assert(curveScript.includes("MT plot test"), "response curve must accept the user-defined title");
   const hiddenCurveScript = buildScript([curveStation], config("responseCurve", "curve_hidden", {
     showTitle: false,

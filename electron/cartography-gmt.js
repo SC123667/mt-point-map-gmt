@@ -11,9 +11,7 @@ function scriptParts(config,outputDirectory,region,shell,quote){
  features.sort((a,b)=>rank(a)-rank(b));
  features.forEach((f,i)=>{
   const s=m.effectiveStyle(f,c),g=f.geometry;
-  const hasProperName=[f.name,f.nameZh,f.nameEn].some(name=>name&&!placement.genericLabel(f,name));
-  if(c.paperStyle&&!hasProperName&&!g.type.includes('Point')){s.color='#a3a6a2';s.width=Math.min(s.width,.25);}
-  const pen=`${s.width}p,${s.color}${s.dash==='dash'?',-':s.dash==='dot'?',.':''}`;
+  const pen=m.strokePen(s);
   let text='',options='';
   if(g.type.includes('Polygon')){
    const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;
@@ -79,7 +77,7 @@ function readLayout(directory,outputName,config={}){
  if(metadata.showLegend&&metadata.legendPosition!=='JBC')reserve(metadata.legendPosition,115,48,'TR');
  const result=placement.place({width,height,ox,oy,frame,obstacles,labels,scaleLabel},metadata.options||{enabled:false});
  fs.writeFileSync(path.join(directory,'标注排布报告.json'),JSON.stringify(result.placement,null,2));
- return result;
+ return {...result,sourceLabels:labels,hideGeneric:placement.settings(metadata.options).hideGeneric};
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 function labelSVG(layout){if(!layout)return '';const texts=layout.labels.map(l=>{const s=l.style,lines=l.name.split(/\n|\\n/),fs=s.fontSize,em=fs*1.22;

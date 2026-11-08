@@ -273,7 +273,7 @@ class SrtmWorkerTask {
   runXYZToGrid() {
     this.runGMTStep({
       step: "xyz2grd",
-      args: ["xyz2grd", this.xyzPath, `-R${this.layout.region}`, `-I${terrainResolutionSeconds(this.config.terrainResolution)}s`, `-G${this.gridTempPath}`, os.endianness() === "LE" ? "-ZTLhw" : "-ZTLh", "-di-32768", "-V"],
+      args: ["xyz2grd", path.basename(this.xyzPath), `-R${this.layout.region}`, `-I${terrainResolutionSeconds(this.config.terrainResolution)}s`, `-G${path.basename(this.gridTempPath)}`, os.endianness() === "LE" ? "-ZTLhw" : "-ZTLh", "-di-32768", "-V"],
       message: "正在生成 GMT 地形网格...",
       basePercent: 76,
       next: () => { fs.rmSync(this.xyzPath, { force: true }); this.runGradient(); }
@@ -283,7 +283,7 @@ class SrtmWorkerTask {
   runGradient() {
     this.runGMTStep({
       step: "gradient",
-      args: ["grdgradient", this.paths.gridPath, "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${this.shadeTempPath}`],
+      args: ["grdgradient", path.basename(this.paths.gridPath), "-A315", `-Ne${terrainIntensity(this.config.terrainIntensity)}`, `-G${path.basename(this.shadeTempPath)}`],
       message: "正在生成地形阴影...",
       basePercent: 90,
       next: () => this.complete("SRTM 高分辨率地形底图准备完成。")
@@ -296,9 +296,12 @@ class SrtmWorkerTask {
     this.message = message;
     this.percent = Math.max(this.percent, basePercent);
     this.pausedBySignal = false;
+    this.lastOutput = "";
     this.emit();
+    // GMT's NetCDF path parsing can fail beyond 255 UTF-8 bytes and still
+    // exit zero. Both input and output names must be relative to this area.
     this.child = spawn(this.gmtInfo.path, args, {
-      cwd: this.outputDirectory,
+      cwd: this.paths.directory,
       encoding: "utf8",
       env: gmtChildEnv(this.gmtInfo, this.config)
     });
@@ -318,12 +321,9 @@ class SrtmWorkerTask {
       this.child = null;
       if (this.cancelled || this.done) return;
       if (code === 0) {
-        if (step === "xyz2grd" && !fs.existsSync(this.gridTempPath)) {
-          this.fail("GMT 没有生成 SRTM 地形网格文件。");
-          return;
-        }
-        if (step === "gradient" && !fs.existsSync(this.shadeTempPath)) {
-          this.fail("GMT 没有生成 SRTM 地形阴影文件。");
+        const output = step === "xyz2grd" ? this.gridTempPath : this.shadeTempPath;
+        if (!fs.existsSync(output) || fs.statSync(output).size === 0) {
+          this.fail(`GMT 没有生成有效的 SRTM 地形${step === "xyz2grd" ? "网格" : "阴影"}文件。${this.lastOutput ? `\n${this.lastOutput}` : ""}`);
           return;
         }
         if (step === "xyz2grd") fs.renameSync(this.gridTempPath, this.paths.gridPath);

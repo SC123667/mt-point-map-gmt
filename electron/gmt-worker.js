@@ -49,6 +49,7 @@ function send(payload) {
 }
 
 async function handleTask(payload) {
+  if(payload.mode==='composeInset')return require('./map-inset').compose(payload.bytes,payload.layout);
   if (payload.mode === "pdfToEPS") {
     const { pdfPageSize, setEPSPageBounds } = require('./eps-page');
     const page = await pdfPageSize(await fs.promises.readFile(payload.pdfPath));
@@ -78,6 +79,7 @@ async function handleTask(payload) {
 }
 
 async function exportGMTMap(payload) {
+  payload={...payload,config:require("./response-export").responseConfig(payload.records||[],payload.config)};
   // Pin one engine for the entire job, including script generation and metadata.
   const engine = resolveGMT();
   if (engine.available) process.env.MT_GMT_PATH = engine.path;
@@ -85,12 +87,14 @@ async function exportGMTMap(payload) {
   const formats = payload.formats || ["png"];
   const outputName = payload.config?.outputName || "mt_point_map";
   const includesVector = formats.some(isVectorFormat);
+  const inset=!!require('./map-inset').active(payload.config);
   const nativeTitle = shouldOverlayTitle(payload.config);
   const nativeLegend = shouldOverlayLegend(payload.config);
-  const nativeAnnotations = payload.config?.plotType !== "responseCurve" && ((payload.config?.showScale && payload.config?.cartography?.paperStyle && !payload.config?.swapAxes) || (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel));
+  const responseCollection = payload.config?.plotType === "responseCurve" && (require("./response-collection").normalize(payload.config.curveCollection).mode !== "single" || require("./response-collection").normalize(payload.config.curveCollection).style === "reference");
+  const nativeAnnotations = responseCollection || payload.config?.plotType !== "responseCurve" && ((payload.config?.showScale && payload.config?.cartography?.paperStyle && !payload.config?.swapAxes) || (payload.config?.cartography?.features || []).some(f => f.visible !== false && require("./cartography").effectiveStyle(f,payload.config.cartography).showLabel));
   const nativeCartesianElements = Boolean(payload.config?.swapAxes && (payload.config?.showScale || payload.config?.showNorthArrow));
-  const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations || Boolean(payload.config?.illustratorPackage));
-  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage) ? ["eps"] : [])])];
+  const needsNativeDecorations = formats.some((format) => ["png", "pdf", "eps"].includes(String(format).toLowerCase())) && (inset || nativeTitle || nativeLegend || nativeCartesianElements || nativeAnnotations || Boolean(payload.config?.illustratorPackage));
+  const gmtFormats = [...new Set([...formats, ...(needsNativeDecorations ? ["png", "pdf"] : []), ...((inset || nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage) ? ["eps"] : [])])];
   sendProgress("workspace", 8, "正在准备 GMT 工作区...");
   const gmtWorkspace = await createGMTWorkspace(outputDirectory, payload.config, payload.cacheDirectory);
   const config = {
@@ -104,10 +108,11 @@ async function exportGMTMap(payload) {
   const script = buildScript(payload.records || [], config, gmtWorkspace.directory, gmtFormats);
   const result = await runGMTAsync(script, gmtWorkspace.directory, outputName, gmtFormats, config);
   sendProgress("finalize", 88, "正在整理输出文件...");
-  if (result.ok && (nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage)) {
-    const layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName, payload.config);
+  if (result.ok && (inset || nativeAnnotations || nativeLegend || payload.config?.interactiveMap || payload.config?.illustratorPackage)) {
+    let layout = require("./cartography-gmt").readLayout(gmtWorkspace.directory, outputName, payload.config);
+    if (responseCollection) layout = require("./response-collection-gmt").annotate(layout, gmtWorkspace.directory);
     result.mapFrame = {width:layout.width,height:layout.height,ox:layout.ox,oy:layout.oy};
-    if(layout.labels.length || layout.scaleLabel || layout.placement?.enabled) result.annotationLayout = layout;
+    if(layout.labels.length || layout.scaleLabel || layout.placement) result.annotationLayout = layout;
   }
   finalizeGMTWorkspace(result, gmtWorkspace, outputDirectory, outputName, gmtFormats);
   if (result.ok) {
@@ -302,7 +307,7 @@ function finalizeGMTWorkspace(result, workspace, outputDirectory, outputName, fo
     copyIfExists(path.join(workspace.directory, "stations_labels.tsv"), path.join(outputDirectory, "stations_labels.tsv"));
     copyIfExists(path.join(workspace.directory, DEFAULT_OVERLAY_FILE), path.join(outputDirectory, DEFAULT_OVERLAY_FILE));
     copyIfExists(path.join(workspace.directory, DEFAULT_LEGEND_FILE), path.join(outputDirectory, DEFAULT_LEGEND_FILE));
-    for (const name of fs.readdirSync(workspace.directory)) if (/^map_|^地图图层|^图层来源|^terrain_paper(?:Gray)?\.cpt$|^标注排布报告\.json$/.test(name)) copyIfExists(path.join(workspace.directory,name),path.join(outputDirectory,name));
+    for (const name of fs.readdirSync(workspace.directory)) if (/^map_|^curve_|^地图图层|^图层来源|^terrain_paper(?:Gray)?\.cpt$|^标注排布报告\.json$/.test(name)) copyIfExists(path.join(workspace.directory,name),path.join(outputDirectory,name));
     fs.rmSync(workspace.directory, { recursive: true, force: true });
   }
 }
@@ -317,7 +322,7 @@ function copyIfExists(source, target) {
 function shouldOverlayTitle(config) {
   if (config?.showTitle === false) return false;
   const title = String(config?.title || "").trim();
-  return title && (config.illustratorPackage || needsNativeTextRendering(title));
+  return title && (config.illustratorPackage || needsNativeTextRendering(title) || config.plotType === "responseCurve" && (require("./response-collection").normalize(config.curveCollection).mode !== "single" || require("./response-collection").normalize(config.curveCollection).style === "reference"));
 }
 
 function shouldOverlayLegend(config) {

@@ -254,7 +254,8 @@ try {
   assert(swappedTerrainScript.includes(`gmt grdedit ${terrainGrid} -Et`));
   assert(swappedTerrainScript.includes(`gmt grdedit ${terrainShade} -Et`));
   assert(/_swapxy\.nc['"]? -R40\.02\/40\.06\/113\.6\/113\.64 -JX24c\/12c/.test(swappedTerrainScript));
-  assert(/_swapxy_shade\.nc['"]? -Cgeo/.test(swappedTerrainScript));
+  assert(swappedTerrainScript.includes("gmt makecpt -Cgeo -T0/3500 -Z -H > terrain_elevation.cpt"));
+  assert(/_swapxy_shade\.nc['"]? -Cterrain_elevation\.cpt/.test(swappedTerrainScript));
 
   const customElementScript = buildScript([
     { name: "A01", lon: 101.0, lat: 35.0 }
@@ -396,3 +397,30 @@ assert(legendCommand('legend.txt','86/96/28/32','M16c','sh',{labelFontSize:7.5})
 const areas=buildLegendEntries({plotType:'baseMap',region:'86/96/28/32',cartography:c.normalize({features:[{name:'Arc',category:'Schematic arc',geometry:{type:'Polygon',coordinates:[[[88,29],[90,29],[90,30],[88,29]]]},style:{opacity:10,fill:'#d7b875',dash:'dash'}}]})});
 assert.equal(areas[0].symbol,'area');assert.equal(areas[0].opacity,10);
 assert(buildLegendSpec(areas).includes('r 0.42c/0.18c #d7b875@90'));
+
+// Line opacity is separate from legacy polygon fill opacity and survives JSON.
+{
+  const cart=require('../electron/cartography');
+  const paper=require('../electron/paper-style');
+  const make=(id,category,style,type='LineString')=>cart.feature({id,name:id,nameZh:id,nameEn:id,category,style,geometry:{type,coordinates:type==='Point'?[.5,.5]:[[0,0],[1,1]]}});
+  assert.equal(cart.style({opacity:18}).strokeOpacity,100,'Old fill opacity must not fade lines');
+  const line=make('fault','断层',{color:'#123456',width:1.5,strokeOpacity:25,dash:'dash'});
+  assert.equal(cart.strokePen(cart.effectiveStyle(line)),'1.5p,#123456@75,-');
+  assert.equal(cart.strokePen({strokeOpacity:0}),'0.8p,#62494a@100');
+  assert.equal(cart.normalize(JSON.parse(JSON.stringify({features:[line]}))).features[0].style.strokeOpacity,25);
+  const c={plotType:'baseMap',region:'0/1/0/1',cartography:{language:'en',features:[line]},legend:{}};
+  const legend=require('../electron/legend');
+  assert.equal(legend.buildLegendEntries(c)[0].pen,'1.5p,#123456@75,-');
+  assert.equal(legend.buildLegendEntries({...c,legend:{lineOpacity:100}})[0].pen,'1.5p,#123456,-');
+  assert.equal(legend.buildLegendEntries({...c,legend:{lineOpacity:0}})[0].pen,'1.5p,#123456@100,-');
+  assert.equal(cart.effectiveStyle(line).strokeOpacity,25,'Legend override must not mutate map');
+  assert(legend.buildLegendSpec(legend.buildLegendEntries(c),{lineOpacity:50}).includes('#123456@50,-'));
+  const pts=[make('XC','矿床',{symbol:'a',fill:'#aa0000'},'Point'),make('DG','矿床',{symbol:'d',fill:'#aa9900'},'Point'),make('XC2','矿床',{symbol:'a',fill:'#aa0000'},'Point')];
+  const entries=legend.buildLegendEntries({...c,cartography:{language:'en',features:pts}});
+  assert.equal(entries.length,2,'One category can contain stars and diamonds');
+  assert(entries.some(e=>e.gmtSymbol==='a'&&e.label.includes('XC2')));assert(entries.some(e=>e.gmtSymbol==='d'&&e.label.includes('DG')));
+  const before=JSON.stringify(pts);const applied=paper.applyLineStyles({features:[line,...pts]});
+  assert.deepEqual(applied.features[0].geometry,line.geometry);assert.equal(JSON.stringify(applied.features.slice(1)),before,'Line preset preserves point symbols');
+  assert.notDeepEqual(paper.PALETTE['正断层'],paper.PALETTE['逆冲断层']);
+  console.log('Legend opacity, distinct symbol groups, legacy fill compatibility and line preset passed');
+}

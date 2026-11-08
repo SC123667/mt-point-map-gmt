@@ -26,14 +26,30 @@ function collectEditableSVG(pageWidth) {
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');ctx.font=c.font;
     const font=parseFloat(c.fontSize),line=parseFloat(c.lineHeight)||font*1.2;
     const value=el.textContent.trim();if(!value)return;
-    // Keep each label one editable text frame, including wrapped legend rows.
-    const lines=[];let s='';for(const char of value) { if(s&&ctx.measureText(s+char).width>r.width+.5){lines.push(s);s='';}s+=char;}if(s)lines.push(s);
+    // Read Chromium's actual line layout. Canvas advances differ from DOM
+    // kerning/fallback fonts and used to push a closing parenthesis onto an
+    // invented extra line, without reserving any space in the legend.
+    const lines=[],walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+    let node;
+    while((node=walker.nextNode())){
+      let offset=0;
+      for(const char of node.textContent){
+        const range=document.createRange();range.setStart(node,offset);offset+=char.length;range.setEnd(node,offset);
+        const rect=Array.from(range.getClientRects()).find(v=>v.width>0&&v.height>0);
+        if(!rect)continue;
+        let row=lines.at(-1);
+        if(!row||Math.min(row.bottom,rect.bottom)-Math.max(row.top,rect.top)<=Math.min(row.bottom-row.top,rect.height)/2){
+          row={text:'',x:rect.left,top:rect.top,bottom:rect.bottom};lines.push(row);
+        }
+        row.text+=char;row.x=Math.min(row.x,rect.left);row.top=Math.min(row.top,rect.top);row.bottom=Math.max(row.bottom,rect.bottom);
+      }
+    }
+    if(!lines.length)return;
     const t=document.createElementNS(ns,'text');
     t.setAttribute('font-family',c.fontFamily);t.setAttribute('font-size',font*scale);t.setAttribute('font-weight',c.fontWeight);t.setAttribute('fill',c.color);
     const metrics=ctx.measureText('Hg');const ascent=metrics.fontBoundingBoxAscent||font*.9,descent=metrics.fontBoundingBoxDescent||font*.22;
-    lines.forEach((lineText,i)=>{const span=document.createElementNS(ns,'tspan');
-      let x=r.x;if(c.textAlign==='center'||el.classList.contains('title'))x+=(r.width-ctx.measureText(lineText).width)/2;
-      span.setAttribute('x',x*scale);span.setAttribute('y',((el.classList.contains('title')?r.bottom-parseFloat(c.paddingBottom)-line:r.y)+(line-ascent-descent)/2+ascent+i*line)*scale);span.textContent=lineText;t.appendChild(span);});
+    lines.forEach(row=>{const span=document.createElementNS(ns,'tspan');
+      span.setAttribute('x',row.x*scale);span.setAttribute('y',((el.classList.contains('title')?r.bottom-parseFloat(c.paddingBottom)-line:r.y)+(line-ascent-descent)/2+ascent+row.top-lines[0].top)*scale);span.textContent=row.text.trim();t.appendChild(span);});
     parent.appendChild(t);
   }
   const names=group('GMT_names');document.querySelectorAll('.map-wrap > svg').forEach(el=>svg(el,names));
@@ -55,13 +71,13 @@ async function writeIllustratorPackage(directory, name, basePDF, rendered) {
   const destination=path.join(directory,`${name}_AI编辑包`);
   await fs.promises.mkdir(destination,{recursive:true});
   const scale=size.width/rendered.imageSize.width;
-  const info={width:size.width,height:size.height,title:rendered.titleHeight*scale,footer:rendered.footerHeight*scale,groups:rendered.editingGroups||[]};
+  const info={westernFont:rendered.plotType==='responseCurve'?'Times New Roman':null,plotType:rendered.plotType||"map",width:size.width,height:size.height,title:rendered.titleHeight*scale,footer:rendered.footerHeight*scale,groups:rendered.editingGroups||[]};
   await fs.promises.writeFile(path.join(destination,'base-map.pdf'),basePDF);
   await fs.promises.writeFile(path.join(destination,'labels.svg'),rendered.editingSVG);
   const template=await fs.promises.readFile(path.join(__dirname,'illustrator-template.jsx'),'utf8');
   await fs.promises.writeFile(path.join(destination,'生成可编辑AI.jsx'),template.replace('/*GMT_METADATA*/',JSON.stringify(info)).replace(/[^\x00-\x7f]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0')));
   await fs.promises.writeFile(path.join(destination,'使用说明.txt'),
-    '在 Illustrator 中选择：文件 → 脚本 → 其他脚本，运行本文件夹的「生成可编辑AI.jsx」。\n生成后直接打开「可编辑图件.ai」，不要把它置入现有画板。\n名称和图例保留完整文字对象；编辑版不加白色文字描边，可在 AI 外观面板添加。\n底图与构造保留矢量路径；需要保留的地图裁剪组可用直接选择工具 A 编辑内部路径。\n地形晕渲本身是影像，不能变成可修改高程的矢量。\n脚本仅打开本文件夹的副本，不修改原工程或原始导出。请将整个文件夹一起移动。\n');
+    (rendered.plotType==='responseCurve'?'本包包含所选 EDI 测点的视电阻率与相位曲线。AI 脚本将西文设为 Times New Roman（保留粗体/斜体），中文保持回退字体；需要本机安装 Times New Roman。曲线、数据符号、误差棒、坐标轴及文字保留矢量对象；在“响应曲线与坐标轴”层中编辑。\n':'') + '在 Illustrator 中选择：文件 → 脚本 → 其他脚本，运行本文件夹的「生成可编辑AI.jsx」。\n生成后直接打开「可编辑图件.ai」，不要把它置入现有画板。\n名称和图例保留完整文字对象；编辑版不加白色文字描边，可在 AI 外观面板添加。\n底图与构造保留矢量路径；需要保留的地图裁剪组可用直接选择工具 A 编辑内部路径。\n地形晕渲本身是影像，不能变成可修改高程的矢量。\n脚本仅打开本文件夹的副本，不修改原工程或原始导出。请将整个文件夹一起移动。\n');
   return path.join(destination,'生成可编辑AI.jsx');
 }
 module.exports={collectEditableSVG,writeIllustratorPackage};
